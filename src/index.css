@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "Fira Code", monospace;
+  --color-brand-primary: #1e3a24;
+  --color-brand-accent: #b58d3d;
+}
+
+body {
+  background-color: #fafcfb !important;
+  color: #1c1917 !important;
+}
+
+/* Redefine glass-panel to be warm crisp paper-cards */
+.glass-panel {
+  background-color: #ffffff;
+  border: 1px solid rgba(220, 219, 215, 0.95);
+  box-shadow: 0 4px 18px rgba(30, 25, 20, 0.02), 0 1px 3px rgba(30, 25, 20, 0.01);
+  color: #1c1917;
+}
+
+/* Enforce perfect readability contrasting rules inside glass-panels to bypass dark classes */
+.glass-panel .text-white {
+  color: #1c1917 !important;
+}
+.glass-panel .text-slate-100, .glass-panel .text-slate-200, .glass-panel .text-zinc-100, .glass-panel .text-orange-100 {
+  color: #1c1917 !important;
+}
+.glass-panel .text-slate-305, .glass-panel .text-slate-300, .glass-panel .text-zinc-300, .glass-panel .text-stone-300 {
+  color: #44403c !important; /* stone-700 */
+}
+.glass-panel .text-slate-400, .glass-panel .text-slate-450, .glass-panel .text-zinc-400, .glass-panel .text-stone-400 {
+  color: #57534e !important; /* stone-600 */
+}
+.glass-panel .text-slate-500, .glass-panel .text-zinc-500 {
+  color: #78716c !important; /* stone-500 */
+}
+
+/* Refactor neon labels to rich solid tones on cream backgrounds */
+.glass-panel .text-cyan-400, .glass-panel .text-teal-400, .glass-panel .text-emerald-400 {
+  color: #047857 !important; /* emerald-700 */
+}
+.glass-panel .text-zinc-900, .glass-panel .text-slate-900, .glass-panel .text-stone-900 {
+  color: #1c1917 !important;
+}
+.glass-panel .border-white\/5, .glass-panel .border-white\/10, .glass-panel .border-stone-800 {
+  border-color: #e7e5e4 !important; /* stone-200 */
+}
+.glass-panel .bg-slate-900, .glass-panel .bg-[#0d1425], .glass-panel .bg-[#0c1324], .glass-panel .bg-[#0f172a] {
+  background-color: #fafaf9 !important; /* stone-50 */
+  border-color: #e7e5e4 !important;
+}
+.glass-panel .bg-slate-950, .glass-panel .bg-slate-950\/20, .glass-panel .bg-slate-950\/40 {
+  background-color: #f5f5f4 !important; /* stone-100 */
+  border-color: #e7e5e4 !important;
+}
+
+.glass-panel-hover:hover {
+  background-color: #fcfcfb;
+  border-color: #c4c1bc;
+  box-shadow: 0 6px 22px rgba(30, 25, 20, 0.035);
+}
+
+.glass-input {
+  background-color: #ffffff;
+  border: 1px solid #d6d3d1;
+  color: #1c1917;
+}
+
+.glass-input:focus {
+  background-color: #ffffff;
+  border-color: #166534; /* emerald-800 */
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.1);
+}
+
+/* Custom scrollbar matching warm cream theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(30, 30, 30, 0.1);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(30, 30, 30, 0.2);
+}
+
+.animate-spin-slow {
+  animation: spin 12s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,158 @@
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  writeBatch 
+} from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
+
+// Initialize Firebase App
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firestore with custom database ID from config if present
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+
+// Dynamic collections names
+export const COLLECTIONS = {
+  USERS: 'users',
+  PROJECTS: 'projects',
+  SALES: 'sales',
+  PAYOUTS: 'payouts',
+  CONFIG: 'config',
+  NOTIFICATIONS: 'notifications'
+};
+
+/**
+ * Fetch all documents in a collection and return them as an array.
+ */
+export async function getCollectionData<T>(collectionName: string): Promise<T[]> {
+  const colRef = collection(db, collectionName);
+  const snapshot = await getDocs(colRef);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as T[];
+}
+
+/**
+ * Set/Overwrite a document in a collection.
+ */
+export async function setDocumentData<T extends object>(collectionName: string, docId: string, data: T): Promise<void> {
+  const docRef = doc(db, collectionName, docId);
+  await setDoc(docRef, data, { merge: true });
+}
+
+/**
+ * Update dynamic fields in a document.
+ */
+export async function updateDocumentData(collectionName: string, docId: string, data: Record<string, any>): Promise<void> {
+  const docRef = doc(db, collectionName, docId);
+  await updateDoc(docRef, data);
+}
+
+/**
+ * Delete a document.
+ */
+export async function deleteDocument(collectionName: string, docId: string): Promise<void> {
+  const docRef = doc(db, collectionName, docId);
+  await deleteDoc(docRef);
+}
+
+/**
+ * Seeds initial database data if collections are empty.
+ */
+export async function seedDatabase(initialData: {
+  users: any[];
+  projects: any[];
+  sales: any[];
+  payouts: any[];
+  config: any;
+  notifications: any[];
+}): Promise<{
+  users: any[];
+  projects: any[];
+  sales: any[];
+  payouts: any[];
+  config: any;
+  notifications: any[];
+}> {
+  // Check if users collection is empty. If yes, seed all collections.
+  const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
+  if (usersSnapshot.empty) {
+    console.log('Database empty. Seeding initial data...');
+    
+    // Seed MLM Config
+    await setDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'), initialData.config);
+
+    // Seed Users
+    const usersBatch = writeBatch(db);
+    initialData.users.forEach(user => {
+      const userRef = doc(db, COLLECTIONS.USERS, user.id);
+      usersBatch.set(userRef, user);
+    });
+    await usersBatch.commit();
+
+    // Seed Projects
+    const projectsBatch = writeBatch(db);
+    initialData.projects.forEach(project => {
+      const projectRef = doc(db, COLLECTIONS.PROJECTS, project.id);
+      projectsBatch.set(projectRef, project);
+    });
+    await projectsBatch.commit();
+
+    // Seed Sales
+    const salesBatch = writeBatch(db);
+    initialData.sales.forEach(sale => {
+      const saleRef = doc(db, COLLECTIONS.SALES, sale.id);
+      salesBatch.set(saleRef, sale);
+    });
+    await salesBatch.commit();
+
+    // Seed Payouts
+    const payoutsBatch = writeBatch(db);
+    initialData.payouts.forEach(payout => {
+      const payoutRef = doc(db, COLLECTIONS.PAYOUTS, payout.id);
+      payoutsBatch.set(payoutRef, payout);
+    });
+    await payoutsBatch.commit();
+
+    // Seed Notifications
+    const notifsBatch = writeBatch(db);
+    initialData.notifications.forEach(notif => {
+      const notifRef = doc(db, COLLECTIONS.NOTIFICATIONS, notif.id);
+      notifsBatch.set(notifRef, notif);
+    });
+    await notifsBatch.commit();
+
+    console.log('Seeding completed successfully!');
+    return initialData;
+  } else {
+    // Database is already populated, fetch and return actual database state
+    console.log('Database already initialized. Fetching documents...');
+    const users = await getCollectionData<any>(COLLECTIONS.USERS);
+    const projects = await getCollectionData<any>(COLLECTIONS.PROJECTS);
+    const sales = await getCollectionData<any>(COLLECTIONS.SALES);
+    const payouts = await getCollectionData<any>(COLLECTIONS.PAYOUTS);
+    const notifs = await getCollectionData<any>(COLLECTIONS.NOTIFICATIONS);
+    
+    const configSnapshot = await getDocs(collection(db, COLLECTIONS.CONFIG));
+    let config = initialData.config;
+    if (!configSnapshot.empty) {
+      config = configSnapshot.docs[0].data();
+    }
+
+    return {
+      users,
+      projects,
+      sales,
+      payouts,
+      config,
+      notifications: notifs
+    };
+  }
+}

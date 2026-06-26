@@ -1,0 +1,8 @@
+{
+  "name": "SBR CRM",
+  "description": "Whitelabel real estate referral hierarchy and commission payout automation platform for SBR Associates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

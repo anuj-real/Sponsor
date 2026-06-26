@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the requesting user is an Admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+    // Helper function to check if the document belongs to the requesting user
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. MLM System Configuration
+    match /config/{configId} {
+      // Channel Partners can read commission tier structures, but only Admins can alter them
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 2. Users (Channel Partners & Admins) profiles
+    match /users/{userId} {
+      // Anyone logged-in can read profiles to visualize sponsorship trees and downline structures
+      allow read: if isAuthenticated();
+      // Users can update their own phone/email/details, but only Admins can create users, change roles, or modify statuses
+      allow create, update: if isAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'sponsorId']));
+      allow delete: if isAdmin();
+    }
+
+    // 3. Real Estate Projects & Live Inventory Map
+    match /projects/{projectId} {
+      // All active Channel Partners can browse available units and prices
+      allow read: if isAuthenticated();
+      // Only Admin can add new projects, upload layout blueprints, or set starting rates
+      allow write: if isAdmin();
+    }
+
+    // 4. Sales Bookings Ledger
+    match /sales/{saleId} {
+      // Admin can view and modify all transaction records
+      allow read, write: if isAdmin();
+      // Channel Partners can view and register sales they directly closed
+      allow read: if isAuthenticated() && (resource == null || resource.data.agentId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.agentId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.agentId == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['bookingStatus', 'tokenAmount', 'approved']);
+    }
+
+    // 5. Commission Payouts
+    match /payouts/{payoutId} {
+      // Admins approve and disburse payouts
+      allow read, write: if isAdmin();
+      // Channel Partners can query and examine their own payouts and indirect override bonuses
+      allow read: if isAuthenticated() && (resource == null || resource.data.agentId == request.auth.uid);
+      allow write: if false; // Hard system block; payouts cannot be manually overwritten by clients
+    }
+
+    // 6. Push Notifications & Alerts
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+    }
+  }
+}
