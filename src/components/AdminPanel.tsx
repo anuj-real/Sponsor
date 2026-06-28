@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord } from '../types';
+import { calculatePointsFromSize } from '../lib/points';
 import { 
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
@@ -56,8 +57,8 @@ export default function AdminPanel({
   onUpdateSaleBookingStatus,
   onUpdateSale
 }: AdminPanelProps) {
-  // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, REPORTS
-  const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'REPORTS'>('SETTINGS');
+  // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS
+  const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS'>('SETTINGS');
 
   const formatPoints = (val: number) => {
     return `${Number(val.toFixed(3)).toLocaleString()} PTS`;
@@ -91,6 +92,35 @@ export default function AdminPanel({
   const [promotionalMilestones, setPromotionalMilestones] = useState(config.promotionalMilestones || []);
   const [specialMonthlyOffers, setSpecialMonthlyOffers] = useState(config.specialMonthlyOffers || []);
   const [termsAndConditions, setTermsAndConditions] = useState(config.termsAndConditions || []);
+
+  // Sync state with incoming config prop to ensure DB persistence updates propagate down
+  React.useEffect(() => {
+    setTds(config.tdsPercentage);
+    setAdminFee(config.adminFeePercentage);
+    setLevels(config.levels);
+    setRewards(config.rewards || []);
+    setSalaries(config.salaries || []);
+    setLeadershipConfigs(config.leadershipConfigs || []);
+    setPromotionalMilestones(config.promotionalMilestones || []);
+    setSpecialMonthlyOffers(config.specialMonthlyOffers || []);
+    setTermsAndConditions(config.termsAndConditions || []);
+  }, [config]);
+
+  // Helper to save entire config payload back to database on every direct interaction
+  const saveFullConfig = (updatedFields: Partial<MLMConfig>) => {
+    const finalConfig: MLMConfig = {
+      tdsPercentage: Number(updatedFields.tdsPercentage ?? tds),
+      adminFeePercentage: Number(updatedFields.adminFeePercentage ?? adminFee),
+      levels: (updatedFields.levels ?? levels).map(l => ({ ...l, percentage: Number(l.percentage) })),
+      rewards: (updatedFields.rewards ?? rewards).map(r => ({ ...r, targetVolume: Number(r.targetVolume) })),
+      salaries: (updatedFields.salaries ?? salaries).map(s => ({ ...s, fixedSalary: Number(s.fixedSalary || 0), targetRequired: Number(s.targetRequired || 0) })),
+      leadershipConfigs: updatedFields.leadershipConfigs ?? leadershipConfigs,
+      promotionalMilestones: updatedFields.promotionalMilestones ?? promotionalMilestones,
+      specialMonthlyOffers: updatedFields.specialMonthlyOffers ?? specialMonthlyOffers,
+      termsAndConditions: updatedFields.termsAndConditions ?? termsAndConditions
+    };
+    onUpdateConfig(finalConfig);
+  };
   
   // Target index for editing
   const [editingLeadIdx, setEditingLeadIdx] = useState<number | null>(null);
@@ -140,11 +170,11 @@ export default function AdminPanel({
   const [projStartingPrice, setProjStartingPrice] = useState(15000); // INR per Sq Yard
   const [projMapUrl, setProjMapUrl] = useState('https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800');
   const [sizeTiersInput, setSizeTiersInput] = useState([
-    { size: '120 Sq Yards', unitsRaw: 'Villa A-101, Villa A-102, Villa A-103' },
-    { size: '150 Sq Yards', unitsRaw: 'Villa B-201, Villa B-202, Villa B-203, Villa B-204' },
-    { size: '200 Sq Yards', unitsRaw: 'Villa C-501, Villa C-502' }
+    { unitsRaw: '1-20', size: '100', type: 'Residential' },
+    { unitsRaw: '21-25', size: '27', type: 'Commercial' }
   ]);
   const [projSuccess, setProjSuccess] = useState('');
+  const [expandedProjUnitsId, setExpandedProjUnitsId] = useState<string | null>(null);
 
   // Plot SBR Booking state
   const [bookProjId, setBookProjId] = useState('');
@@ -171,12 +201,6 @@ export default function AdminPanel({
       setBookRatePerSqYard((activeProj.sqYardStartingPrice ?? 15000).toString());
     }
   }, [bookProjId, projects]);
-
-  // Reports & Ledgers states
-  const [selectedReportMonth, setSelectedReportMonth] = useState<string>('ALL');
-  const [selectedReportProject, setSelectedReportProject] = useState<string>('ALL');
-  const [reportSearchQuery, setReportSearchQuery] = useState<string>('');
-  const [selectedSaleDetailId, setSelectedSaleDetailId] = useState<string | null>(null);
 
   // Payments Ledger and Editor State
   const [selectedPaymentSaleId, setSelectedPaymentSaleId] = useState<string | null>(null);
@@ -336,25 +360,24 @@ export default function AdminPanel({
     );
   };
 
-  // Auto-fill points based on Plot Size (Sq Yds) * Selected Units count * Rate per Sq Yd (in INR)
-  // Formula: (Plot Size * Units * Rate) / 750000
+  // Auto-fill points based on Plot Size (Sq Yds) * Selected Units count
+  // Formula: points per unit (based on size tier) * Units
   React.useEffect(() => {
     if (bookSizeCategory) {
       const numericSizePart = parseFloat(bookSizeCategory.replace(/[^\d.]/g, '')) || 0;
+      const pointsPerUnit = calculatePointsFromSize(numericSizePart);
       const unitCount = selectedUnits.length || 1;
-      const totalSize = numericSizePart * unitCount;
-      const rate = parseFloat(bookRatePerSqYard) || 15000;
-      const calculatedPoints = (totalSize * rate) / 750000;
+      const calculatedPoints = pointsPerUnit * unitCount;
       
       if (calculatedPoints > 0) {
-        setBookSaleValue(Number(calculatedPoints.toFixed(3)).toString());
+        setBookSaleValue(calculatedPoints.toString());
       } else {
         setBookSaleValue('');
       }
     } else {
       setBookSaleValue('');
     }
-  }, [bookSizeCategory, selectedUnits, bookRatePerSqYard]);
+  }, [bookSizeCategory, selectedUnits]);
 
   // Calculate stats
   const totalSalesVal = sales.reduce((acc, s) => acc + s.saleValue, 0);
@@ -456,27 +479,62 @@ export default function AdminPanel({
 
     const uniqueProjId = `PRJ-${Math.floor(100 + Math.random() * 900)}`;
     
-    // Process units
-    const formattedInventory = sizeTiersInput.map(tier => {
-      const unitsArr = tier.unitsRaw
-        .split(',')
-        .map(u => u.trim())
-        .filter(u => u !== '')
-        .map(u => ({
-          unitNumber: u,
-          status: 'AVAILABLE' as const,
-          bookedByAgentId: null,
-          buyerName: null
-        }));
-      return {
-        size: tier.size,
-        units: unitsArr
-      };
+    // Group units by size category so they conform to the standard layout
+    const groupedBySubSize: { [sizeKey: string]: any[] } = {};
+
+    sizeTiersInput.forEach(tier => {
+      const sizeNum = parseFloat(tier.size) || 0;
+      const sizeLabel = `${sizeNum} Sq Yards`;
+      const typeLabel = tier.type || 'Residential';
+
+      // Parse the units raw text which may contain ranges like "1-20" or comma-separated lists
+      const rawParts = tier.unitsRaw.split(',').map(p => p.trim()).filter(p => p !== '');
+      const unitsArr: any[] = [];
+
+      rawParts.forEach(part => {
+        const rangeMatch = part.match(/^(.*?)\s*(\d+)\s*-\s*(\d+)$/);
+        if (rangeMatch) {
+          const prefix = rangeMatch[1] || '';
+          const startNum = parseInt(rangeMatch[2], 10);
+          const endNum = parseInt(rangeMatch[3], 10);
+          const start = Math.min(startNum, endNum);
+          const end = Math.max(startNum, endNum);
+          // Limit to 400 to prevent accidental infinite loop
+          const limit = Math.min(end, start + 400);
+          for (let i = start; i <= limit; i++) {
+            unitsArr.push({
+              unitNumber: `${prefix}${i}`,
+              status: 'AVAILABLE' as const,
+              bookedByAgentId: null,
+              buyerName: null,
+              type: typeLabel
+            });
+          }
+        } else {
+          unitsArr.push({
+            unitNumber: part,
+            status: 'AVAILABLE' as const,
+            bookedByAgentId: null,
+            buyerName: null,
+            type: typeLabel
+          });
+        }
+      });
+
+      if (!groupedBySubSize[sizeLabel]) {
+        groupedBySubSize[sizeLabel] = [];
+      }
+      groupedBySubSize[sizeLabel].push(...unitsArr);
     });
+
+    const formattedInventory = Object.keys(groupedBySubSize).map(sizeKey => ({
+      size: sizeKey,
+      units: groupedBySubSize[sizeKey]
+    }));
 
     // Min and Max pricing estimation (Sq yard * starting rate)
     const basePrices = sizeTiersInput.map(t => {
-      const numericSize = parseInt(t.size.replace(/\D/g, ''), 10) || 100;
+      const numericSize = parseFloat(t.size) || 100;
       return numericSize * projStartingPrice;
     });
     const minVal = basePrices.length ? Math.min(...basePrices) : projStartingPrice * 100;
@@ -496,6 +554,11 @@ export default function AdminPanel({
     setProjSuccess(`Successfully created Real Estate Project: "${projName}" with ${formattedInventory.reduce((acc, c) => acc + c.units.length, 0)} registered inventory units!`);
     setProjName('');
     setProjLocation('');
+    setProjMapUrl('https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800');
+    setSizeTiersInput([
+      { unitsRaw: '1-20', size: '100', type: 'Residential' },
+      { unitsRaw: '21-25', size: '27', type: 'Commercial' }
+    ]);
     setTimeout(() => setProjSuccess(''), 5000);
   };
 
@@ -537,14 +600,14 @@ export default function AdminPanel({
     setTimeout(() => setBookingSuccess(''), 5000);
   };
 
-  const handleSizeTierChange = (index: number, field: 'size' | 'unitsRaw', value: string) => {
+  const handleSizeTierChange = (index: number, field: 'size' | 'unitsRaw' | 'type', value: string) => {
     const updated = [...sizeTiersInput];
     updated[index][field] = value;
     setSizeTiersInput(updated);
   };
 
   const addSizeTierRow = () => {
-    setSizeTiersInput([...sizeTiersInput, { size: '100 Sq Yards', unitsRaw: 'Villa X-101' }]);
+    setSizeTiersInput([...sizeTiersInput, { size: '100', unitsRaw: '', type: 'Residential' }]);
   };
 
   const removeSizeTierRow = (index: number) => {
@@ -678,14 +741,6 @@ export default function AdminPanel({
           }`}
         >
           <CreditCard className="w-4 h-4" /> Operations & Payouts Auditing
-        </button>
-        <button
-          onClick={() => setActiveSubTab('REPORTS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'REPORTS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" /> Reports & Monthly Ledgers
         </button>
       </div>
 
@@ -878,6 +933,7 @@ export default function AdminPanel({
                                   };
                                   setLeadershipConfigs(updated);
                                   setEditingLeadIdx(null);
+                                  saveFullConfig({ leadershipConfigs: updated });
                                 }
                               }}
                               className="px-2.5 py-1 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-md transition-all cursor-pointer font-sans"
@@ -919,7 +975,11 @@ export default function AdminPanel({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setLeadershipConfigs(leadershipConfigs.filter((_, i) => i !== idx))}
+                              onClick={() => {
+                                const updated = leadershipConfigs.filter((_, i) => i !== idx);
+                                setLeadershipConfigs(updated);
+                                saveFullConfig({ leadershipConfigs: updated });
+                              }}
                               className="p-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-100 hover:text-rose-600 rounded-lg text-stone-400 transition-all cursor-pointer"
                               title="Delete Condition"
                             >
@@ -976,7 +1036,7 @@ export default function AdminPanel({
                       const priceEl = document.getElementById('lead-price') as HTMLInputElement;
                       const rulesEl = document.getElementById('lead-lineage') as HTMLInputElement;
                       if (rankEl && volEl && priceEl && rulesEl && rankEl.value) {
-                        setLeadershipConfigs([
+                        const updated = [
                           ...leadershipConfigs,
                           {
                             designation: rankEl.value,
@@ -985,7 +1045,9 @@ export default function AdminPanel({
                             incentivePrice: Number(priceEl.value) || 0,
                             rules: rulesEl.value || 'None'
                           }
-                        ]);
+                        ];
+                        setLeadershipConfigs(updated);
+                        saveFullConfig({ leadershipConfigs: updated });
                         rankEl.value = '';
                         if (condEl) condEl.value = '';
                         volEl.value = '';
@@ -1056,6 +1118,7 @@ export default function AdminPanel({
                                   };
                                   setPromotionalMilestones(updated);
                                   setEditingMilestoneIdx(null);
+                                  saveFullConfig({ promotionalMilestones: updated });
                                 }
                               }}
                               className="px-2.5 py-1 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-md transition-all cursor-pointer font-sans"
@@ -1085,7 +1148,11 @@ export default function AdminPanel({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setPromotionalMilestones(promotionalMilestones.filter((_, i) => i !== idx))}
+                              onClick={() => {
+                                const updated = promotionalMilestones.filter((_, i) => i !== idx);
+                                setPromotionalMilestones(updated);
+                                saveFullConfig({ promotionalMilestones: updated });
+                              }}
                               className="p-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-100 hover:text-rose-600 rounded-lg text-stone-400 transition-all cursor-pointer"
                               title="Delete Milestone"
                             >
@@ -1118,14 +1185,16 @@ export default function AdminPanel({
                       const condEl = document.getElementById('milestone-condition') as HTMLInputElement;
                       const rewEl = document.getElementById('milestone-reward') as HTMLInputElement;
                       if (condEl && rewEl && condEl.value && rewEl.value) {
-                        setPromotionalMilestones([
+                        const updated = [
                           ...promotionalMilestones,
                           {
                             id: `prm-${Date.now()}`,
                             condition: condEl.value,
                             award: rewEl.value
                           }
-                        ]);
+                        ];
+                        setPromotionalMilestones(updated);
+                        saveFullConfig({ promotionalMilestones: updated });
                         condEl.value = '';
                         rewEl.value = '';
                       }
@@ -1223,6 +1292,7 @@ export default function AdminPanel({
                                   };
                                   setSpecialMonthlyOffers(updated);
                                   setEditingOfferIdx(null);
+                                  saveFullConfig({ specialMonthlyOffers: updated });
                                 }
                               }}
                               className="px-2.5 py-1 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-md transition-all cursor-pointer font-sans"
@@ -1263,7 +1333,11 @@ export default function AdminPanel({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setSpecialMonthlyOffers(specialMonthlyOffers.filter((_, i) => i !== idx))}
+                              onClick={() => {
+                                const updated = specialMonthlyOffers.filter((_, i) => i !== idx);
+                                setSpecialMonthlyOffers(updated);
+                                saveFullConfig({ specialMonthlyOffers: updated });
+                              }}
                               className="p-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-100 hover:text-rose-600 rounded-lg text-stone-400 transition-all cursor-pointer shrink-0"
                               title="Delete Offer"
                             >
@@ -1325,7 +1399,7 @@ export default function AdminPanel({
                       const startEl = document.getElementById('offer-start-date') as HTMLInputElement;
                       const endEl = document.getElementById('offer-end-date') as HTMLInputElement;
                       if (volEl && payEl && perkEl && volEl.value && payEl.value && perkEl.value) {
-                        setSpecialMonthlyOffers([
+                        const updated = [
                           ...specialMonthlyOffers,
                           {
                             id: `smo-${Date.now()}`,
@@ -1335,7 +1409,9 @@ export default function AdminPanel({
                             startDate: startEl && startEl.value ? startEl.value : undefined,
                             endDate: endEl && endEl.value ? endEl.value : undefined
                           }
-                        ]);
+                        ];
+                        setSpecialMonthlyOffers(updated);
+                        saveFullConfig({ specialMonthlyOffers: updated });
                         volEl.value = '';
                         payEl.value = '';
                         perkEl.value = '';
@@ -1388,6 +1464,7 @@ export default function AdminPanel({
                                   updated[idx] = editTermText;
                                   setTermsAndConditions(updated);
                                   setEditingTermIdx(null);
+                                  saveFullConfig({ termsAndConditions: updated });
                                 }
                               }}
                               className="px-2.5 py-1 text-[10px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-md transition-all cursor-pointer font-sans"
@@ -1416,7 +1493,11 @@ export default function AdminPanel({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setTermsAndConditions(termsAndConditions.filter((_, i) => i !== idx))}
+                              onClick={() => {
+                                const updated = termsAndConditions.filter((_, i) => i !== idx);
+                                setTermsAndConditions(updated);
+                                saveFullConfig({ termsAndConditions: updated });
+                              }}
                               className="p-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-100 hover:text-rose-600 rounded-lg text-stone-400 transition-all cursor-pointer shrink-0 font-sans"
                               title="Delete Compliance Rule"
                             >
@@ -1442,7 +1523,9 @@ export default function AdminPanel({
                     onClick={() => {
                       const termEl = document.getElementById('new-term') as HTMLTextAreaElement;
                       if (termEl && termEl.value) {
-                        setTermsAndConditions([...termsAndConditions, termEl.value]);
+                        const updated = [...termsAndConditions, termEl.value];
+                        setTermsAndConditions(updated);
+                        saveFullConfig({ termsAndConditions: updated });
                         termEl.value = '';
                       }
                     }}
@@ -1789,7 +1872,7 @@ export default function AdminPanel({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Starting Price per Sq Yd</label>
                   <div className="relative">
                     <input
@@ -1804,61 +1887,99 @@ export default function AdminPanel({
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Blueprint Map URL</label>
-                  <input
-                    type="text"
-                    placeholder="https://images.unsplash.com/...map"
-                    value={projMapUrl}
-                    onChange={(e) => setProjMapUrl(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
-                  />
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Project Layout Map</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Map Image URL..."
+                      value={projMapUrl}
+                      onChange={(e) => setProjMapUrl(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-2 text-[11px] rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
+                    />
+                    <label className="px-2.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-750 font-bold rounded-lg text-[10.5px] cursor-pointer border border-stone-250 shrink-0 transition-all flex items-center justify-center">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              if (event.target?.result) {
+                                setProjMapUrl(event.target.result as string);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
               {/* Dynamic Size Slabs Input list */}
               <div className="space-y-3.5 border-t border-stone-200 pt-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wide block">Plot/Villa Size Tiers</span>
+                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wide block">Inventory Slabs / Sizing Ranges</span>
                   <button
                     type="button"
                     onClick={addSizeTierRow}
                     className="text-[9.5px] font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
                   >
-                    + Add Size Category
+                    + Add Inventory Row
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
+                <div className="space-y-3 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
                   {sizeTiersInput.map((tier, idx) => (
                     <div key={idx} className="bg-stone-50 p-2.5 border border-stone-200 rounded-lg space-y-2 relative">
                       <button
                         type="button"
                         onClick={() => removeSizeTierRow(idx)}
-                        className="absolute top-1.5 right-2 text-stone-400 hover:text-rose-600 text-[10px] cursor-pointer"
+                        className="absolute top-1.5 right-2 text-stone-400 hover:text-rose-600 text-[9.5px] font-bold cursor-pointer"
                         title="Delete category tier"
                       >
-                        Delete
+                        ✕ Remove
                       </button>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="col-span-1">
-                          <label className="text-[8.5px] font-bold text-stone-500 uppercase block mb-0.5">Size/Area</label>
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-5">
+                          <label className="text-[8.5px] font-bold text-stone-500 uppercase block mb-0.5">Unit Number(s) / Range</label>
                           <input
                             type="text"
-                            value={tier.size}
-                            onChange={(e) => handleSizeTierChange(idx, 'size', e.target.value)}
-                            className="w-full px-2 py-1 text-[10.5px] font-bold rounded border border-stone-200 bg-white text-stone-900 focus:outline-none"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="text-[8.5px] font-bold text-stone-500 uppercase block mb-0.5">Units (comma separated)</label>
-                          <input
-                            type="text"
+                            required
                             value={tier.unitsRaw}
                             onChange={(e) => handleSizeTierChange(idx, 'unitsRaw', e.target.value)}
-                            placeholder="Unit A-11, Unit A-12, Unit A-13"
+                            placeholder="e.g. 1-20 or Villa-101"
                             className="w-full px-2 py-1 text-[10.5px] rounded border border-stone-200 bg-white text-stone-900 focus:outline-none font-mono"
                           />
+                        </div>
+                        <div className="col-span-3">
+                          <label className="text-[8.5px] font-bold text-stone-500 uppercase block mb-0.5">Size (Sq Yd)</label>
+                          <input
+                            type="number"
+                            required
+                            value={tier.size}
+                            onChange={(e) => handleSizeTierChange(idx, 'size', e.target.value)}
+                            placeholder="e.g. 100"
+                            className="w-full px-2 py-1 text-[10.5px] font-bold rounded border border-stone-200 bg-white text-stone-900 focus:outline-none font-mono"
+                          />
+                        </div>
+                        <div className="col-span-4">
+                          <label className="text-[8.5px] font-bold text-stone-500 uppercase block mb-0.5">Unit Type</label>
+                          <select
+                            value={tier.type || 'Residential'}
+                            onChange={(e) => handleSizeTierChange(idx, 'type', e.target.value)}
+                            className="w-full px-2 py-1 text-[10.5px] rounded border border-stone-200 bg-white text-stone-900 focus:outline-none cursor-pointer"
+                          >
+                            <option value="Residential">Residential</option>
+                            <option value="Commercial">Commercial</option>
+                            <option value="Villa">Villa</option>
+                            <option value="Plot">Plot</option>
+                          </select>
                         </div>
                       </div>
                     </div>
@@ -1935,6 +2056,48 @@ export default function AdminPanel({
                           <p className="text-[11.5px] font-mono font-bold text-rose-800">{bookedUnits}</p>
                           <p className="text-[8.5px] text-rose-600 uppercase mt-0.5">Book</p>
                         </div>
+                      </div>
+
+                      <div className="border-t border-stone-150 pt-2 flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedProjUnitsId(expandedProjUnitsId === proj.id ? null : proj.id)}
+                          className="w-full text-center py-1.5 bg-stone-100 hover:bg-stone-200/80 text-stone-700 hover:text-stone-900 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          {expandedProjUnitsId === proj.id ? 'Hide Unit Directory ✕' : 'View Unit Directory (200+ Capacity) 🔍'}
+                        </button>
+                        
+                        {expandedProjUnitsId === proj.id && (
+                          <div className="mt-1 border border-stone-200 rounded-xl bg-stone-50/50 p-2 max-h-56 overflow-y-auto custom-scrollbar space-y-2">
+                            <div className="text-[9.5px] font-bold text-stone-500 uppercase flex justify-between px-1">
+                              <span>Unit ID / Type</span>
+                              <span>Status</span>
+                            </div>
+                            <div className="space-y-1">
+                              {proj.inventory.flatMap(cat => 
+                                cat.units.map(u => ({ ...u, size: cat.size }))
+                              ).map((u, ui) => (
+                                <div key={ui} className="flex justify-between items-center text-[10px] bg-white p-1.5 rounded border border-stone-150 shadow-xxs">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-stone-800">{u.unitNumber}</span>
+                                    <span className="text-[8px] text-stone-500 font-medium font-sans">
+                                      {u.size} • {u.type || 'Residential'}
+                                    </span>
+                                  </div>
+                                  <span className={`px-1.5 py-0.5 rounded-md font-bold text-[8.5px] uppercase ${
+                                    u.status === 'BOOKED' 
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                                      : u.status === 'HOLD'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-250'
+                                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  }`}>
+                                    {u.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2141,7 +2304,7 @@ export default function AdminPanel({
                 
                 {bookSizeCategory && (
                   <div className="text-[9.5px] text-stone-500 font-medium">
-                    Formula: <span className="font-semibold text-stone-700">Plot Size ({parseFloat(bookSizeCategory.replace(/[^\d.]/g, '')) || 0} Sq Yd)</span> × <span className="font-semibold text-stone-700">Units ({selectedUnits.length || 1})</span> × <span className="font-semibold text-stone-700">Rate ({formatINR(parseFloat(bookRatePerSqYard) || 15000)})</span> = <span className="font-bold text-stone-700">{formatINR((parseFloat(bookSizeCategory.replace(/[^\d.]/g, '')) || 0) * (selectedUnits.length || 1) * (parseFloat(bookRatePerSqYard) || 15000))}</span> total sale value. Converting to points: <span className="font-bold text-emerald-800">{bookSaleValue || '0'} PTS</span> (at ₹7,50,000 per Point).
+                    Formula: <span className="font-semibold text-stone-700">Plot Size ({parseFloat(bookSizeCategory.replace(/[^\d.]/g, '')) || 0} Sq Yd)</span> points value = <span className="font-semibold text-stone-700">{calculatePointsFromSize(parseFloat(bookSizeCategory.replace(/[^\d.]/g, '')) || 0)} PTS</span> per unit. Total Units = <span className="font-semibold text-stone-700">{selectedUnits.length || 1}</span>. Converting to points: <span className="font-bold text-emerald-800">{bookSaleValue || '0'} PTS</span>. Total Sale Value (INR) = <span className="font-bold text-stone-700">{formatINR((parseFloat(bookSizeCategory.replace(/[^\d.]/g, '')) || 0) * (selectedUnits.length || 1) * (parseFloat(bookRatePerSqYard) || 15000))}</span>.
                   </div>
                 )}
               </div>
@@ -2574,762 +2737,300 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* 7. REPORTS, LEDGERS & ANALYTICS PORTAL */}
-      {activeSubTab === 'REPORTS' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Header Controls */}
-          <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wide">SBR Business Ledger & Monthly Reports</h3>
-              <p className="text-xs text-stone-500 mt-1">Generate multi-dimensional monthly ledgers, compute tax withholdings, and export data audits.</p>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => {
-                  const headers = ["Booking ID", "Date", "Project", "Unit Number", "Sourcing Agent", "Agent ID", "Size (Sq Yd)", "Agreement Value (PTS)", "Booking Status"];
-                  const rows = sales.map(s => [
-                    s.id,
-                    s.saleDate,
-                    s.project,
-                    s.unitNumber,
-                    s.agentName,
-                    s.agentId,
-                    s.sizeSqYards,
-                    s.saleValue.toString(),
-                    s.bookingStatus || 'TOKEN_RECEIVED'
-                  ]);
-                  exportToCSV("SBR_Corporate_Sales_Ledger.csv", headers, rows);
-                }}
-                className="px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              >
-                <Download className="w-3.5 h-3.5" /> Export Sales
-              </button>
-
-              <button
-                onClick={() => {
-                  const headers = ["Sponsor ID", "Name", "Email", "Phone", "Designation", "Sponsor ID", "Joined Date", "Status", "Direct Sales (PTS)", "Downline Sales (PTS)"];
-                  const rows = users.map(u => [
-                    u.id,
-                    u.name,
-                    u.email,
-                    u.phone,
-                    u.designation,
-                    u.sponsorId || 'N/A',
-                    u.joinedDate,
-                    u.status,
-                    u.totalDirectSales.toString(),
-                    u.totalDownlineSales.toString()
-                  ]);
-                  exportToCSV("SBR_Sponsor_Directory.csv", headers, rows);
-                }}
-                className="px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              >
-                <Download className="w-3.5 h-3.5" /> Export Agents
-              </button>
-
-              <button
-                onClick={() => {
-                  const headers = ["Payout ID", "Sale ID", "Project", "Unit", "Agent Name", "Agent ID", "Level", "Percentage (%)", "Gross Commission (PTS)", "TDS (PTS)", "Admin Fee (PTS)", "Net Commission (PTS)", "Status", "Disbursement Date"];
-                  const rows = payouts.map(p => [
-                    p.id,
-                    p.saleId,
-                    p.project,
-                    p.unitNumber,
-                    p.agentName,
-                    p.agentId,
-                    p.level.toString(),
-                    p.percentage.toString(),
-                    p.grossCommission.toString(),
-                    p.tdsDeduction.toString(),
-                    p.adminFee.toString(),
-                    p.netCommission.toString(),
-                    p.status,
-                    p.payoutDate
-                  ]);
-                  exportToCSV("SBR_Commission_Payout_Register.csv", headers, rows);
-                }}
-                className="px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              >
-                <Download className="w-3.5 h-3.5" /> Export Payouts
-              </button>
-
-              <button
-                onClick={() => window.print()}
-                className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-              >
-                <Printer className="w-3.5 h-3.5" /> Print Ledger Page
-              </button>
-            </div>
-          </div>
-
-          {/* Filters Bar */}
-          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5 font-sans">Filter by Month</label>
-              <select
-                value={selectedReportMonth}
-                onChange={(e) => setSelectedReportMonth(e.target.value)}
-                className="w-full bg-white border border-stone-250 rounded-lg px-3 py-1.5 text-xs font-sans font-medium focus:outline-none focus:ring-1 focus:ring-emerald-700 focus:border-emerald-700"
-              >
-                <option value="ALL">All Months (Cumulative)</option>
-                {Array.from(new Set(sales.map(s => s.saleDate.substring(0, 7))))
-                  .sort()
-                  .reverse()
-                  .map(m => {
-                    const [year, month] = m.split('-');
-                    const dateObj = new Date(parseInt(year), parseInt(month) - 1, 1);
-                    const monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-                    return <option key={m} value={m}>{monthName}</option>;
-                  })}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5 font-sans">Filter by SBR Project</label>
-              <select
-                value={selectedReportProject}
-                onChange={(e) => setSelectedReportProject(e.target.value)}
-                className="w-full bg-white border border-stone-250 rounded-lg px-3 py-1.5 text-xs font-sans font-medium focus:outline-none focus:ring-1 focus:ring-emerald-700 focus:border-emerald-700"
-              >
-                <option value="ALL">All Projects</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5 font-sans">Search Buyer, Agent, or ID</label>
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search ledger entries..."
-                  value={reportSearchQuery}
-                  onChange={(e) => setReportSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-stone-250 rounded-lg pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-700 focus:border-emerald-700"
-                />
+      {/* Payment Records & Installment Management Modal */}
+      {selectedPaymentSaleId && (() => {
+        const sale = sales.find(s => s.id === selectedPaymentSaleId);
+        if (!sale) return null;
+        
+        const payments = getSalePayments(sale);
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        const totalValue = getSaleTotalAgreementValueINR(sale);
+        const pending = totalValue - totalPaid;
+        const pct = totalValue > 0 ? (totalPaid / totalValue) * 100 : 0;
+        
+        return (
+          <div className="fixed inset-0 bg-stone-900/45 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl border border-stone-200 max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-xl">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center">
+                <div>
+                  <h4 className="font-extrabold text-stone-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                    💳 Payment Installments & Ledger
+                  </h4>
+                  <p className="text-[11px] text-stone-500 mt-0.5 font-sans">
+                    Manage payment installments, check transaction status, and add new payment events for Booking ID: <span className="font-mono font-bold text-stone-850">{sale.id}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedPaymentSaleId(null)}
+                  className="text-stone-400 hover:text-stone-700 text-sm font-bold cursor-pointer font-mono"
+                >
+                  [ Close ESC ]
+                </button>
               </div>
-            </div>
-          </div>
 
-          {/* Aggregated metrics based on filters */}
-          {(() => {
-            const filteredSales = sales.filter(sale => {
-              const monthMatch = selectedReportMonth === 'ALL' || sale.saleDate.startsWith(selectedReportMonth);
-              const projectMatch = selectedReportProject === 'ALL' || sale.projectId === selectedReportProject;
-              const searchMatch = !reportSearchQuery || 
-                sale.buyerName.toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
-                sale.agentName.toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
-                sale.id.toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
-                sale.unitNumber.toLowerCase().includes(reportSearchQuery.toLowerCase());
-              return monthMatch && projectMatch && searchMatch;
-            });
-
-            const relatedPayouts = payouts.filter(p => filteredSales.some(s => s.id === p.saleId));
-            const totalSourcedVal = filteredSales.reduce((acc, curr) => acc + curr.saleValue, 0);
-            const totalVolSqYds = filteredSales.reduce((acc, curr) => acc + (parseFloat(curr.sizeSqYards) || 0), 0);
-            const grossComms = relatedPayouts.reduce((acc, curr) => acc + curr.grossCommission, 0);
-            const tdsDeducted = relatedPayouts.reduce((acc, curr) => acc + curr.tdsDeduction, 0);
-            const adminFees = relatedPayouts.reduce((acc, curr) => acc + curr.adminFee, 0);
-            const netPayouts = relatedPayouts.reduce((acc, curr) => acc + curr.netCommission, 0);
-
-            return (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4">
-                  <div className="bg-white border border-stone-200 rounded-2xl p-4.5 shadow-2xs">
-                    <p className="text-[9.5px] font-bold text-stone-500 uppercase tracking-widest font-sans">Filtered Transactions</p>
-                    <p className="text-xl font-extrabold text-stone-900 mt-1.5 font-mono">{filteredSales.length} Sourced</p>
-                    <div className="flex items-center gap-1.5 mt-2 text-[10px] text-stone-500">
-                      <span className="font-bold text-stone-800 font-mono">{totalVolSqYds.toLocaleString()}</span> Total Sq Yards Sold
-                    </div>
+              {/* Modal Body */}
+              <div className="p-6 space-y-6 flex-1 font-sans">
+                {/* Real estate context summary banner */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-stone-50 border border-stone-200 p-4 rounded-xl">
+                  <div>
+                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">SBR Layout Unit</p>
+                    <p className="font-bold text-stone-900 text-xs">{sale.project}</p>
+                    <p className="text-[11px] text-emerald-800 font-bold">{sale.unitNumber}</p>
                   </div>
-
-                  <div className="bg-white border border-stone-200 rounded-2xl p-4.5 shadow-2xs">
-                    <p className="text-[9.5px] font-bold text-stone-500 uppercase tracking-widest font-sans">Agreement Sourced Value</p>
-                    <p className="text-xl font-extrabold text-emerald-800 mt-1.5 font-mono">{formatPoints(totalSourcedVal)}</p>
-                    <div className="flex items-center gap-1.5 mt-2 text-[10px] text-stone-500">
-                      Average deal size: <span className="font-semibold text-stone-800 font-mono">{filteredSales.length ? formatPoints(totalSourcedVal / filteredSales.length) : '0 PTS'}</span>
-                    </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Buyer Client</p>
+                    <p className="font-bold text-stone-900 text-xs">{sale.buyerName}</p>
+                    <p className="text-[10px] text-stone-500 font-mono">Ref: {sale.referenceNumber}</p>
                   </div>
-
-                  <div className="bg-white border border-stone-200 rounded-2xl p-4.5 shadow-2xs">
-                    <p className="text-[9.5px] font-bold text-stone-500 uppercase tracking-widest font-sans">Distributed Commission (Gross)</p>
-                    <p className="text-xl font-extrabold text-stone-900 mt-1.5 font-mono">{formatPoints(grossComms)}</p>
-                    <div className="flex items-center gap-1.5 mt-2 text-[10px] text-stone-500">
-                      Effective payout index: <span className="font-semibold text-stone-800 font-mono">{totalSourcedVal ? ((grossComms / totalSourcedVal) * 100).toFixed(1) : '0'}%</span>
-                    </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Sourcing Broker</p>
+                    <p className="font-bold text-stone-900 text-xs">{sale.agentName}</p>
+                    <p className="text-[10px] text-stone-500 font-mono">ID: {sale.agentId}</p>
                   </div>
-
-                  <div className="bg-white border border-emerald-200 bg-emerald-50/15 rounded-2xl p-4.5 shadow-2xs">
-                    <p className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-widest font-sans">Net Disbursed / Scheduled</p>
-                    <p className="text-xl font-extrabold text-emerald-900 mt-1.5 font-mono">{formatPoints(netPayouts)}</p>
-                    <div className="flex items-center justify-between mt-2 text-[9px] text-stone-500 font-sans font-semibold">
-                      <span>TDS Deducted: {formatPoints(tdsDeducted)}</span>
-                      <span>Admin Withheld: {formatPoints(adminFees)}</span>
-                    </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Agreement Price (PTS)</p>
+                    <p className="font-extrabold text-stone-900 font-mono text-sm">{formatPoints(sale.saleValue)}</p>
+                    <p className="text-[9.5px] text-stone-400 uppercase tracking-widest font-mono">({sale.sizeSqYards} SQ YD)</p>
                   </div>
                 </div>
 
-                {/* SBR Corporate Sales Ledger details */}
-                <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
-                  <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center">
-                    <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider">Itemized Sales Ledger</h4>
-                    <span className="text-[10px] font-bold text-stone-500 font-mono">Showing {filteredSales.length} of {sales.length} records</span>
+                {/* Overall Financial Progress Card */}
+                <div className="bg-emerald-50/10 border border-emerald-250 p-4 rounded-xl space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">
+                      Installment Progress Tracker
+                    </span>
+                    <span className="text-xs font-black text-emerald-800 font-mono">
+                      {pct.toFixed(2)}% Paid
+                    </span>
+                  </div>
+                  
+                  <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        pct >= 100 
+                          ? 'bg-emerald-650' 
+                          : pct >= 30 
+                          ? 'bg-blue-600' 
+                          : 'bg-amber-600'
+                      }`}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-stone-50 border-b border-stone-200 text-[9.5px] uppercase font-bold text-stone-500 tracking-wider">
-                          <th className="px-4 py-2.5">Date</th>
-                          <th className="px-4 py-2.5">Booking ID</th>
-                          <th className="px-4 py-2.5">Layout / Project</th>
-                          <th className="px-4 py-2.5">Sourcing Agent</th>
-                          <th className="px-4 py-2.5">Buyer Client</th>
-                          <th className="px-4 py-2.5 text-right font-mono">Size (Sq Yd)</th>
-                          <th className="px-4 py-2.5 text-right font-mono text-stone-500">Rate / SqYd</th>
-                          <th className="px-4 py-2.5 text-center font-mono">Payment Progress (INR)</th>
-                          <th className="px-4 py-2.5 text-right font-mono">Sale Value</th>
-                          <th className="px-4 py-2.5 text-right font-mono">Net Payouts</th>
-                          <th className="px-4 py-2.5 text-center">Status</th>
-                          <th className="px-4 py-2.5 text-center">Commission Breakdown</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-150 text-stone-800">
-                        {filteredSales.length === 0 ? (
-                          <tr>
-                            <td colSpan={12} className="px-4 py-8 text-center text-stone-400 italic font-medium">No sales transactions match the filtered criteria.</td>
-                          </tr>
-                        ) : (
-                          filteredSales.map((sale) => {
-                            const salePayouts = payouts.filter(p => p.saleId === sale.id);
-                            const saleNet = salePayouts.reduce((acc, curr) => acc + curr.netCommission, 0);
-                            return (
-                              <tr key={sale.id} className="hover:bg-stone-50/30 transition-colors">
-                                <td className="px-4 py-3 text-stone-500 whitespace-nowrap font-mono">{sale.saleDate}</td>
-                                <td className="px-4 py-3 font-bold font-mono text-stone-900">{sale.id}</td>
-                                <td className="px-4 py-3">
-                                  <p className="font-bold text-stone-900">{sale.project}</p>
-                                  <p className="text-[10px] text-stone-500 font-semibold">{sale.unitNumber}</p>
-                                </td>
-                                <td className="px-4 py-3 font-sans">
-                                  <p className="font-bold text-stone-900">{sale.agentName}</p>
-                                  <p className="text-[9.5px] text-stone-500 font-mono">{sale.agentId}</p>
-                                </td>
-                                <td className="px-4 py-3 text-stone-700 font-semibold">{sale.buyerName}</td>
-                                <td className="px-4 py-3 text-right font-mono text-stone-600">{sale.sizeSqYards}</td>
-                                <td className="px-4 py-3 text-right font-mono text-stone-600 font-bold">{sale.ratePerSqYard ? formatINR(sale.ratePerSqYard) : '₹15,000'}</td>
-                                <td className="px-4 py-3">
-                                  {renderPaymentProgress(sale)}
-                                </td>
-                                <td className="px-4 py-3 text-right font-bold text-stone-900 font-mono">{formatPoints(sale.saleValue)}</td>
-                                <td className="px-4 py-3 text-right font-bold text-emerald-800 font-mono">{formatPoints(saleNet)}</td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className={`inline-flex items-center gap-1 text-[9px] uppercase font-bold rounded px-2 py-0.5 border ${
-                                    (sale.bookingStatus || 'TOKEN_RECEIVED') === 'REGISTRY_DONE'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-250'
-                                      : (sale.bookingStatus || 'TOKEN_RECEIVED') === 'BOOKING_DONE'
-                                      ? 'bg-blue-50 text-blue-800 border-blue-250'
-                                      : 'bg-amber-50 text-amber-800 border-amber-250'
-                                  }`}>
-                                    {(sale.bookingStatus || 'TOKEN_RECEIVED').replace('_', ' ')}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <button
-                                      onClick={() => setSelectedSaleDetailId(sale.id)}
-                                      className="px-2.5 py-1 text-[10px] font-bold rounded border border-stone-250 hover:border-stone-400 bg-white text-stone-700 transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1"
-                                    >
-                                      View Audit Ledger
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setSelectedPaymentSaleId(sale.id);
-                                        setPaymentFormId(null);
-                                        setPaymentFormAmount('');
-                                        setPaymentFormDate(new Date().toISOString().split('T')[0]);
-                                        setPaymentFormMode('BANK_TRANSFER');
-                                        setPaymentFormReference('');
-                                        setPaymentFormNotes('');
-                                      }}
-                                      className="px-2.5 py-1 text-[10px] font-bold rounded border border-emerald-250 hover:border-emerald-400 bg-emerald-50 text-emerald-800 transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1"
-                                    >
-                                      💳 Payments ({getSalePayments(sale).length})
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            );
-          })()}
-
-          {/* Audit Ledger Detail Modal */}
-          {selectedSaleDetailId && (() => {
-            const sale = sales.find(s => s.id === selectedSaleDetailId);
-            if (!sale) return null;
-            const salePayouts = payouts.filter(p => p.saleId === sale.id).sort((a, b) => a.level - b.level);
-            
-            return (
-              <div className="fixed inset-0 bg-stone-900/45 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in print:relative print:bg-white print:p-0 print:inset-auto">
-                <div className="bg-white rounded-2xl border border-stone-200 max-w-3xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-xl print:shadow-none print:border-none print:max-h-none">
-                  {/* Modal Header */}
-                  <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center print:hidden">
+                  <div className="grid grid-cols-3 gap-4 text-center pt-2">
+                    <div className="border-r border-stone-200">
+                      <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Total Sale Value (INR)</p>
+                      <p className="font-extrabold text-stone-900 text-xs font-mono">{formatINR(totalValue)}</p>
+                    </div>
+                    <div className="border-r border-stone-200">
+                      <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest mb-0.5">Total Amount Paid (INR)</p>
+                      <p className="font-extrabold text-emerald-800 text-xs font-mono">{formatINR(totalPaid)}</p>
+                    </div>
                     <div>
-                      <h4 className="font-extrabold text-stone-900 text-sm uppercase tracking-wider">Multi-Tier Distribution Audit</h4>
-                      <p className="text-[11px] text-stone-500 mt-0.5 font-sans">Detailed breakdown of commission credits for Booking ID: <span className="font-mono font-bold text-stone-850">{sale.id}</span></p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedSaleDetailId(null)}
-                      className="text-stone-400 hover:text-stone-700 text-sm font-bold cursor-pointer font-mono"
-                    >
-                      [ Close ESC ]
-                    </button>
-                  </div>
-
-                  {/* Printable Invoice Body */}
-                  <div className="p-6 space-y-6 flex-1 font-sans print:p-0">
-                    <div className="border-2 border-stone-200 rounded-2xl p-5 bg-stone-50/20 print:border-none print:p-0">
-                      {/* Logo and SBR watermark */}
-                      <div className="flex justify-between items-start border-b border-stone-250 pb-4 mb-4">
-                        <div>
-                          <h2 className="text-xl font-black text-stone-900 tracking-tight font-sans">SBR GROUP</h2>
-                          <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider font-mono">Corporate Sales Distribution Voucher</p>
-                        </div>
-                        <div className="text-right font-mono">
-                          <p className="text-xs font-bold text-stone-900">Voucher No: VCH-{sale.id}</p>
-                          <p className="text-[10px] text-stone-500 mt-0.5">Date: {sale.saleDate}</p>
-                        </div>
-                      </div>
-
-                      {/* Sale metadata */}
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
-                        <div className="col-span-2 md:col-span-1">
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">SBR Property Sourced</p>
-                          <p className="font-bold text-stone-900">{sale.project}</p>
-                          <p className="text-[10px] text-emerald-800 font-semibold">{sale.unitNumber}</p>
-                        </div>
-                        <div className="col-span-2 md:col-span-1">
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Buyer Client</p>
-                          <p className="font-bold text-stone-900">{sale.buyerName}</p>
-                          <p className="text-[10px] text-stone-500 font-mono">Ref: {sale.referenceNumber}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Plot Size Dimension</p>
-                          <p className="font-bold text-stone-900 font-mono">{sale.sizeSqYards}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Rate / Sq Yard</p>
-                          <p className="font-bold text-stone-900 font-mono">{sale.ratePerSqYard ? formatINR(sale.ratePerSqYard) : '₹15,000'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Token Amount</p>
-                          <p className="font-bold text-amber-800 font-mono">{sale.tokenAmount !== undefined ? formatINR(sale.tokenAmount) : '₹75,000'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Agreement Value</p>
-                          <p className="font-extrabold text-stone-900 font-mono text-sm">{formatPoints(sale.saleValue)}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Commissions ledger breakdown */}
-                    <div className="space-y-3">
-                      <h5 className="font-bold text-stone-900 text-xs uppercase tracking-wider">Multi-Level commission schedule</h5>
-                      
-                      <div className="overflow-x-auto border border-stone-200 rounded-xl">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr className="bg-stone-50 border-b border-stone-200 text-[9px] uppercase font-bold text-stone-500 tracking-wider font-sans">
-                              <th className="px-4 py-2">Tier Level</th>
-                              <th className="px-4 py-2">Sponsor Associate Name</th>
-                              <th className="px-4 py-2">ID Number</th>
-                              <th className="px-4 py-2 text-right">Index (%)</th>
-                              <th className="px-4 py-2 text-right">Gross Commission</th>
-                              <th className="px-4 py-2 text-right text-stone-500">TDS (5%)</th>
-                              <th className="px-4 py-2 text-right text-stone-500">Admin (10%)</th>
-                              <th className="px-4 py-2 text-right font-bold text-emerald-900">Net Credit</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-stone-150 font-sans">
-                            {salePayouts.length === 0 ? (
-                              <tr>
-                                <td colSpan={8} className="px-4 py-6 text-center text-stone-400 italic">No network commissions recorded for this direct booking.</td>
-                              </tr>
-                            ) : (
-                              salePayouts.map((pay) => (
-                                <tr key={pay.id} className="hover:bg-stone-50/50">
-                                  <td className="px-4 py-2.5 font-bold text-stone-800">
-                                    {pay.level === 1 ? (
-                                      <span className="text-[10.5px] text-emerald-800 font-bold">Direct Broker (L1)</span>
-                                    ) : (
-                                      `Downline Sponsor (L${pay.level})`
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-2.5 font-semibold text-stone-900">{pay.agentName}</td>
-                                  <td className="px-4 py-2.5 font-mono text-stone-500 text-[11px]">{pay.agentId}</td>
-                                  <td className="px-4 py-2.5 text-right font-mono font-medium text-stone-700">{pay.percentage}%</td>
-                                  <td className="px-4 py-2.5 text-right font-mono font-medium text-stone-800">{formatPoints(pay.grossCommission)}</td>
-                                  <td className="px-4 py-2.5 text-right font-mono text-stone-500">-{formatPoints(pay.tdsDeduction)}</td>
-                                  <td className="px-4 py-2.5 text-right font-mono text-stone-500">-{formatPoints(pay.adminFee)}</td>
-                                  <td className="px-4 py-2.5 text-right font-bold font-mono text-emerald-800 bg-emerald-50/10">{formatPoints(pay.netCommission)}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Bottom aggregate metrics of distribution */}
-                    <div className="flex flex-col sm:flex-row items-end justify-between gap-4 pt-3 border-t border-stone-200">
-                      <div className="text-[10px] text-stone-500 font-semibold max-w-sm">
-                        <p className="uppercase tracking-wide font-bold mb-1 font-sans">Voucher Audit Compliance</p>
-                        This distribution document conforms to the SBR multi-level compensation model configured at SBR Operations. 5.0% TDS is withheld for IT reporting, and 10.0% administration and maintenance charges are deducted at source.
-                      </div>
-
-                      <div className="bg-stone-50 border border-stone-200 rounded-xl p-4.5 w-full sm:w-64 font-mono">
-                        <div className="flex justify-between text-[11px] text-stone-500">
-                          <span>Total Gross Distributed:</span>
-                          <span className="font-bold text-stone-800">{formatPoints(salePayouts.reduce((acc, curr) => acc + curr.grossCommission, 0))}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px] text-stone-500 mt-1 pb-1.5 border-b border-stone-200">
-                          <span>Aggregate Deductions:</span>
-                          <span className="font-bold text-rose-700">-{formatPoints(salePayouts.reduce((acc, curr) => acc + curr.tdsDeduction + curr.adminFee, 0))}</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-extrabold text-stone-900 mt-2">
-                          <span>Aggregate Net Disbursed:</span>
-                          <span className="text-emerald-800">{formatPoints(salePayouts.reduce((acc, curr) => acc + curr.netCommission, 0))}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modal Footer Controls */}
-                  <div className="p-4 border-t border-stone-200 bg-stone-50/50 flex justify-between items-center print:hidden">
-                    <button
-                      onClick={() => window.print()}
-                      className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> Print Voucher
-                    </button>
-                    <button
-                      onClick={() => setSelectedSaleDetailId(null)}
-                      className="px-3.5 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-                    >
-                      Close Voucher View
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Payment Records & Installment Management Modal */}
-          {selectedPaymentSaleId && (() => {
-            const sale = sales.find(s => s.id === selectedPaymentSaleId);
-            if (!sale) return null;
-            
-            const payments = getSalePayments(sale);
-            const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-            const totalValue = getSaleTotalAgreementValueINR(sale);
-            const pending = totalValue - totalPaid;
-            const pct = totalValue > 0 ? (totalPaid / totalValue) * 100 : 0;
-            
-            return (
-              <div className="fixed inset-0 bg-stone-900/45 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-                <div className="bg-white rounded-2xl border border-stone-200 max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-xl">
-                  {/* Modal Header */}
-                  <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-extrabold text-stone-900 text-sm uppercase tracking-wider flex items-center gap-2">
-                        💳 Payment Installments & Ledger
-                      </h4>
-                      <p className="text-[11px] text-stone-500 mt-0.5 font-sans">
-                        Manage payment installments, check transaction status, and add new payment events for Booking ID: <span className="font-mono font-bold text-stone-850">{sale.id}</span>
+                      <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest mb-0.5">Pending Balance (INR)</p>
+                      <p className={`font-extrabold text-xs font-mono ${pending > 0 ? 'text-amber-800 font-bold' : 'text-emerald-800 font-bold'}`}>
+                        {pending > 0 ? formatINR(pending) : 'Fully Paid'}
                       </p>
                     </div>
-                    <button
-                      onClick={() => setSelectedPaymentSaleId(null)}
-                      className="text-stone-400 hover:text-stone-700 text-sm font-bold cursor-pointer font-mono"
-                    >
-                      [ Close ESC ]
-                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Side: Ledger / Installment History (7 cols) */}
+                  <div className="lg:col-span-7 space-y-3">
+                    <h5 className="font-bold text-stone-900 text-xs uppercase tracking-wider flex items-center gap-1">
+                      📋 Receipt Records History ({payments.length})
+                    </h5>
+
+                    <div className="border border-stone-200 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto custom-scrollbar">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-stone-50 border-b border-stone-200 text-[9px] uppercase font-bold text-stone-500 tracking-wider">
+                            <th className="px-3 py-2">Receipt Date</th>
+                            <th className="px-3 py-2">Mode</th>
+                            <th className="px-3 py-2 text-right">Amount Received</th>
+                            <th className="px-3 py-2 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-150">
+                          {payments.map((p) => (
+                            <tr key={p.id} className="hover:bg-stone-50/50">
+                              <td className="px-3 py-2.5 font-mono text-stone-500 text-[11px] whitespace-nowrap">
+                                {p.date}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="inline-block text-[9.5px] font-semibold font-sans text-stone-700">
+                                  {p.paymentMode.replace('_', ' ')}
+                                </span>
+                                {p.reference && (
+                                  <p className="text-[9px] text-stone-400 font-mono mt-0.5 truncate max-w-[120px]" title={p.reference}>
+                                    Ref: {p.reference}
+                                  </p>
+                                )}
+                                {p.notes && (
+                                  <p className="text-[9px] text-stone-400 italic mt-0.5 truncate max-w-[120px]" title={p.notes}>
+                                    "{p.notes}"
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold font-mono text-stone-900 text-xs">
+                                {formatINR(p.amount)}
+                              </td>
+                              <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                                <div className="inline-flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditPaymentClick(p)}
+                                    className="text-blue-700 hover:text-blue-900 font-bold text-[10.5px] cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                  {payments.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm("Are you sure you want to delete this payment record?")) {
+                                          handleDeletePayment(p.id);
+                                        }
+                                      }}
+                                      className="text-rose-750 hover:text-rose-900 font-bold text-[10.5px] cursor-pointer"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  {/* Modal Body */}
-                  <div className="p-6 space-y-6 flex-1 font-sans">
-                    {/* Real estate context summary banner */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-stone-50 border border-stone-200 p-4 rounded-xl">
-                      <div>
-                        <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">SBR Layout Unit</p>
-                        <p className="font-bold text-stone-900 text-xs">{sale.project}</p>
-                        <p className="text-[11px] text-emerald-800 font-bold">{sale.unitNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Buyer Client</p>
-                        <p className="font-bold text-stone-900 text-xs">{sale.buyerName}</p>
-                        <p className="text-[10px] text-stone-500 font-mono">Ref: {sale.referenceNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Sourcing Broker</p>
-                        <p className="font-bold text-stone-900 text-xs">{sale.agentName}</p>
-                        <p className="text-[10px] text-stone-500 font-mono">ID: {sale.agentId}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Agreement Price (PTS)</p>
-                        <p className="font-extrabold text-stone-900 font-mono text-sm">{formatPoints(sale.saleValue)}</p>
-                        <p className="text-[9.5px] text-stone-400 uppercase tracking-widest font-mono">({sale.sizeSqYards} SQ YD)</p>
-                      </div>
-                    </div>
+                  {/* Right Side: Add / Edit Receipt Entry Form (5 cols) */}
+                  <div className="lg:col-span-5 bg-stone-50 border border-stone-200 rounded-xl p-4.5 space-y-3.5 h-fit">
+                    <h5 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
+                      {paymentFormId ? '📝 Edit Receipt Entry' : '➕ Add Installment Receipt'}
+                    </h5>
 
-                    {/* Overall Financial Progress Card */}
-                    <div className="bg-emerald-50/10 border border-emerald-250 p-4 rounded-xl space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">
-                          Installment Progress Tracker
-                        </span>
-                        <span className="text-xs font-black text-emerald-800 font-mono">
-                          {pct.toFixed(2)}% Paid
-                        </span>
-                      </div>
-                      
-                      <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-500 ${
-                            pct >= 100 
-                              ? 'bg-emerald-650' 
-                              : pct >= 30 
-                              ? 'bg-blue-600' 
-                              : 'bg-amber-600'
-                          }`}
-                          style={{ width: `${Math.min(pct, 100)}%` }}
+                    <form onSubmit={handleAddOrUpdatePayment} className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                          Amount Received (INR) *
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          min="1"
+                          placeholder="e.g. 75000"
+                          value={paymentFormAmount}
+                          onChange={(e) => setPaymentFormAmount(e.target.value)}
+                          className="w-full px-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 text-center pt-2">
-                        <div className="border-r border-stone-200">
-                          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5">Total Sale Value (INR)</p>
-                          <p className="font-extrabold text-stone-900 text-xs font-mono">{formatINR(totalValue)}</p>
-                        </div>
-                        <div className="border-r border-stone-200">
-                          <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest mb-0.5">Total Amount Paid (INR)</p>
-                          <p className="font-extrabold text-emerald-800 text-xs font-mono">{formatINR(totalPaid)}</p>
-                        </div>
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest mb-0.5">Pending Balance (INR)</p>
-                          <p className={`font-extrabold text-xs font-mono ${pending > 0 ? 'text-amber-800 font-bold' : 'text-emerald-800 font-bold'}`}>
-                            {pending > 0 ? formatINR(pending) : 'Fully Paid'}
-                          </p>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                            Receipt Date *
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={paymentFormDate}
+                            onChange={(e) => setPaymentFormDate(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs font-sans rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                      {/* Left Side: Ledger / Installment History (7 cols) */}
-                      <div className="lg:col-span-7 space-y-3">
-                        <h5 className="font-bold text-stone-900 text-xs uppercase tracking-wider flex items-center gap-1">
-                          📋 Receipt Records History ({payments.length})
-                        </h5>
-
-                        <div className="border border-stone-200 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto custom-scrollbar">
-                          <table className="w-full text-left text-xs">
-                            <thead>
-                              <tr className="bg-stone-50 border-b border-stone-200 text-[9px] uppercase font-bold text-stone-500 tracking-wider">
-                                <th className="px-3 py-2">Receipt Date</th>
-                                <th className="px-3 py-2">Mode</th>
-                                <th className="px-3 py-2 text-right">Amount Received</th>
-                                <th className="px-3 py-2 text-right">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-stone-150">
-                              {payments.map((p) => (
-                                <tr key={p.id} className="hover:bg-stone-50/50">
-                                  <td className="px-3 py-2.5 font-mono text-stone-500 text-[11px] whitespace-nowrap">
-                                    {p.date}
-                                  </td>
-                                  <td className="px-3 py-2.5">
-                                    <span className="inline-block text-[9.5px] font-semibold font-sans text-stone-700">
-                                      {p.paymentMode.replace('_', ' ')}
-                                    </span>
-                                    {p.reference && (
-                                      <p className="text-[9px] text-stone-400 font-mono mt-0.5 truncate max-w-[120px]" title={p.reference}>
-                                        Ref: {p.reference}
-                                      </p>
-                                    )}
-                                    {p.notes && (
-                                      <p className="text-[9px] text-stone-400 italic mt-0.5 truncate max-w-[120px]" title={p.notes}>
-                                        "{p.notes}"
-                                      </p>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right font-bold font-mono text-stone-900 text-xs">
-                                    {formatINR(p.amount)}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                                    <div className="inline-flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleEditPaymentClick(p)}
-                                        className="text-blue-700 hover:text-blue-900 font-bold text-[10.5px] cursor-pointer"
-                                      >
-                                        Edit
-                                      </button>
-                                      {payments.length > 1 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            if (window.confirm("Are you sure you want to delete this payment record?")) {
-                                              handleDeletePayment(p.id);
-                                            }
-                                          }}
-                                          className="text-rose-750 hover:text-rose-900 font-bold text-[10.5px] cursor-pointer"
-                                        >
-                                          Delete
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                            Payment Mode
+                          </label>
+                          <select
+                            value={paymentFormMode}
+                            onChange={(e) => setPaymentFormMode(e.target.value as any)}
+                            className="w-full px-2 py-1.5 text-xs font-sans rounded-lg border border-stone-200 bg-white text-stone-900 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          >
+                            <option value="BANK_TRANSFER">Bank Transfer</option>
+                            <option value="CHEQUE">Cheque</option>
+                            <option value="CASH">Cash</option>
+                            <option value="OTHER">Other</option>
+                          </select>
                         </div>
                       </div>
 
-                      {/* Right Side: Add / Edit Receipt Entry Form (5 cols) */}
-                      <div className="lg:col-span-5 bg-stone-50 border border-stone-200 rounded-xl p-4.5 space-y-3.5 h-fit">
-                        <h5 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
-                          {paymentFormId ? '📝 Edit Receipt Entry' : '➕ Add Installment Receipt'}
-                        </h5>
-
-                        <form onSubmit={handleAddOrUpdatePayment} className="space-y-3">
-                          <div>
-                            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
-                              Amount Received (INR) *
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              required
-                              min="1"
-                              placeholder="e.g. 75000"
-                              value={paymentFormAmount}
-                              onChange={(e) => setPaymentFormAmount(e.target.value)}
-                              className="w-full px-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
-                                Receipt Date *
-                              </label>
-                              <input
-                                type="date"
-                                required
-                                value={paymentFormDate}
-                                onChange={(e) => setPaymentFormDate(e.target.value)}
-                                className="w-full px-2 py-1.5 text-xs font-sans rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
-                                Payment Mode
-                              </label>
-                              <select
-                                value={paymentFormMode}
-                                onChange={(e) => setPaymentFormMode(e.target.value as any)}
-                                className="w-full px-2 py-1.5 text-xs font-sans rounded-lg border border-stone-200 bg-white text-stone-900 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                              >
-                                <option value="BANK_TRANSFER">Bank Transfer</option>
-                                <option value="CHEQUE">Cheque</option>
-                                <option value="CASH">Cash</option>
-                                <option value="OTHER">Other</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
-                              Transaction Reference / Instrument #
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. TXN-90123491823"
-                              value={paymentFormReference}
-                              onChange={(e) => setPaymentFormReference(e.target.value)}
-                              className="w-full px-3 py-1.5 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
-                              Internal Notes / Remarks
-                            </label>
-                            <textarea
-                              rows={2}
-                              placeholder="Specify receipts, cleared status, or remarks..."
-                              value={paymentFormNotes}
-                              onChange={(e) => setPaymentFormNotes(e.target.value)}
-                              className="w-full px-3 py-1.5 text-xs font-sans rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                            />
-                          </div>
-
-                          <div className="flex gap-2 pt-1">
-                            {paymentFormId && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPaymentFormId(null);
-                                  setPaymentFormAmount('');
-                                  setPaymentFormDate(new Date().toISOString().split('T')[0]);
-                                  setPaymentFormMode('BANK_TRANSFER');
-                                  setPaymentFormReference('');
-                                  setPaymentFormNotes('');
-                                }}
-                                className="flex-1 px-3 py-2 bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                            <button
-                              type="submit"
-                              className="flex-1 px-3 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs text-center"
-                            >
-                              {paymentFormId ? 'Update Receipt' : 'Record Receipt'}
-                            </button>
-                          </div>
-                        </form>
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                          Transaction Reference / Instrument #
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. TXN-90123491823"
+                          value={paymentFormReference}
+                          onChange={(e) => setPaymentFormReference(e.target.value)}
+                          className="w-full px-3 py-1.5 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                        />
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Modal Footer Controls */}
-                  <div className="p-4 border-t border-stone-200 bg-stone-50/50 flex justify-end items-center">
-                    <button
-                      onClick={() => setSelectedPaymentSaleId(null)}
-                      className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-                    >
-                      Close Ledger View
-                    </button>
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                          Internal Notes / Remarks
+                        </label>
+                        <textarea
+                          rows={2}
+                          placeholder="Specify receipts, cleared status, or remarks..."
+                          value={paymentFormNotes}
+                          onChange={(e) => setPaymentFormNotes(e.target.value)}
+                          className="w-full px-3 py-1.5 text-xs font-sans rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        {paymentFormId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentFormId(null);
+                              setPaymentFormAmount('');
+                              setPaymentFormDate(new Date().toISOString().split('T')[0]);
+                              setPaymentFormMode('BANK_TRANSFER');
+                              setPaymentFormReference('');
+                              setPaymentFormNotes('');
+                            }}
+                            className="flex-1 px-3 py-2 bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          className="flex-1 px-3 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs text-center"
+                        >
+                          {paymentFormId ? 'Update Receipt' : 'Record Receipt'}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               </div>
-            );
-          })()}
-        </div>
-      )}
+
+              {/* Modal Footer Controls */}
+              <div className="p-4 border-t border-stone-200 bg-stone-50/50 flex justify-end items-center">
+                <button
+                  onClick={() => setSelectedPaymentSaleId(null)}
+                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                >
+                  Close Ledger View
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

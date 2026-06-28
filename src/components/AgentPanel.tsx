@@ -209,13 +209,13 @@ export default function AgentPanel({
           <div>
             <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider font-sans">Real-time Sizing Conversion Rule</h4>
             <p className="text-[11px] text-stone-650 mt-0.5 leading-normal">
-              Every sale of <span className="font-bold text-emerald-850">50 Square Yards</span> is computed as exactly <span className="font-bold text-emerald-850">1.0 Point (PTS)</span>. Commission and levels are derived purely in points.
+              Plot points are derived from plot size (e.g. up to 80 Sq Yd = <span className="font-bold text-emerald-850">1.0 Point</span>, 81-130 = <span className="font-bold text-emerald-850">2.0 Points</span>, 131-180 = <span className="font-bold text-emerald-850">3.0 Points</span>, and up to 10.0 Points for 481-530 Sq Yd). Commission and levels are derived purely in points.
             </p>
           </div>
         </div>
         <div className="hidden sm:block text-right px-4 py-2 bg-white rounded-xl border border-stone-200 shrink-0">
           <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-sans">Platform Standard</span>
-          <span className="font-mono font-extrabold text-sm text-emerald-850">50 Sq Yd = 1.0 Point</span>
+          <span className="font-mono font-extrabold text-xs text-emerald-850">Tiered Points System</span>
         </div>
       </div>
 

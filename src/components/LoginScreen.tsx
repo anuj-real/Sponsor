@@ -117,7 +117,7 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
               <span className="text-emerald-600">✦</span> Sourcing Standard Ledger Rules
             </h4>
             <p className="text-xs text-stone-600 leading-relaxed font-sans">
-              <strong className="text-stone-900">50 Square Yards = 1.0 Point (PTS).</strong> All real estate transactions, team override bonuses, and final monthly commission payouts are calculated, logged, and tracked strictly in points (PTS) for operations consistency.
+              <strong className="text-stone-900">Tiered Points System.</strong> Points are calculated from plot sizes in square yards (e.g. up to 80 sq yds = 1.0 Point; 81-130 = 2.0 Points; 131-180 = 3.0 Points; up to 10.0 Points for 481-530 sq yds). All real estate transactions, team override bonuses, and final monthly commission payouts are calculated, logged, and tracked strictly in points (PTS) for operations consistency.
             </p>
           </div>
 

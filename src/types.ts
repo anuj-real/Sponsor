@@ -28,6 +28,7 @@ export interface InventoryUnit {
   status: 'AVAILABLE' | 'BOOKED' | 'HOLD';
   bookedByAgentId?: string | null;
   buyerName?: string;
+  type?: string; // e.g. "Residential" or "Commercial"
 }
 
 export interface RealEstateProject {
@@ -45,6 +46,7 @@ export interface RealEstateProject {
       status: 'AVAILABLE' | 'BOOKED' | 'HOLD';
       bookedByAgentId?: string | null;
       buyerName?: string | null;
+      type?: string; // e.g. "Residential" or "Commercial"
     }[];
   }[];
 }
