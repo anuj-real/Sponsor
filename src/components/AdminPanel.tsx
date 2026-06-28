@@ -1550,7 +1550,7 @@ export default function AdminPanel({
                 <PlusCircle className="w-5 h-5 text-emerald-800" /> Register Strategic Sponsoring Partner (SBR Series)
               </h3>
               <p className="text-xs text-stone-500 mt-1">
-                Aadhaar card details, PAN card, and date of birth are standard regulatory mandatory fields to certify a sourcing partner under SBR CRM compensation guidelines.
+                Aadhaar card details, PAN card, and date of birth are standard regulatory mandatory fields to certify a sourcing partner under SBR Sponsors compensation guidelines.
               </p>
             </div>
 
@@ -1796,7 +1796,7 @@ export default function AdminPanel({
                             onClick={() => {
                               const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
                                 `Hello *${agent.name}*,\n` +
-                                `Your account has been onboarded to SBR CRM successfully!\n\n` +
+                                `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
                                 `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
                                 `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
                                 `🔑 *Default Passcode:* password\n\n` +
@@ -1852,7 +1852,7 @@ export default function AdminPanel({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. SBR CRM Meadows"
+                  placeholder="e.g. SBR Sponsors Meadows"
                   value={projName}
                   onChange={(e) => setProjName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"

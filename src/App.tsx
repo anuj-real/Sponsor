@@ -555,7 +555,7 @@ export default function App() {
                 P
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-stone-900 font-serif">SBR <span className="text-emerald-850 font-normal">CRM</span></h1>
+                <h1 className="text-xl font-bold tracking-tight text-stone-900 font-serif">SBR <span className="text-emerald-850 font-normal">Sponsors</span></h1>
               </div>
             </div>
           </div>

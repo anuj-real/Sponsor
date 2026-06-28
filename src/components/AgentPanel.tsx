@@ -275,7 +275,7 @@ export default function AgentPanel({
                 </h3>
                 <p className="text-xs text-stone-500 mt-1">
                   {activePanelTab === 'LEDGER' 
-                    ? 'Audited list of actual sales you directly sourced for SBR CRM.' 
+                    ? 'Audited list of actual sales you directly sourced for SBR Sponsors.' 
                     : 'Real-time property map availability and class listings.'}
                 </p>
               </div>

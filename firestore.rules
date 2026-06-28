@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Catch-all rule for this demo CRM application. 
+    // Catch-all rule for this demo SBR Sponsors application. 
     // Since the app uses client-side simulated sessions (SBR0001, SBR0005) 
     // without Firebase Auth, we allow read and write access to collections 
     // so that the database and simulated auth can synchronize properly.

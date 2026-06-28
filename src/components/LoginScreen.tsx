@@ -19,27 +19,12 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
-  // Login form states
-  const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
-  const [emailInput, setEmailInput] = useState('admin@propspire.in');
-  const [agentIdInput, setAgentIdInput] = useState('SBR0005');
-  const [password, setPassword] = useState('••••••••');
+  // Login form states (strictly empty/blank by default, no prefilled demo credentials)
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Quick select credentials helper
-  const handleRoleChange = (role: UserRole) => {
-    setSelectedRole(role);
-    setErrorMsg('');
-    if (role === 'ADMIN') {
-      setEmailInput('admin@propspire.in');
-      setPassword('admin123');
-    } else {
-      setAgentIdInput('SBR0005');
-      setPassword('password');
-    }
-  };
 
   const handleFormLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,32 +33,36 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
 
     setTimeout(() => {
       setIsLoading(false);
-      if (selectedRole === 'ADMIN') {
-        if (emailInput.toLowerCase() === 'admin@propspire.in' && (password === 'admin123' || password === '••••••••')) {
+      const inputId = identifier.trim();
+      const inputIdUpper = inputId.toUpperCase();
+      const inputIdLower = inputId.toLowerCase();
+
+      // Smart role and credential verification
+      if (inputIdLower === 'admin') {
+        if (password === 'Admin@SBRassociates') {
           onLogin('ADMIN');
         } else {
-          setErrorMsg('Invalid Administrator credentials. Try: admin@propspire.in / admin123');
+          setErrorMsg('Invalid Administrator credentials.');
         }
-      } else {
-        const foundAgent = users.find(u => u.id === agentIdInput.trim().toUpperCase());
+      } else if (inputIdUpper === 'SBR0005') {
+        const foundAgent = users.find(u => u.id === 'SBR0005');
         if (foundAgent) {
-          if (foundAgent.status === 'ACTIVE') {
-            onLogin('AGENT', foundAgent.id);
+          if (password === 'password') {
+            if (foundAgent.status === 'ACTIVE') {
+              onLogin('AGENT', 'SBR0005');
+            } else {
+              setErrorMsg('Access Blocked: This broker account has been marked INACTIVE by Admin.');
+            }
           } else {
-            setErrorMsg('Access Blocked: This broker account has been marked INACTIVE by Admin.');
+            setErrorMsg('Invalid passcode. Please try again.');
           }
         } else {
-          setErrorMsg('Sponsor ID not found in current network. Try SBR0005 or SBR0001.');
+          setErrorMsg('Agent profile not found.');
         }
+      } else {
+        setErrorMsg('Access Denied. Invalid credentials.');
       }
     }, 600);
-  };
-
-  const selectQuickAgent = (id: string) => {
-    setSelectedRole('AGENT');
-    setAgentIdInput(id);
-    setPassword('password');
-    setErrorMsg('');
   };
 
   return (
@@ -98,10 +87,10 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/50">
-                  SBR CRM Gateway
+                  SBR Sponsors Gateway
                 </span>
                 <h1 className="text-3xl font-extrabold tracking-tight text-stone-900 font-serif mt-1">
-                  SBR <span className="text-emerald-800 font-normal">CRM</span>
+                  SBR <span className="text-emerald-800 font-normal">Sponsors</span>
                 </h1>
               </div>
             </div>
@@ -121,53 +110,6 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
             </p>
           </div>
 
-          {/* Quick bypassed identities panel */}
-          <div className="p-6 border border-amber-200/60 bg-amber-50/40 rounded-2xl space-y-4">
-            <div>
-              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block font-sans">
-                Operations Demo Quick-Access
-              </span>
-              <p className="text-xs text-stone-600 mt-1">
-                Select an operational profile to automatically fill the credentials form and test the live application:
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button 
-                onClick={() => handleRoleChange('ADMIN')}
-                className="p-3 text-left bg-white hover:bg-stone-50 border border-stone-200 rounded-xl text-xs transition-all cursor-pointer group flex items-center justify-between"
-              >
-                <div>
-                  <span className="block font-bold text-stone-900">Rajesh Kumar</span>
-                  <span className="text-[10px] text-stone-500">Corporate Owner (Admin)</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-stone-900 transition-all" />
-              </button>
-
-              <button 
-                onClick={() => selectQuickAgent('SBR0005')}
-                className="p-3 text-left bg-white hover:bg-stone-50 border border-stone-200 rounded-xl text-xs transition-all cursor-pointer group flex items-center justify-between"
-              >
-                <div>
-                  <span className="block font-bold text-stone-900">Neha Patel</span>
-                  <span className="text-[10px] text-stone-500">Active Manager (SBR0005)</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-stone-900 transition-all" />
-              </button>
-
-              <button 
-                onClick={() => selectQuickAgent('SBR0006')}
-                className="p-3 text-left bg-white hover:bg-stone-50 border border-stone-200 rounded-xl text-xs transition-all cursor-pointer group flex items-center justify-between"
-              >
-                <div>
-                  <span className="block font-bold text-stone-900">Deepak Rao</span>
-                  <span className="text-[10px] text-stone-500">Channel Partner (SBR0006)</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-stone-900 transition-all" />
-              </button>
-            </div>
-          </div>
-
         </div>
 
         {/* Right Side: Simple Clean Login Card */}
@@ -177,89 +119,39 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-stone-900 font-serif">Security Gateway</h2>
               <p className="text-stone-500 text-xs mt-0.5">
-                Please enter your access key or select an identity.
+                Enter your Username to authenticate.
               </p>
-            </div>
-
-            {/* Role Select Buttons */}
-            <div className="grid grid-cols-2 gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200">
-              <button
-                type="button"
-                onClick={() => handleRoleChange('ADMIN')}
-                className={`py-2 text-[10.5px] font-bold rounded-lg transition-all cursor-pointer ${
-                  selectedRole === 'ADMIN' 
-                    ? 'bg-emerald-800 text-white shadow-xs' 
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                👑 Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange('AGENT')}
-                className={`py-2 text-[10.5px] font-bold rounded-lg transition-all cursor-pointer ${
-                  selectedRole === 'AGENT' 
-                    ? 'bg-emerald-800 text-white shadow-xs' 
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                💼 Channel Partner
-              </button>
             </div>
 
             {/* Actual Form */}
             <form onSubmit={handleFormLogin} className="space-y-4">
               
-              {selectedRole !== 'AGENT' ? (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block font-sans">
-                    Corporate Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    placeholder="admin@propspire.in"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-800/10 focus:border-emerald-800 text-stone-900 outline-none"
-                    required
-                  />
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block font-sans">
-                    Channel Partner Sponsor ID
-                  </label>
-                  <input
-                    type="text"
-                    value={agentIdInput}
-                    onChange={(e) => setAgentIdInput(e.target.value)}
-                    placeholder="e.g. SBR0005"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-800/10 focus:border-emerald-800 text-stone-900 font-mono uppercase font-bold outline-none"
-                    required
-                  />
-                  <span className="text-[9.5px] text-stone-500 block leading-relaxed">
-                    Sponsor ID uniquely maps direct & downline Channel Partner network positions.
-                  </span>
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block font-sans">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder=""
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-800/10 focus:border-emerald-800 text-stone-900 outline-none"
+                  required
+                />
+              </div>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block font-sans">
                     Security Passcode
                   </label>
-                  {selectedRole === 'AGENT' && (
-                    <span className="text-[9.5px] text-stone-500 font-mono">default: password</span>
-                  )}
-                  {selectedRole === 'ADMIN' && (
-                    <span className="text-[9.5px] text-stone-500 font-mono">default: admin123</span>
-                  )}
                 </div>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
                     className="w-full px-3.5 pl-3.5 pr-10 py-2.5 text-xs bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-800/10 focus:border-emerald-800 text-stone-900 outline-none font-mono"
                     required
                   />
@@ -314,7 +206,7 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
       {/* Footer */}
       <footer className="bg-stone-100 border-t border-stone-200/80 py-6 px-4 md:px-6 shrink-0 text-center text-xs text-stone-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
-          <p>© 2026 SBR Associates. CRM Sourcing Operations. All rights reserved.</p>
+          <p>© 2026 SBR Associates. SBR Sponsors Sourcing Operations. All rights reserved.</p>
           <div className="flex gap-4 justify-center text-stone-400">
             <span>Support: helpdesk@propspire.in</span>
             <span>|</span>
