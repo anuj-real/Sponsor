@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
-import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
 
 interface AgentPanelProps {
@@ -30,6 +30,7 @@ export default function AgentPanel({
   const [activePanelTab, setActivePanelTab] = useState<'LEDGER' | 'INVENTORY'>('LEDGER');
   const [selectedInventoryProjId, setSelectedInventoryProjId] = useState<string>('ALL');
   const [selectedInventoryStatus, setSelectedInventoryStatus] = useState<string>('ALL');
+  const [expandedMapProjId, setExpandedMapProjId] = useState<string | null>(null);
 
   // Campaign date status checker logic
   const now = new Date();
@@ -145,9 +146,6 @@ export default function AgentPanel({
 
   const downlineNetwork = getDownlineList(agent.id);
 
-  // Filter notifications specifically for this agent
-  const myAlerts = notifications.filter(n => n.userId === agent.id);
-
   const handleCopySponsorId = () => {
     navigator.clipboard.writeText(agent.id);
     setCopied(true);
@@ -156,12 +154,12 @@ export default function AgentPanel({
 
   // Helpers
   const formatPoints = (val: number) => {
-    return `${Number(val.toFixed(3)).toLocaleString()} PTS`;
+    return `${Math.round(val).toLocaleString()} PTS`;
   };
 
   return (
     <div className="space-y-6">
-      {/* Simulation Identity Banner */}
+      {/* Partner Identity Banner */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-stone-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-lg select-none text-emerald-800">
@@ -178,25 +176,6 @@ export default function AgentPanel({
               Associate Sponsor ID: <span className="font-mono font-bold text-stone-900 bg-stone-50 px-2 py-0.5 rounded border border-stone-200">{agent.id}</span> • Joined {agent.joinedDate}
             </p>
           </div>
-        </div>
-
-        {/* Simulate as another agent switcher */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-stone-550">
-            <Key className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Simulate Profile:</span>
-          </div>
-          <select
-            value={agent.id}
-            onChange={(e) => onSelectAgentId(e.target.value)}
-            className="px-3 py-1.5 text-xs font-semibold text-stone-700 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-800/10 focus:border-emerald-850 cursor-pointer"
-          >
-            {users.map(u => (
-              <option key={u.id} value={u.id} className="bg-white text-stone-800">
-                {u.name} ({u.id}) [{u.designation || 'Associate'}]
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -334,7 +313,7 @@ export default function AgentPanel({
                             {!deal.bookingStatus || deal.bookingStatus === 'TOKEN_RECEIVED' ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                                Token received (₹${(deal.tokenAmount !== undefined ? deal.tokenAmount : 75000).toLocaleString('en-IN')})
+                                Token received (₹{(deal.tokenAmount !== undefined ? deal.tokenAmount : 75000).toLocaleString('en-IN')})
                               </span>
                             ) : deal.bookingStatus === 'BOOKING_DONE' ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-blue-50 text-blue-900 border border-blue-200">
@@ -433,6 +412,62 @@ export default function AgentPanel({
                               </div>
                             </div>
 
+                            {false && proj.imageMapUrl && (
+                              <div className="bg-white border border-stone-200/60 rounded-xl p-3 space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <Map className="w-4 h-4 text-emerald-700" />
+                                    <span className="text-xs font-bold text-stone-800">Project Site Plan & Plot Map</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => setExpandedMapProjId(expandedMapProjId === proj.id ? null : proj.id)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-150 text-xs font-bold hover:bg-emerald-100/80 transition-colors cursor-pointer select-none"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>{expandedMapProjId === proj.id ? 'Hide Layout Map' : 'View Layout Map'}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => window.open(proj.imageMapUrl!, '_blank')}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 border border-stone-200 text-xs font-bold hover:bg-stone-200 transition-colors cursor-pointer select-none"
+                                      title="Download layout map file"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                      <span>Download Map</span>
+                                    </button>
+                                  </div>
+                                </div>
+                                
+                                {expandedMapProjId === proj.id && (
+                                  <div className="space-y-2">
+                                    <div className="overflow-hidden rounded-lg border border-stone-150 bg-stone-50 p-1 max-w-full flex justify-center">
+                                      <img 
+                                        src={proj.imageMapUrl} 
+                                        alt={`${proj.name} Plot Map`} 
+                                        className="w-full max-h-[350px] object-contain rounded-md animate-fade-in"
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => {
+                                          e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=1200';
+                                        }}
+                                      />
+                                    </div>
+                                    <p className="text-[10px] text-stone-500 text-center mt-1">
+                                      If the layout image does not load inside the secure frame, click the <span className="font-semibold text-stone-700">Download Map</span> button above or{' '}
+                                      <a 
+                                        href={proj.imageMapUrl} 
+                                        download={`${proj.name.replace(/\s+/g, '_')}_layout_map.jpg`}
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-emerald-800 underline font-semibold hover:text-emerald-950"
+                                      >
+                                        click here to open/download directly
+                                      </a>.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {filteredInventory.length === 0 ? (
                               <p className="text-xs text-stone-400 italic text-center py-2">No units match standard search criteria.</p>
                             ) : (
@@ -497,43 +532,6 @@ export default function AgentPanel({
               >
                 {copied ? 'Copied!' : 'Copy Code'}
               </button>
-            </div>
-          </div>
-
-          {/* Alert Stream */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
-            <h4 className="font-bold text-stone-900 border-b border-stone-150 pb-3 flex items-center gap-1.5 text-sm">
-              <Bell className="w-4 h-4 text-emerald-700" /> Interactive Billing Alerts
-            </h4>
-
-            <div className="space-y-3 mt-3 max-h-[220px] overflow-y-auto custom-scrollbar">
-              {myAlerts.length > 0 ? (
-                myAlerts.map((alert) => (
-                  <div key={alert.id} className="p-3 text-[11px] rounded-lg border border-stone-200 bg-stone-50/50 relative group">
-                    <div className="flex justify-between items-start">
-                      <span className="font-semibold text-stone-900">{alert.title}</span>
-                      <button 
-                        onClick={() => onClearNotification(alert.id)}
-                        className="text-[9px] text-stone-500 hover:text-stone-850 transition-colors block pl-2 cursor-pointer"
-                        title="Dismiss notification"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                    <p className="text-stone-600 mt-1 leading-normal">{alert.message}</p>
-                    {alert.amount && (
-                      <span className="text-[10px] font-bold font-mono text-emerald-800 block mt-1.5 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/50 w-max">
-                        +{formatPoints(alert.amount)}
-                      </span>
-                    )}
-                    <span className="text-[9px] text-stone-400 block mt-1 font-mono">{alert.timestamp}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-xs text-stone-400 italic">
-                  No billing messages or payouts pending.
-                </div>
-              )}
             </div>
           </div>
         </div>

@@ -61,7 +61,7 @@ export default function AdminPanel({
   const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS'>('SETTINGS');
 
   const formatPoints = (val: number) => {
-    return `${Number(val.toFixed(3)).toLocaleString()} PTS`;
+    return `${Math.round(val).toLocaleString()} PTS`;
   };
 
   const formatINR = (val: number) => {
@@ -2026,6 +2026,9 @@ export default function AdminPanel({
                       alt={proj.name}
                       referrerPolicy="no-referrer"
                       className="w-full h-36 object-cover bg-stone-100 border-b border-stone-200"
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=600';
+                      }}
                     />
                     <div className="p-4 space-y-3">
                       <div>

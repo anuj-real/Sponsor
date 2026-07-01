@@ -20,6 +20,7 @@ export interface User {
   pan?: string;
   address?: string;
   photo?: string; // SBR associate photo URL or base64 placeholder
+  password?: string; // Optional user password
 }
 
 export interface InventoryUnit {

@@ -44,23 +44,40 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
         } else {
           setErrorMsg('Invalid Administrator credentials.');
         }
-      } else if (inputIdUpper === 'SBR0005') {
-        const foundAgent = users.find(u => u.id === 'SBR0005');
+      } else {
+        const foundAgent = users.find(u => u.id.toUpperCase() === inputIdUpper);
         if (foundAgent) {
-          if (password === 'password') {
+          // Dynamic passcode mapping as fallback
+          const fallbackPasscodes: Record<string, string> = {
+            'SBR': 'SBR@2026',
+            'ADMIN1': 'Admin1@SBR',
+            'ADMIN2': 'Admin2@SBR',
+            'RAM': 'Ram@SBR',
+            'MANORANJAN': 'Manoranjan@SBR',
+            'VIKAS': 'Vikas@SBR',
+            'DK': 'DK@SBR'
+          };
+
+          const expectedPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || 'password';
+
+          if (password === expectedPasscode) {
             if (foundAgent.status === 'ACTIVE') {
-              onLogin('AGENT', 'SBR0005');
+              // The 7 corporate and family level nodes get full Admin rights/access
+              const isAdminNode = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(foundAgent.id.toUpperCase());
+              if (isAdminNode) {
+                onLogin('ADMIN', foundAgent.id);
+              } else {
+                onLogin('AGENT', foundAgent.id);
+              }
             } else {
-              setErrorMsg('Access Blocked: This broker account has been marked INACTIVE by Admin.');
+              setErrorMsg('Access Blocked: This account has been marked INACTIVE by Admin.');
             }
           } else {
             setErrorMsg('Invalid passcode. Please try again.');
           }
         } else {
-          setErrorMsg('Agent profile not found.');
+          setErrorMsg('Account ID not recognized.');
         }
-      } else {
-        setErrorMsg('Access Denied. Invalid credentials.');
       }
     }, 600);
   };

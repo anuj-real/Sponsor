@@ -19,16 +19,19 @@ import {
   BookOpen, 
   Lock, 
   HelpCircle,
-  LogOut
+  LogOut,
+  RefreshCw
 } from 'lucide-react';
 import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
+import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
   setDocumentData, 
   deleteDocument, 
+  resetDatabaseToDefaults,
   COLLECTIONS 
 } from './lib/firebase';
 
@@ -49,6 +52,14 @@ export default function App() {
   // Selected User in the Tree diagram
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('SBR0005');
 
+  // Security Modal States
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
   // Load from Firestore on mount
   useEffect(() => {
     async function initFirestore() {
@@ -62,12 +73,55 @@ export default function App() {
           notifications: INITIAL_NOTIFICATIONS
         });
 
-        setUsers(data.users);
-        setProjects(data.projects);
-        setSales(data.sales);
-        setPayouts(data.payouts);
-        setConfig(data.config);
-        setNotifications(data.notifications);
+        const activeConfig = data.config || INITIAL_MLM_CONFIG;
+        
+        // Strictly filter to "IMT Sohna" across the platform
+        const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
+        const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+        
+        const loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+        const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
+
+        // Filter notifications to match
+        const loadedNotifs = (data.notifications || INITIAL_NOTIFICATIONS).filter(n => {
+          return loadedUsers.some(u => u.id === n.userId);
+        });
+
+        setUsers(loadedUsers);
+        setProjects(loadedProjects);
+        setSales(loadedSales);
+        setPayouts(loadedPayouts);
+        setConfig(activeConfig);
+        setNotifications(loadedNotifs);
+
+        // Delete other sales / payouts that are NOT IMT Sohna from Firestore to keep DB pure
+        const nonImtSohnaSales = (data.sales || []).filter(s => s.project !== 'IMT Sohna');
+        for (const s of nonImtSohnaSales) {
+          try {
+            await deleteDocument(COLLECTIONS.SALES, s.id);
+          } catch (e) {
+            console.warn(`Failed to delete non-IMT Sohna sale ${s.id}:`, e);
+          }
+        }
+        const nonImtSohnaPayouts = (data.payouts || []).filter(p => p.project !== 'IMT Sohna');
+        for (const p of nonImtSohnaPayouts) {
+          try {
+            await deleteDocument(COLLECTIONS.PAYOUTS, p.id);
+          } catch (e) {
+            console.warn(`Failed to delete non-IMT Sohna payout ${p.id}:`, e);
+          }
+        }
+
+        // Overwrite Firestore records with perfectly normalized / filtered data to ensure strict DB-level correctness
+        for (const s of loadedSales) {
+          await setDocumentData(COLLECTIONS.SALES, s.id, s);
+        }
+        for (const p of loadedPayouts) {
+          await setDocumentData(COLLECTIONS.PAYOUTS, p.id, p);
+        }
+        for (const u of loadedUsers) {
+          await setDocumentData(COLLECTIONS.USERS, u.id, u);
+        }
       } catch (error) {
         console.error("Firebase Initialization failed, falling back to LocalStorage:", error);
         
@@ -79,22 +133,11 @@ export default function App() {
         const storedConfig = localStorage.getItem('SBR_CONFIG');
         const storedNotifs = localStorage.getItem('SBR_NOTIFICATIONS');
 
-        if (storedUsers) setUsers(JSON.parse(storedUsers));
-        else setUsers(INITIAL_USERS);
-
-        if (storedProjects) setProjects(JSON.parse(storedProjects));
-        else setProjects(INITIAL_PROJECTS);
-
-        if (storedSales) setSales(JSON.parse(storedSales));
-        else setSales(INITIAL_SALES);
-
-        if (storedPayouts) setPayouts(JSON.parse(storedPayouts));
-        else setPayouts(INITIAL_PAYOUTS);
-
+        let activeConfig = INITIAL_MLM_CONFIG;
         if (storedConfig) {
           try {
-            const parsed = JSON.parse(storedConfig);
-            setConfig(parsed);
+            activeConfig = JSON.parse(storedConfig);
+            setConfig(activeConfig);
           } catch (e) {
             setConfig(INITIAL_MLM_CONFIG);
           }
@@ -102,8 +145,17 @@ export default function App() {
           setConfig(INITIAL_MLM_CONFIG);
         }
 
-        if (storedNotifs) setNotifications(JSON.parse(storedNotifs));
-        else setNotifications(INITIAL_NOTIFICATIONS);
+        const localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
+        const localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
+        const localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
+        const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
+        const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
+
+        setUsers(localUsers);
+        setProjects(localProjects);
+        setSales(localSales);
+        setPayouts(localPayouts);
+        setNotifications(localNotifs);
       } finally {
         setDbLoading(false);
       }
@@ -128,11 +180,13 @@ export default function App() {
 
   const handleLogin = (role: UserRole, agentId?: string) => {
     let name = '';
-    if (role === 'ADMIN') {
+    if (role === 'ADMIN' && !agentId) {
       name = 'Rahul Deshmukh (Owner)';
     } else if (agentId) {
       const agent = users.find((u: User) => u.id === agentId);
       name = agent ? agent.name : 'SBR Broker';
+    } else {
+      name = 'SBR Administrator';
     }
 
     const newSession = { role, agentId, name };
@@ -152,8 +206,17 @@ export default function App() {
   // State Change triggers
   const handleUpdateConfig = async (newConfig: MLMConfig) => {
     setConfig(newConfig);
+    const normalized = normalizeUsersWithSales(users, sales, newConfig);
+    setUsers(normalized);
     try {
       await setDocumentData(COLLECTIONS.CONFIG, 'main_config', newConfig);
+      // Save any users whose designations have changed
+      for (const u of normalized) {
+        const original = users.find(o => o.id === u.id);
+        if (original && original.designation !== u.designation) {
+          await setDocumentData(COLLECTIONS.USERS, u.id, u);
+        }
+      }
     } catch (e) {
       console.error('Firestore save failed', e);
     }
@@ -201,8 +264,8 @@ export default function App() {
       totalDirectSales: 0,
       totalDownlineSales: 0
     };
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
+    const normalizedUsers = normalizeUsersWithSales([...users, newUser], sales, config);
+    setUsers(normalizedUsers);
     
     // Create audit notification for admin actions
     const notif: Notification = {
@@ -218,7 +281,19 @@ export default function App() {
     setNotifications(updatedNotifs);
     
     try {
-      await setDocumentData(COLLECTIONS.USERS, newUser.id, newUser);
+      // Find the finalized version of the new user in normalizedUsers
+      const finalNewUser = normalizedUsers.find(u => u.id === newUser.id) || newUser;
+      await setDocumentData(COLLECTIONS.USERS, finalNewUser.id, finalNewUser);
+
+      // Save any other users whose designations might have changed due to this addition
+      for (const u of normalizedUsers) {
+        if (u.id === newUser.id) continue;
+        const oldUser = users.find(old => old.id === u.id);
+        if (oldUser && oldUser.designation !== u.designation) {
+          await setDocumentData(COLLECTIONS.USERS, u.id, u);
+        }
+      }
+
       await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
     } catch (e) {
       console.error('Firestore save failed', e);
@@ -313,16 +388,14 @@ export default function App() {
     });
     setProjects(updatedProjects);
 
-    // 2. Build multi-tiered commission payouts
-    const newPayoutsList: CommissionPayout[] = [];
+    // 2. Build multi-tiered commission payouts and notifications
     const newNotifications: Notification[] = [];
     let currentAgentId: string | null = saleData.agentId;
     let currentLevel = 1;
 
     let updatedUsers = [...users];
-    const modifiedUsers: User[] = [];
 
-    // Propagate up the sponsor/recruit tree structure
+    // Propagate up the sponsor/recruit tree structure to generate notifications
     while (currentAgentId && currentLevel <= config.levels.length) {
       const levelConfig = config.levels.find(l => l.level === currentLevel);
       if (!levelConfig) break;
@@ -330,34 +403,8 @@ export default function App() {
       const currentAgent = updatedUsers.find(u => u.id === currentAgentId);
       if (!currentAgent) break;
 
-      // Extract raw computations
-      const value = saleData.saleValue;
-      const pct = levelConfig.percentage;
-      const gross = (value * pct) / 100;
-      const tds = (gross * config.tdsPercentage) / 100;
-      const admin = (gross * config.adminFeePercentage) / 100;
-      const net = gross - tds - admin;
-
-      const payoutId = `PAY-${Math.floor(200 + Math.random() * 800)}`;
-      const payout: CommissionPayout = {
-        id: payoutId,
-        saleId: newSaleId,
-        project: saleData.project,
-        unitNumber: saleData.unitNumber,
-        saleValue: value,
-        agentId: currentAgent.id,
-        agentName: currentAgent.name,
-        level: currentLevel,
-        percentage: pct,
-        grossCommission: gross,
-        tdsDeduction: tds,
-        adminFee: admin,
-        netCommission: net,
-        status: 'PENDING',
-        payoutDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0] // Scheduled disbursement in 2 weeks
-      };
-
-      newPayoutsList.push(payout);
+      const value = Math.round(saleData.saleValue);
+      const net = value;
 
       // Trigger user-notification
       const notifId = `NOT-${Math.floor(100 + Math.random() * 900)}`;
@@ -365,8 +412,8 @@ export default function App() {
         ? 'Personal Sourcing Commission Due'
         : `Indirect Network Overrides (L${currentLevel})`;
       const notifMsg = currentLevel === 1
-        ? `We registered your sale of ${saleData.project} (${saleData.unitNumber}) of value ${value.toLocaleString()} PTS. Scheduled net payout is ${net.toLocaleString()} PTS.`
-        : `A Level ${currentLevel} override of ${net.toLocaleString()} PTS is pending collection, sourced by downline representative ${agentName} at ${saleData.project}.`;
+        ? `We registered your sale of ${saleData.project} (${saleData.unitNumber}) of value ${value} PTS. Scheduled net payout is ${net} PTS.`
+        : `A Level ${currentLevel} override of ${net} PTS is pending collection, sourced by downline representative ${agentName} at ${saleData.project}.`;
 
       newNotifications.push({
         id: notifId,
@@ -378,30 +425,17 @@ export default function App() {
         isRead: false
       });
 
-      // Increment stats for this agent dynamically
-      updatedUsers = updatedUsers.map(u => {
-        if (u.id === currentAgent.id) {
-          const nextUser = {
-            ...u,
-            totalDirectSales: currentLevel === 1 ? u.totalDirectSales + value : u.totalDirectSales,
-            totalDownlineSales: currentLevel === 1 ? u.totalDownlineSales : u.totalDownlineSales + value
-          };
-          modifiedUsers.push(nextUser);
-          return nextUser;
-        }
-        return u;
-      });
-
       // Target immediate grandparent sponsor next
       currentAgentId = currentAgent.sponsorId;
       currentLevel++;
     }
 
-    const updatedPayouts = [...newPayoutsList, ...payouts];
+    const normalizedUsers = normalizeUsersWithSales(users, updatedSales, config);
+    const updatedPayouts = rebuildPayoutsFromSales(updatedSales, normalizedUsers, config, payouts);
     const updatedNotifs = [...newNotifications, ...notifications];
 
     setPayouts(updatedPayouts);
-    setUsers(updatedUsers);
+    setUsers(normalizedUsers);
     setNotifications(updatedNotifs);
 
     try {
@@ -409,14 +443,25 @@ export default function App() {
       if (targetProj) {
         await setDocumentData(COLLECTIONS.PROJECTS, (targetProj as RealEstateProject).id, targetProj);
       }
-      for (const p of newPayoutsList) {
+      for (const p of updatedPayouts) {
         await setDocumentData(COLLECTIONS.PAYOUTS, p.id, p);
       }
       for (const n of newNotifications) {
         await setDocumentData(COLLECTIONS.NOTIFICATIONS, n.id, n);
       }
-      for (const u of modifiedUsers) {
-        await setDocumentData(COLLECTIONS.USERS, u.id, u);
+      
+      // Save any user who has modified stats or modified designation
+      for (const u of normalizedUsers) {
+        const original = users.find(o => o.id === u.id);
+        if (!original) {
+          await setDocumentData(COLLECTIONS.USERS, u.id, u);
+        } else if (
+          original.designation !== u.designation ||
+          original.totalDirectSales !== u.totalDirectSales ||
+          original.totalDownlineSales !== u.totalDownlineSales
+        ) {
+          await setDocumentData(COLLECTIONS.USERS, u.id, u);
+        }
       }
     } catch (e) {
       console.error('Firestore save failed', e);
@@ -511,11 +556,111 @@ export default function App() {
 
   const handleUpdateSale = async (updatedSale: Sale) => {
     const updatedSales = sales.map(s => s.id === updatedSale.id ? updatedSale : s);
+    const normalizedUsers = normalizeUsersWithSales(users, updatedSales, config);
+    const updatedPayouts = rebuildPayoutsFromSales(updatedSales, normalizedUsers, config, payouts);
+
     setSales(updatedSales);
+    setUsers(normalizedUsers);
+    setPayouts(updatedPayouts);
+
     try {
       await setDocumentData(COLLECTIONS.SALES, updatedSale.id, updatedSale);
+      for (const p of updatedPayouts) {
+        await setDocumentData(COLLECTIONS.PAYOUTS, p.id, p);
+      }
+      for (const u of normalizedUsers) {
+        const original = users.find(o => o.id === u.id);
+        if (original && (original.totalDirectSales !== u.totalDirectSales || original.totalDownlineSales !== u.totalDownlineSales || original.designation !== u.designation)) {
+          await setDocumentData(COLLECTIONS.USERS, u.id, u);
+        }
+      }
     } catch (e) {
       console.error('Firestore save failed', e);
+    }
+  };
+
+  const handleResetUserPassword = async (userId: string, newPass: string) => {
+    setIsSavingPassword(true);
+    setPasswordError('');
+    setPasswordSuccess('');
+    try {
+      const userToUpdate = users.find(u => u.id === userId);
+      if (!userToUpdate) {
+        throw new Error("User profile not found in active session.");
+      }
+      const updatedUser = { ...userToUpdate, password: newPass };
+      
+      // Update in Firestore
+      await setDocumentData(COLLECTIONS.USERS, userId, updatedUser);
+      
+      // Update locally
+      const updatedUsers = users.map(u => u.id === userId ? updatedUser : u);
+      setUsers(updatedUsers);
+      
+      setPasswordSuccess("Password updated successfully! This change is now secure in SBR Cloud Core.");
+      setTimeout(() => {
+        setIsSecurityModalOpen(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordSuccess('');
+      }, 2000);
+    } catch (e: any) {
+      console.error(e);
+      setPasswordError("Failed to save password: " + e.message);
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    if (!window.confirm("Are you sure you want to reset the database? This will overwrite all custom data and seed the standard SBR Corporate MLM structure with Neha Patel and other agents.")) {
+      return;
+    }
+    setDbLoading(true);
+    try {
+      const filteredSales = INITIAL_SALES.filter(s => s.project === 'IMT Sohna');
+      const filteredProjects = INITIAL_PROJECTS.filter(p => p.name === 'IMT Sohna');
+      const filteredUsers = normalizeUsersWithSales(INITIAL_USERS, filteredSales, INITIAL_MLM_CONFIG);
+      const filteredPayouts = rebuildPayoutsFromSales(filteredSales, filteredUsers, INITIAL_MLM_CONFIG, INITIAL_PAYOUTS);
+      const filteredNotifs = INITIAL_NOTIFICATIONS.filter(n => filteredUsers.some(u => u.id === n.userId));
+
+      await resetDatabaseToDefaults({
+        users: filteredUsers,
+        projects: filteredProjects,
+        sales: filteredSales,
+        payouts: filteredPayouts,
+        config: INITIAL_MLM_CONFIG,
+        notifications: filteredNotifs
+      });
+      
+      setUsers(filteredUsers);
+      setProjects(filteredProjects);
+      setSales(filteredSales);
+      setPayouts(filteredPayouts);
+      setConfig(INITIAL_MLM_CONFIG);
+      setNotifications(filteredNotifs);
+      
+      setSelectedTreeUserId('SBR0005');
+      setActiveAgentId('SBR0005');
+      
+      setSession({
+        role: 'AGENT',
+        agentId: 'SBR0005',
+        name: 'Neha Patel'
+      });
+      setActiveRole('AGENT');
+      localStorage.setItem('SBR_SESSION', JSON.stringify({
+        role: 'AGENT',
+        agentId: 'SBR0005',
+        name: 'Neha Patel'
+      }));
+      
+      alert("Database successfully reset and seeded with the IMT Sohna SBR MLM Hierarchy!");
+    } catch (e) {
+      console.error("Reset failed", e);
+      alert("Failed to reset database: " + e);
+    } finally {
+      setDbLoading(false);
     }
   };
 
@@ -562,23 +707,23 @@ export default function App() {
 
           {/* Interactive Role Selector / User Identity Block */}
           {session ? (
-            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-4 z-20 self-center md:self-auto">
+            <div className="flex flex-row flex-wrap items-center justify-center md:justify-end gap-1.5 sm:gap-3 z-20 self-center md:self-auto w-full md:w-auto">
               
               {/* Authenticated Broker or Admin Badge */}
-              <div className="flex items-center gap-2 bg-stone-100 border border-stone-200 rounded-xl px-3.5 py-2 text-xs text-stone-700">
-                <div className={`w-2 h-2 rounded-full ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
+              <div className="flex items-center gap-1.5 bg-stone-100 border border-stone-200 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs text-stone-700">
+                <div className={`w-1.5 h-1.5 rounded-full ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
                 <span className="font-semibold text-stone-900">{session.name}</span>
-                <span className="text-[9.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono">
-                  {session.role}
+                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono">
+                  {session.role === 'AGENT' ? 'ASSOCIATE' : session.role}
                 </span>
               </div>
 
               {/* Interactive Role selector ONLY FOR ADMINISTRATOR SESSIONS */}
               {session.role === 'ADMIN' ? (
-                <div className="flex p-0.5 bg-stone-100 border border-stone-250 rounded-xl shadow-xs">
+                <div className="flex p-0.5 bg-stone-100 border border-stone-250 rounded-lg shadow-xs">
                   <button
                     onClick={() => setActiveRole('ADMIN')}
-                    className={`px-3 py-1.5 rounded-lg text-[10.5px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       activeRole === 'ADMIN' 
                         ? 'bg-emerald-800 text-white shadow-sm' 
                         : 'text-stone-500 hover:text-stone-900'
@@ -588,7 +733,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => setActiveRole('AGENT')}
-                    className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       activeRole === 'AGENT' 
                         ? 'bg-emerald-800 text-white shadow-sm' 
                         : 'text-stone-500 hover:text-stone-900'
@@ -598,18 +743,42 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3.5 py-1.5 text-xs text-emerald-800 font-medium font-sans">
+                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs text-emerald-800 font-medium font-sans">
                   🔑 Session Verified
                 </div>
+              )}
+
+              {/* Reset Database Button */}
+              {session.role === 'ADMIN' && (
+                <button
+                  onClick={handleResetDatabase}
+                  className="px-2 py-1.5 sm:px-3.5 sm:py-2 font-bold text-[11px] sm:text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white border border-amber-700/50 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                  title="Reset database to the standard 7-user SBR Corporate Tree"
+                >
+                  <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin-slow" />
+                  <span>Reset SBR Hierarchy</span>
+                </button>
+              )}
+
+              {/* Security Credentials Button */}
+              {session.agentId && (
+                <button
+                  onClick={() => setIsSecurityModalOpen(true)}
+                  className="px-2 py-1.5 sm:px-3.5 sm:py-2 font-bold text-[11px] sm:text-xs rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                  title="Change your secure login passcode"
+                >
+                  <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-stone-600" />
+                  <span>Passcode Settings</span>
+                </button>
               )}
 
               {/* Log Out Button */}
               <button
                 onClick={handleLogout}
-                className="px-3.5 py-2 font-bold text-xs rounded-xl bg-stone-200/60 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-stone-300/80 text-stone-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-2 py-1.5 sm:px-3.5 sm:py-2 font-bold text-[11px] sm:text-xs rounded-lg bg-stone-200/60 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-stone-300/80 text-stone-700 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                 title="Disconnect from session"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span>Disconnect</span>
               </button>
             </div>
@@ -661,7 +830,7 @@ export default function App() {
             <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
               <h2 className="text-lg font-bold text-stone-900 font-serif">SBR Channel Partner Deck</h2>
               <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                Simulated point of view profile. Track direct sales volumes, strategic team downlines, and check your commission bank slip alerts.
+                Track direct sales volumes, strategic team downlines, and check your commission bank slip alerts.
               </p>
             </div>
 
@@ -691,6 +860,137 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Security Passcode Modal */}
+      {isSecurityModalOpen && session?.agentId && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-stone-200 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-white/10 text-amber-400">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-wide">Secure Passcode Settings</h3>
+                  <p className="text-[10px] text-stone-300">Protected by SBR Cloud Core</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSecurityModalOpen(false);
+                  setNewPassword('');
+                  setConfirmPassword('');
+                  setPasswordError('');
+                  setPasswordSuccess('');
+                }}
+                className="text-stone-400 hover:text-white transition-colors cursor-pointer text-sm font-semibold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPassword.trim()) {
+                  setPasswordError('Please enter a valid password.');
+                  return;
+                }
+                if (newPassword !== confirmPassword) {
+                  setPasswordError('Passwords do not match.');
+                  return;
+                }
+                handleResetUserPassword(session.agentId!, newPassword);
+              }}
+              className="p-6 space-y-4"
+            >
+              <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl space-y-1 text-xs">
+                <div className="text-stone-500">Updating credentials for:</div>
+                <div className="font-bold text-stone-850 flex items-center gap-1.5">
+                  <span className="font-mono bg-stone-200 px-1.5 py-0.5 rounded text-stone-800">{session.agentId}</span>
+                  <span>({session.name})</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-stone-600 uppercase tracking-wide">New Secure Passcode</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setPasswordError('');
+                  }}
+                  placeholder="Enter dynamic passcode"
+                  className="w-full px-3.5 py-2 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-1.5 focus:ring-emerald-800 focus:bg-white transition-all text-stone-800 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-stone-600 uppercase tracking-wide">Confirm Secure Passcode</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setPasswordError('');
+                  }}
+                  placeholder="Verify dynamic passcode"
+                  className="w-full px-3.5 py-2 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-1.5 focus:ring-emerald-800 focus:bg-white transition-all text-stone-800 font-medium"
+                  required
+                />
+              </div>
+
+              {passwordError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-xs font-semibold flex items-center gap-2">
+                  <span>⚠</span>
+                  <span>{passwordError}</span>
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-xs font-semibold flex items-center gap-2">
+                  <span>✓</span>
+                  <span>{passwordSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSecurityModalOpen(false);
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setPasswordError('');
+                    setPasswordSuccess('');
+                  }}
+                  className="flex-1 px-4 py-2.5 text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 border border-stone-250 rounded-xl transition-all cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPassword || !!passwordSuccess}
+                  className="flex-1 px-4 py-2.5 text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-900 border border-emerald-950 rounded-xl transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingPassword ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Secure Passcode</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

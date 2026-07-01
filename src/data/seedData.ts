@@ -74,100 +74,52 @@ export const INITIAL_MLM_CONFIG: MLMConfig = {
 export const INITIAL_PROJECTS: RealEstateProject[] = [
   {
     id: 'proj-1',
-    name: 'SBR Keerthi Prime Phase II',
-    location: 'Whitefield Main Road, Bengaluru',
-    minPrice: 3, // Since min size is 150 Sq Yards = 3 PTS
-    maxPrice: 4, // Since max size is 200 Sq Yards = 4 PTS
-    sqYardStartingPrice: 15000, // INR per Sq Yard
-    imageMapUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&q=80&w=650',
+    name: 'IMT Sohna',
+    location: 'IMT Sohna, Gurugram, Haryana',
+    minPrice: 2.0,
+    maxPrice: 5.0,
+    sqYardStartingPrice: 15000,
+    imageMapUrl: '/imt_sohna_map.jpg',
     inventory: [
       {
-        size: '150 Sq Yards',
+        size: '100 Sq Yards',
         units: [
-          { unitNumber: 'Villa A-101', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Villa A-102', status: 'BOOKED', bookedByAgentId: 'SBR0003', buyerName: 'Srinivas Murthy' },
-          { unitNumber: 'Villa A-103', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Villa A-104', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
+          { unitNumber: 'Plot A-101', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot A-102', status: 'BOOKED', bookedByAgentId: 'SBR0003', buyerName: 'Srinivas Murthy' },
+          { unitNumber: 'Plot A-103', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot A-104', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
         ]
       },
       {
-        size: '200 Sq Yards',
-        units: [
-          { unitNumber: 'Villa B-201', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Villa B-202', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Villa B-203', status: 'HOLD', bookedByAgentId: 'SBR0005', buyerName: 'Ramanathan Iyer' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'proj-2',
-    name: 'SBR Elanza Luxury Suites',
-    location: 'Seegehalli Main Road, Bengaluru',
-    minPrice: 2.4, // 120 Sq Yards = 2.4 PTS
-    maxPrice: 3.6, // 180 Sq Yards = 3.6 PTS
-    sqYardStartingPrice: 15000,
-    imageMapUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=650',
-    inventory: [
-      {
         size: '120 Sq Yards',
         units: [
-          { unitNumber: 'Suite 301', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Suite 302', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Suite 401', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Suite 402', status: 'BOOKED', bookedByAgentId: 'SBR0005', buyerName: 'Abhishek Roy' }
+          { unitNumber: 'Plot B-201', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot B-202', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot B-203', status: 'HOLD', bookedByAgentId: 'SBR0005', buyerName: 'Ramanathan Iyer' }
+        ]
+      },
+      {
+        size: '150 Sq Yards',
+        units: [
+          { unitNumber: 'Plot C-301', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot C-302', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot C-401', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot C-402', status: 'BOOKED', bookedByAgentId: 'SBR0005', buyerName: 'Abhishek Roy' }
         ]
       },
       {
         size: '180 Sq Yards',
         units: [
-          { unitNumber: 'Villa S-01', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Villa S-02', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'proj-3',
-    name: 'SBR Minara High-Rise',
-    location: 'Sarjapur Road, Bengaluru',
-    minPrice: 2.0, // 100 Sq Yards = 2 PTS
-    maxPrice: 3.2, // 160 Sq Yards = 3.2 PTS
-    sqYardStartingPrice: 15000,
-    imageMapUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=650',
-    inventory: [
-      {
-        size: '100 Sq Yards',
-        units: [
-          { unitNumber: 'Flat 1201', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Flat 1202', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Flat 1505', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
+          { unitNumber: 'Plot D-01', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot D-02', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
         ]
       },
       {
-        size: '160 Sq Yards',
-        units: [
-          { unitNumber: 'Penthouse B-1801', status: 'BOOKED', bookedByAgentId: 'SBR0006', buyerName: 'Karthik Subramanian' },
-          { unitNumber: 'Penthouse B-1802', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'proj-4',
-    name: 'SBR Horizon Commercial Hub',
-    location: 'ITPL Road, Bengaluru',
-    minPrice: 5.0, // 250 Sq Yards = 5 PTS
-    maxPrice: 5.0,
-    sqYardStartingPrice: 15000,
-    imageMapUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=650',
-    inventory: [
-      {
         size: '250 Sq Yards',
         units: [
-          { unitNumber: 'Office 701', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Office 702', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
-          { unitNumber: 'Retail G-05', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
+          { unitNumber: 'Plot E-701', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot E-702', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null },
+          { unitNumber: 'Plot E-703', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null }
         ]
       }
     ]
@@ -176,23 +128,164 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
 
 export const INITIAL_USERS: User[] = [
   {
+    id: 'SBR',
+    name: 'SBR Company Node',
+    email: 'company@sbrassociates.com',
+    phone: '+91 99999 00000',
+    role: 'AGENT',
+    sponsorId: null,
+    joinedDate: '2025-01-01',
+    rank: 'Crown Club',
+    designation: 'Sr. GM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 710.0,
+    dob: '1975-01-01',
+    aadhar: '0000 0000 0000',
+    pan: 'SBRCO1234A',
+    address: 'SBR Corporate Headquarters, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=150',
+    password: 'SBR@2026'
+  },
+  {
+    id: 'ADMIN1',
+    name: 'Admin Leg 1',
+    email: 'admin1@sbrassociates.com',
+    phone: '+91 98765 43210',
+    role: 'AGENT',
+    sponsorId: 'SBR',
+    joinedDate: '2025-01-02',
+    rank: 'Crown Club',
+    designation: 'GM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 380.0,
+    dob: '1980-05-15',
+    aadhar: '1111 2222 3333',
+    pan: 'ADMN15012A',
+    address: 'SBR Office, Leg 1 Wing, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
+    password: 'Admin1@SBR'
+  },
+  {
+    id: 'ADMIN2',
+    name: 'Admin Leg 2',
+    email: 'admin2@sbrassociates.com',
+    phone: '+91 98765 43211',
+    role: 'AGENT',
+    sponsorId: 'SBR',
+    joinedDate: '2025-01-02',
+    rank: 'Crown Club',
+    designation: 'GM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 330.0,
+    dob: '1981-08-20',
+    aadhar: '1111 2222 4444',
+    pan: 'ADMN25012B',
+    address: 'SBR Office, Leg 2 Wing, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
+    password: 'Admin2@SBR'
+  },
+  {
+    id: 'RAM',
+    name: 'Ram Family ID',
+    email: 'ram@sbrassociates.com',
+    phone: '+91 91111 22222',
+    role: 'AGENT',
+    sponsorId: 'ADMIN1',
+    joinedDate: '2025-01-03',
+    rank: 'Platinum Elite',
+    designation: 'AGM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 210.0,
+    dob: '1985-03-10',
+    aadhar: '2222 3333 4444',
+    pan: 'RAMP5012A',
+    address: 'Indiranagar, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+    password: 'Ram@SBR'
+  },
+  {
+    id: 'MANORANJAN',
+    name: 'Manoranjan Family ID',
+    email: 'manoranjan@sbrassociates.com',
+    phone: '+91 92222 33333',
+    role: 'AGENT',
+    sponsorId: 'ADMIN1',
+    joinedDate: '2025-01-03',
+    rank: 'Platinum Elite',
+    designation: 'AGM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 170.0,
+    dob: '1986-06-18',
+    aadhar: '2222 3333 5555',
+    pan: 'MANO5012B',
+    address: 'HSR Layout, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
+    password: 'Manoranjan@SBR'
+  },
+  {
+    id: 'VIKAS',
+    name: 'Vikas Family ID',
+    email: 'vikas@sbrassociates.com',
+    phone: '+91 93333 44444',
+    role: 'AGENT',
+    sponsorId: 'ADMIN2',
+    joinedDate: '2025-01-03',
+    rank: 'Platinum Elite',
+    designation: 'AGM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 150.0,
+    dob: '1987-09-25',
+    aadhar: '3333 4444 5555',
+    pan: 'VIKA5012C',
+    address: 'Koramanagala, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    password: 'Vikas@SBR'
+  },
+  {
+    id: 'DK',
+    name: 'DK Family ID',
+    email: 'dk@sbrassociates.com',
+    phone: '+91 94444 55555',
+    role: 'AGENT',
+    sponsorId: 'ADMIN2',
+    joinedDate: '2025-01-03',
+    rank: 'Platinum Elite',
+    designation: 'AGM',
+    status: 'ACTIVE',
+    totalDirectSales: 0.0,
+    totalDownlineSales: 180.0,
+    dob: '1988-12-12',
+    aadhar: '4444 5555 6666',
+    pan: 'DKP5012D',
+    address: 'Jayanagar, Bengaluru',
+    photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
+    password: 'DK@SBR'
+  },
+  {
     id: 'SBR0001',
     name: 'Rajesh Kumar',
     email: 'rajesh.k@sbrassociates.com',
     phone: '+91 98450 12345',
     role: 'AGENT',
-    sponsorId: null,
+    sponsorId: 'RAM',
     joinedDate: '2025-01-10',
     rank: 'Crown Club',
-    designation: 'Sr. GM',
+    designation: 'Associate',
     status: 'ACTIVE',
-    totalDirectSales: 160.0, // in Points
-    totalDownlineSales: 450.0, // in Points
+    totalDirectSales: 160.0,
+    totalDownlineSales: 50.0,
     dob: '1979-05-12',
     aadhar: '4532 8912 0041',
     pan: 'APOPK5012A',
     address: 'H-204, Prestige Lakeside Habitat, Whitefield, Bengaluru',
-    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150'
+    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
+    password: 'password'
   },
   {
     id: 'SBR0002',
@@ -200,18 +293,19 @@ export const INITIAL_USERS: User[] = [
     email: 'amit.sharma@partners.in',
     phone: '+91 97412 88321',
     role: 'AGENT',
-    sponsorId: 'SBR0001',
+    sponsorId: 'MANORANJAN',
     joinedDate: '2025-02-15',
     rank: 'Platinum Elite',
-    designation: 'GM',
+    designation: 'Associate',
     status: 'ACTIVE',
-    totalDirectSales: 70.0, // in Points
-    totalDownlineSales: 150.0, // in Points
+    totalDirectSales: 70.0,
+    totalDownlineSales: 100.0,
     dob: '1984-09-22',
     aadhar: '6712 0032 5541',
     pan: 'DFKPS4124F',
     address: '88, 3rd Cross, Indiranagar 2nd Stage, Bengaluru',
-    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150'
+    photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150',
+    password: 'password'
   },
   {
     id: 'SBR0003',
@@ -219,18 +313,19 @@ export const INITIAL_USERS: User[] = [
     email: 'priya.naidu@reb-realty.com',
     phone: '+91 88612 00452',
     role: 'AGENT',
-    sponsorId: 'SBR0001',
+    sponsorId: 'VIKAS',
     joinedDate: '2025-03-01',
     rank: 'Platinum Elite',
-    designation: 'Manager',
+    designation: 'Associate',
     status: 'ACTIVE',
-    totalDirectSales: 50.0, // in Points
+    totalDirectSales: 150.0,
     totalDownlineSales: 0.0,
     dob: '1990-11-04',
     aadhar: '8910 4421 8820',
     pan: 'BVOPD2214K',
     address: 'S-2, Concorde Manhattan, Electronic City, Bengaluru',
-    photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150'
+    photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
+    password: 'password'
   },
   {
     id: 'SBR0004',
@@ -238,18 +333,19 @@ export const INITIAL_USERS: User[] = [
     email: 'sanjay.mehta@realtors.co.in',
     phone: '+91 90088 12399',
     role: 'AGENT',
-    sponsorId: 'SBR0002',
+    sponsorId: 'DK',
     joinedDate: '2025-03-18',
     rank: 'Gold Partner',
-    designation: 'AGM',
+    designation: 'Associate',
     status: 'ACTIVE',
-    totalDirectSales: 45.0, // in Points
-    totalDownlineSales: 110.0, // in Points
+    totalDirectSales: 45.0,
+    totalDownlineSales: 135.0,
     dob: '1982-03-15',
     aadhar: '5561 0041 3320',
     pan: 'CSDKK8920C',
     address: 'Flat 504, Sobha Primrose, Belandur, Bengaluru',
-    photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150'
+    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
+    password: 'password'
   },
   {
     id: 'SBR0005',
@@ -260,15 +356,16 @@ export const INITIAL_USERS: User[] = [
     sponsorId: 'SBR0004',
     joinedDate: '2025-04-05',
     rank: 'Silver Agent',
-    designation: 'Manager',
+    designation: 'Associate',
     status: 'ACTIVE',
-    totalDirectSales: 38.0, // in Points
-    totalDownlineSales: 25.0, // in Points
+    totalDirectSales: 38.0,
+    totalDownlineSales: 97.0,
     dob: '1993-07-31',
     aadhar: '7821 5560 9942',
     pan: 'ERFPT9820Z',
     address: 'Villa 14, Adarsh Palm Meadows, Varthur Road, Bengaluru',
-    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'
+    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    password: 'password'
   },
   {
     id: 'SBR0006',
@@ -281,24 +378,25 @@ export const INITIAL_USERS: User[] = [
     rank: 'Broker Affiliate',
     designation: 'Associate',
     status: 'ACTIVE',
-    totalDirectSales: 12.0, // in Points
+    totalDirectSales: 97.0,
     totalDownlineSales: 0.0,
     dob: '1995-12-05',
     aadhar: '3341 0029 8812',
     pan: 'LKOPT8940W',
     address: '22, Orchid Block, Brigade Metropolis, Garudacharpalya, Bengaluru',
-    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'
+    photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
+    password: 'password'
   }
 ];
 
 export const INITIAL_SALES: Sale[] = [
   {
     id: 'SALE-201',
-    project: 'SBR Keerthi Prime Phase II',
+    project: 'IMT Sohna',
     projectId: 'proj-1',
-    unitNumber: 'Villa A-102',
+    unitNumber: 'Plot A-102',
     buyerName: 'Dr. Srinivas Murthy',
-    saleValue: 3.0, // 150 Sq Yards = 3 PTS
+    saleValue: 3, // 150 Sq Yards = 3 PTS
     agentId: 'SBR0003',
     agentName: 'Priya Naidu',
     saleDate: '2026-05-10',
@@ -311,11 +409,11 @@ export const INITIAL_SALES: Sale[] = [
   },
   {
     id: 'SALE-202',
-    project: 'SBR Elanza Luxury Suites',
-    projectId: 'proj-2',
-    unitNumber: 'Suite 402',
+    project: 'IMT Sohna',
+    projectId: 'proj-1',
+    unitNumber: 'Plot C-402',
     buyerName: 'Abhishek Roy',
-    saleValue: 2.4, // 120 Sq Yards = 2.4 PTS
+    saleValue: 2, // 120 Sq Yards = 2 PTS
     agentId: 'SBR0005',
     agentName: 'Neha Patel',
     saleDate: '2026-05-18',
@@ -328,11 +426,11 @@ export const INITIAL_SALES: Sale[] = [
   },
   {
     id: 'SALE-203',
-    project: 'SBR Minara High-Rise',
-    projectId: 'proj-3',
-    unitNumber: 'Penthouse B-1801',
+    project: 'IMT Sohna',
+    projectId: 'proj-1',
+    unitNumber: 'Plot E-701',
     buyerName: 'Karthik Subramanian',
-    saleValue: 3.2, // 160 Sq Yards = 3.2 PTS
+    saleValue: 3, // 160 Sq Yards = 3 PTS
     agentId: 'SBR0006',
     agentName: 'Deepak Rao',
     saleDate: '2026-05-24',
@@ -350,34 +448,34 @@ export const INITIAL_PAYOUTS: CommissionPayout[] = [
   {
     id: 'PAY-101',
     saleId: 'SALE-201',
-    project: 'SBR Keerthi Prime Phase II',
-    unitNumber: 'Villa A-102',
-    saleValue: 3.0,
+    project: 'IMT Sohna',
+    unitNumber: 'Plot A-102',
+    saleValue: 3,
     agentId: 'SBR0003',
     agentName: 'Priya Naidu',
     level: 1,
     percentage: 5.0,
-    grossCommission: 0.15, // 5% of 3.0 PTS
-    tdsDeduction: 0.0075,  // 5% TDS
-    adminFee: 0.0015,      // 1% admin
-    netCommission: 0.141,
+    grossCommission: 3,
+    tdsDeduction: 0,
+    adminFee: 0,
+    netCommission: 3,
     status: 'DISBURSED',
     payoutDate: '2026-05-15'
   },
   {
     id: 'PAY-102',
     saleId: 'SALE-201',
-    project: 'SBR Keerthi Prime Phase II',
-    unitNumber: 'Villa A-102',
-    saleValue: 3.0,
+    project: 'IMT Sohna',
+    unitNumber: 'Plot A-102',
+    saleValue: 3,
     agentId: 'SBR0001',
     agentName: 'Rajesh Kumar',
     level: 2,
     percentage: 2.5,
-    grossCommission: 0.075, // 2.5% of 3.0 PTS
-    tdsDeduction: 0.00375,
-    adminFee: 0.00075,
-    netCommission: 0.0705,
+    grossCommission: 3,
+    tdsDeduction: 0,
+    adminFee: 0,
+    netCommission: 3,
     status: 'DISBURSED',
     payoutDate: '2026-05-15'
   },
@@ -386,68 +484,68 @@ export const INITIAL_PAYOUTS: CommissionPayout[] = [
   {
     id: 'PAY-103',
     saleId: 'SALE-202',
-    project: 'SBR Elanza Luxury Suites',
-    unitNumber: 'Suite 402',
-    saleValue: 2.4,
+    project: 'IMT Sohna',
+    unitNumber: 'Plot C-402',
+    saleValue: 2,
     agentId: 'SBR0005',
     agentName: 'Neha Patel',
     level: 1,
     percentage: 5.0,
-    grossCommission: 0.12, // 5% of 2.4 PTS
-    tdsDeduction: 0.006,
-    adminFee: 0.0012,
-    netCommission: 0.1128,
+    grossCommission: 2,
+    tdsDeduction: 0,
+    adminFee: 0,
+    netCommission: 2,
     status: 'APPROVED',
     payoutDate: '2026-05-25'
   },
   {
     id: 'PAY-104',
     saleId: 'SALE-202',
-    project: 'SBR Elanza Luxury Suites',
-    unitNumber: 'Suite 402',
-    saleValue: 2.4,
+    project: 'IMT Sohna',
+    unitNumber: 'Plot C-402',
+    saleValue: 2,
     agentId: 'SBR0004',
     agentName: 'Sanjay Mehta',
     level: 2,
     percentage: 2.5,
-    grossCommission: 0.06, // 2.5% of 2.4 PTS
-    tdsDeduction: 0.003,
-    adminFee: 0.0006,
-    netCommission: 0.0564,
+    grossCommission: 2,
+    tdsDeduction: 0,
+    adminFee: 0,
+    netCommission: 2,
     status: 'APPROVED',
     payoutDate: '2026-05-25'
   },
   {
     id: 'PAY-105',
     saleId: 'SALE-202',
-    project: 'SBR Elanza Luxury Suites',
-    unitNumber: 'Suite 402',
-    saleValue: 2.4,
+    project: 'IMT Sohna',
+    unitNumber: 'Plot C-402',
+    saleValue: 2,
     agentId: 'SBR0002',
     agentName: 'Amit Sharma',
     level: 3,
     percentage: 1.5,
-    grossCommission: 0.036, // 1.5% of 2.4 PTS
-    tdsDeduction: 0.0018,
-    adminFee: 0.00036,
-    netCommission: 0.03384,
+    grossCommission: 2,
+    tdsDeduction: 0,
+    adminFee: 0,
+    netCommission: 2,
     status: 'APPROVED',
     payoutDate: '2026-05-25'
   },
   {
     id: 'PAY-106',
     saleId: 'SALE-202',
-    project: 'SBR Elanza Luxury Suites',
-    unitNumber: 'Suite 402',
-    saleValue: 2.4,
+    project: 'IMT Sohna',
+    unitNumber: 'Plot C-402',
+    saleValue: 2,
     agentId: 'SBR0001',
     agentName: 'Rajesh Kumar',
     level: 4,
     percentage: 1.0,
-    grossCommission: 0.024, // 1.0% of 2.4 PTS
-    tdsDeduction: 0.0012,
-    adminFee: 0.00024,
-    netCommission: 0.02256,
+    grossCommission: 2,
+    tdsDeduction: 0,
+    adminFee: 0,
+    netCommission: 2,
     status: 'APPROVED',
     payoutDate: '2026-05-25'
   }
@@ -458,8 +556,8 @@ export const INITIAL_NOTIFICATIONS: Notification[] = [
     id: 'NOT-001',
     userId: 'SBR0003',
     title: 'Commission Credited',
-    message: 'Your commission of 0.141 PTS for SBR Keerthi Prime Villa A-102 has been disbursed into your account ledgers.',
-    amount: 0.141,
+    message: 'Your commission of 3 PTS for IMT Sohna Plot A-102 has been disbursed into your account ledgers.',
+    amount: 3,
     timestamp: '2026-05-15 15:30',
     isRead: true
   },
@@ -467,8 +565,8 @@ export const INITIAL_NOTIFICATIONS: Notification[] = [
     id: 'NOT-002',
     userId: 'SBR0001',
     title: 'Indirect Downline Commission Credited',
-    message: 'Level 2 commission of 0.0705 PTS generated from Priya Naidu\'s sale has been disbursed.',
-    amount: 0.0705,
+    message: 'Level 2 commission of 3 PTS generated from Priya Naidu\'s sale has been disbursed.',
+    amount: 3,
     timestamp: '2026-05-15 15:32',
     isRead: false
   },
@@ -476,8 +574,8 @@ export const INITIAL_NOTIFICATIONS: Notification[] = [
     id: 'NOT-003',
     userId: 'SBR0005',
     title: 'Commission Approved',
-    message: 'Your commission of 0.1128 PTS for SBR Elanza Suite 402 is approved and scheduled for next billing cycle.',
-    amount: 0.1128,
+    message: 'Your commission of 2 PTS for IMT Sohna Plot C-402 is approved and scheduled for next billing cycle.',
+    amount: 2,
     timestamp: '2026-05-25 10:00',
     isRead: false
   }

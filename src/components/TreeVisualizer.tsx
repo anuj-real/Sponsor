@@ -10,7 +10,9 @@ interface TreeVisualizerProps {
 
 export default function TreeVisualizer({ users, onSelectUser, selectedUserId }: TreeVisualizerProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
-    'SBR-1001': true, // Auto-expand crown sponsor by default
+    'SBR': true,
+    'ADMIN1': true,
+    'ADMIN2': true,
   });
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -152,7 +154,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId }: 
             <div className="mt-2.5 sm:mt-0 pt-2.5 sm:pt-0 sm:text-right border-t sm:border-t-0 border-zinc-100 flex justify-between sm:block">
               <span className="text-[10px] uppercase tracking-wider font-medium text-zinc-400 block">Network Vol.</span>
               <span className="font-mono font-bold text-zinc-800 text-xs sm:text-sm">
-                {networkVolume >= 1000 ? `${(networkVolume).toFixed(2)} PTS` : `${networkVolume} PTS`}
+                {Math.round(networkVolume).toLocaleString()} PTS
               </span>
             </div>
           </div>

@@ -156,3 +156,62 @@ export async function seedDatabase(initialData: {
     };
   }
 }
+
+/**
+ * Overwrites and resets the database collections to default seed data
+ */
+export async function resetDatabaseToDefaults(initialData: {
+  users: any[];
+  projects: any[];
+  sales: any[];
+  payouts: any[];
+  config: any;
+  notifications: any[];
+}): Promise<void> {
+  console.log('Resetting database to default seed data...');
+
+  // 1. Reset MLM Config
+  await setDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'), initialData.config);
+
+  // 2. Reset Users
+  const usersBatch = writeBatch(db);
+  initialData.users.forEach(user => {
+    const userRef = doc(db, COLLECTIONS.USERS, user.id);
+    usersBatch.set(userRef, user);
+  });
+  await usersBatch.commit();
+
+  // 3. Reset Projects
+  const projectsBatch = writeBatch(db);
+  initialData.projects.forEach(project => {
+    const projectRef = doc(db, COLLECTIONS.PROJECTS, project.id);
+    projectsBatch.set(projectRef, project);
+  });
+  await projectsBatch.commit();
+
+  // 4. Reset Sales
+  const salesBatch = writeBatch(db);
+  initialData.sales.forEach(sale => {
+    const saleRef = doc(db, COLLECTIONS.SALES, sale.id);
+    salesBatch.set(saleRef, sale);
+  });
+  await salesBatch.commit();
+
+  // 5. Reset Payouts
+  const payoutsBatch = writeBatch(db);
+  initialData.payouts.forEach(payout => {
+    const payoutRef = doc(db, COLLECTIONS.PAYOUTS, payout.id);
+    payoutsBatch.set(payoutRef, payout);
+  });
+  await payoutsBatch.commit();
+
+  // 6. Reset Notifications
+  const notifsBatch = writeBatch(db);
+  initialData.notifications.forEach(notif => {
+    const notifRef = doc(db, COLLECTIONS.NOTIFICATIONS, notif.id);
+    notifsBatch.set(notifRef, notif);
+  });
+  await notifsBatch.commit();
+
+  console.log('Database reset complete!');
+}
