@@ -37,7 +37,7 @@ import {
 
 export default function App() {
   const [activeRole, setActiveRole] = useState<UserRole>('ADMIN');
-  const [activeAgentId, setActiveAgentId] = useState<string>('SBR0005'); // Simulated default agent (Neha Patel)
+  const [activeAgentId, setActiveAgentId] = useState<string>('C'); // Simulated default agent (Company Profile C)
   const [session, setSession] = useState<{ role: UserRole; agentId?: string; name: string } | null>(null);
   
   // Master states
@@ -50,7 +50,7 @@ export default function App() {
   const [dbLoading, setDbLoading] = useState(true);
 
   // Selected User in the Tree diagram
-  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('SBR0005');
+  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('C');
 
   // Security Modal States
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function App() {
   useEffect(() => {
     async function initFirestore() {
       try {
-        const data = await seedDatabase({
+        let data = await seedDatabase({
           users: INITIAL_USERS,
           projects: INITIAL_PROJECTS,
           sales: INITIAL_SALES,
@@ -72,6 +72,34 @@ export default function App() {
           config: INITIAL_MLM_CONFIG,
           notifications: INITIAL_NOTIFICATIONS
         });
+
+        // Auto-migration: Check if database has old data (contains SBR0005 or is missing top-level C)
+        const hasOldData = data.users.some(u => u.id === 'SBR0005') || !data.users.some(u => u.id === 'C');
+        if (hasOldData) {
+          console.log("SBR Cloud Core: Old seed data detected in Firestore. Auto-migrating to the new 7-user SBR MLM Corporate Structure...");
+          await resetDatabaseToDefaults({
+            users: INITIAL_USERS,
+            projects: INITIAL_PROJECTS,
+            sales: INITIAL_SALES,
+            payouts: INITIAL_PAYOUTS,
+            config: INITIAL_MLM_CONFIG,
+            notifications: INITIAL_NOTIFICATIONS
+          });
+          data = {
+            users: INITIAL_USERS,
+            projects: INITIAL_PROJECTS,
+            sales: INITIAL_SALES,
+            payouts: INITIAL_PAYOUTS,
+            config: INITIAL_MLM_CONFIG,
+            notifications: INITIAL_NOTIFICATIONS
+          };
+          
+          localStorage.setItem('SBR_SESSION', JSON.stringify({
+            role: 'ADMIN',
+            agentId: 'C',
+            name: 'Company Profile C'
+          }));
+        }
 
         const activeConfig = data.config || INITIAL_MLM_CONFIG;
         
@@ -116,9 +144,31 @@ export default function App() {
           setConfig(INITIAL_MLM_CONFIG);
         }
 
-        const localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
-        const localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
-        const localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
+        let localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
+        let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
+        let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
+
+        // Auto-migration for local fallback
+        const hasOldLocalData = localUsers.some(u => u.id === 'SBR0005') || !localUsers.some(u => u.id === 'C');
+        if (hasOldLocalData) {
+          console.log("SBR Cloud Core: Old seed data detected in LocalStorage. Auto-migrating to the new 7-user SBR MLM Corporate Structure...");
+          localSales = INITIAL_SALES;
+          localProjects = INITIAL_PROJECTS;
+          localUsers = normalizeUsersWithSales(INITIAL_USERS, localSales, activeConfig);
+          
+          localStorage.setItem('SBR_USERS', JSON.stringify(localUsers));
+          localStorage.setItem('SBR_PROJECTS', JSON.stringify(localProjects));
+          localStorage.setItem('SBR_SALES', JSON.stringify(localSales));
+          localStorage.setItem('SBR_PAYOUTS', JSON.stringify(INITIAL_PAYOUTS));
+          localStorage.setItem('SBR_NOTIFICATIONS', JSON.stringify(INITIAL_NOTIFICATIONS));
+          
+          localStorage.setItem('SBR_SESSION', JSON.stringify({
+            role: 'ADMIN',
+            agentId: 'C',
+            name: 'Company Profile C'
+          }));
+        }
+
         const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
         const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
 
@@ -138,21 +188,41 @@ export default function App() {
     if (storedSession) {
       try {
         const parsed = JSON.parse(storedSession);
+        // If stored session is for Neha Patel, redirect it to C
+        if (parsed.agentId === 'SBR0005') {
+          parsed.agentId = 'C';
+          parsed.name = 'Company Profile C';
+          parsed.role = 'ADMIN';
+        }
         setSession(parsed);
         setActiveRole(parsed.role);
         if (parsed.agentId) {
           setActiveAgentId(parsed.agentId);
+          setSelectedTreeUserId(parsed.agentId);
         }
       } catch (e) {
         console.error('Error loading stored session', e);
       }
+    } else {
+      // By default if no session exists, default to Admin Company Profile C session
+      const defaultSession = {
+        role: 'ADMIN' as UserRole,
+        agentId: 'C',
+        name: 'Company Profile C'
+      };
+      setSession(defaultSession);
+      setActiveRole('ADMIN');
+      setActiveAgentId('C');
+      setSelectedTreeUserId('C');
+      localStorage.setItem('SBR_SESSION', JSON.stringify(defaultSession));
     }
   }, []);
 
   const handleLogin = (role: UserRole, agentId?: string) => {
     let name = '';
     if (role === 'ADMIN' && !agentId) {
-      name = 'Rahul Deshmukh (Owner)';
+      name = 'Company Profile C';
+      agentId = 'C';
     } else if (agentId) {
       const agent = users.find((u: User) => u.id === agentId);
       name = agent ? agent.name : 'SBR Broker';
@@ -200,7 +270,7 @@ export default function App() {
     // Create audit notification for admin actions
     const notif: Notification = {
       id: `NOT-${Math.floor(500 + Math.random() * 500)}`,
-      userId: 'SBR0001',
+      userId: 'C',
       title: 'New SBR Project Created',
       message: `Project ${newProj.name} created at ${newProj.location} with Starting Price ${newProj.sqYardStartingPrice} PTS/sq yard.`,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
@@ -241,7 +311,7 @@ export default function App() {
     // Create audit notification for admin actions
     const notif: Notification = {
       id: `NOT-${Math.floor(500 + Math.random() * 500)}`,
-      userId: newUserData.sponsorId || 'SBR0001',
+      userId: newUserData.sponsorId || 'C',
       title: 'New Sourcing Partner Appointed',
       message: `Associate ${newUserData.name} onboarded onto SBR hierarchy with Sponsor ID: ${newUserData.id}.`,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
@@ -583,6 +653,24 @@ export default function App() {
     }
   };
 
+  const handleAdminUpdateUserProfile = async (userId: string, updatedFields: Partial<User>) => {
+    try {
+      const userToUpdate = users.find(u => u.id === userId);
+      if (!userToUpdate) {
+        throw new Error("User profile not found in SBR organization.");
+      }
+      if (['C', 'A1', 'A2'].includes(userId)) {
+        throw new Error("Security Violation: Core Administrative nodes are exempt from manual updates.");
+      }
+      const updatedUser = { ...userToUpdate, ...updatedFields };
+      await setDocumentData(COLLECTIONS.USERS, userId, updatedUser);
+      setUsers(prevUsers => prevUsers.map(u => u.id === userId ? updatedUser : u));
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.message || "Failed to update broker credentials.");
+    }
+  };
+
   const handleResetDatabase = async () => {
     if (!window.confirm("Are you sure you want to reset the database? This will overwrite all custom data and seed the standard SBR Corporate MLM structure with Neha Patel and other agents.")) {
       return;
@@ -611,22 +699,22 @@ export default function App() {
       setConfig(INITIAL_MLM_CONFIG);
       setNotifications(filteredNotifs);
       
-      setSelectedTreeUserId('SBR0005');
-      setActiveAgentId('SBR0005');
+      setSelectedTreeUserId('C');
+      setActiveAgentId('C');
       
       setSession({
-        role: 'AGENT',
-        agentId: 'SBR0005',
-        name: 'Neha Patel'
+        role: 'ADMIN',
+        agentId: 'C',
+        name: 'Company Profile C'
       });
-      setActiveRole('AGENT');
+      setActiveRole('ADMIN');
       localStorage.setItem('SBR_SESSION', JSON.stringify({
-        role: 'AGENT',
-        agentId: 'SBR0005',
-        name: 'Neha Patel'
+        role: 'ADMIN',
+        agentId: 'C',
+        name: 'Company Profile C'
       }));
       
-      alert("Database successfully reset and seeded with the IMT Sohna SBR MLM Hierarchy!");
+      alert("Database successfully reset and seeded with the clean 7-user SBR MLM Corporate Hierarchy!");
     } catch (e) {
       console.error("Reset failed", e);
       alert("Failed to reset database: " + e);
@@ -784,6 +872,7 @@ export default function App() {
               onDisbursePayout={handleDisbursePayout}
               onUpdateSaleBookingStatus={handleUpdateSaleBookingStatus}
               onUpdateSale={handleUpdateSale}
+              onUpdateUserProfile={handleAdminUpdateUserProfile}
             />
 
             <TreeVisualizer 

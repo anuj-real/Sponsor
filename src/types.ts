@@ -9,7 +9,7 @@ export interface User {
   sponsorId: string | null; // ID of the person who onboarded them
   joinedDate: string;
   rank?: 'Crown Club' | 'Platinum Elite' | 'Gold Partner' | 'Silver Agent' | 'Broker Affiliate';
-  designation: 'Associate' | 'Manager' | 'Sr. Manager' | 'AGM' | 'GM' | 'Sr. GM';
+  designation?: 'Associate' | 'Manager' | 'Sr. Manager' | 'AGM' | 'GM' | 'Sr. GM' | 'Exempt' | 'N/A';
   status: 'ACTIVE' | 'INACTIVE';
   totalDirectSales: number; // Sum of direct sales driven by this agent (in Points)
   totalDownlineSales: number; // Sum of sales driven by their network (in Points)

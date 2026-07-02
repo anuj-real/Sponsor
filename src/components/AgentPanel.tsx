@@ -565,7 +565,13 @@ export default function AgentPanel({
               <Award className="w-4 h-4 text-emerald-800" /> Designation Ranks & Direct Incentive
             </h4>
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-              {(config.leadershipConfigs || []).length === 0 ? (
+              {['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'VIKAS', 'DK'].includes(agent.id) ? (
+                <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl text-stone-500 text-xs leading-relaxed space-y-2">
+                  <p className="font-semibold text-stone-700">Administrative Exemption</p>
+                  <p>Leadership override tiers and direct incentive eligibility calculations are disabled for SBR corporate nodes.</p>
+                  <p className="text-[11px] text-stone-400">Your profile is exempt from designation tracks based on the company's grandfathered structure.</p>
+                </div>
+              ) : (config.leadershipConfigs || []).length === 0 ? (
                 <p className="text-xs text-stone-400 italic">No team designation tracks set up.</p>
               ) : (() => {
                 const directRecruitsCount = users.filter(u => u.sponsorId === agent.id).length;

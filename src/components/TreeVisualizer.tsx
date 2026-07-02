@@ -11,8 +11,11 @@ interface TreeVisualizerProps {
 export default function TreeVisualizer({ users, onSelectUser, selectedUserId }: TreeVisualizerProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     'SBR': true,
+    'C': true,
     'ADMIN1': true,
+    'A1': true,
     'ADMIN2': true,
+    'A2': true,
   });
   const [searchQuery, setSearchQuery] = useState('');
 

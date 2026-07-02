@@ -30,10 +30,10 @@ export function parseConditionString(condition: string) {
  * Dynamically computes a user's eligible designation based on their stats and downline size.
  */
 export function calculateUserDesignation(user: User, allUsers: User[], config?: MLMConfig): User['designation'] {
-  // Administrative nodes (SBR, ADMIN1, ADMIN2, RAM, MANORANJAN, VIKAS, DK) are grandfathered.
-  const adminIds = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'];
+  // Administrative nodes are grandfathered and designation logic is disabled for them.
+  const adminIds = ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'VIKAS', 'DK', 'SBR', 'ADMIN1', 'ADMIN2'];
   if (adminIds.includes(user.id)) {
-    return user.designation || 'Associate';
+    return 'Exempt';
   }
 
   const directSales = user.totalDirectSales || 0;
@@ -149,6 +149,28 @@ export function normalizeUsersWithSales(users: User[], sales: Sale[], config?: M
 }
 
 /**
+ * Helper to check if a seller is a downline of one of the 4 family IDs (MANORANJAN, RAM, DK, VIKAS)
+ */
+function isDescendantOfFamilyIds(sellerId: string, users: User[]): boolean {
+  const familyIds = ['MANORANJAN', 'RAM', 'DK', 'VIKAS'];
+  let currentId: string | null = sellerId;
+  const visited = new Set<string>();
+
+  while (currentId) {
+    if (familyIds.includes(currentId)) {
+      return true;
+    }
+    if (visited.has(currentId)) {
+      break;
+    }
+    visited.add(currentId);
+    const agent = users.find(u => u.id === currentId);
+    currentId = agent ? agent.sponsorId : null;
+  }
+  return false;
+}
+
+/**
  * Rebuilds/normalizes all commission payouts based on current sales and user tree to ensure strict consistency.
  */
 export function rebuildPayoutsFromSales(
@@ -163,6 +185,9 @@ export function rebuildPayoutsFromSales(
     let currentAgentId: string | null = sale.agentId;
     let currentLevel = 1;
 
+    // Check if the sale's direct seller is a descendant of the 4 family IDs
+    const isFromFamilyDownline = isDescendantOfFamilyIds(sale.agentId, users);
+
     while (currentAgentId && currentLevel <= (config?.levels?.length || 10)) {
       const levelConfig = config?.levels?.find(l => l.level === currentLevel);
       if (!levelConfig) break;
@@ -171,10 +196,14 @@ export function rebuildPayoutsFromSales(
       if (!currentAgent) break;
 
       const value = Math.round(sale.saleValue);
-      const gross = value;
-      const tds = 0;
-      const admin = 0;
-      const net = value;
+      const levelPct = levelConfig.percentage;
+      const tdsPct = config?.tdsPercentage ?? 5.0;
+      const adminPct = config?.adminFeePercentage ?? 1.0;
+
+      const gross = parseFloat((value * (levelPct / 100)).toFixed(4));
+      const tds = parseFloat((gross * (tdsPct / 100)).toFixed(4));
+      const admin = parseFloat((gross * (adminPct / 100)).toFixed(4));
+      const net = parseFloat((gross - tds - admin).toFixed(4));
 
       // Look up if a payout already exists for this sale, agent, and level to preserve its status & id
       const match = existingPayouts.find(
@@ -185,23 +214,36 @@ export function rebuildPayoutsFromSales(
       const status = match?.status || 'PENDING';
       const payoutDate = match?.payoutDate || new Date(new Date(sale.saleDate).setDate(new Date(sale.saleDate).getDate() + 14)).toISOString().split('T')[0];
 
-      rebuilt.push({
-        id: payoutId,
-        saleId: sale.id,
-        project: sale.project,
-        unitNumber: sale.unitNumber,
-        saleValue: value,
-        agentId: currentAgent.id,
-        agentName: currentAgent.name,
-        level: currentLevel,
-        percentage: levelConfig.percentage,
-        grossCommission: gross,
-        tdsDeduction: tds,
-        adminFee: admin,
-        netCommission: net,
-        status,
-        payoutDate
-      });
+      // Administrative/corporate nodes:
+      // 1. Cannot make direct sales (level === 1), as "no direct sale will be made by these 7 profiles".
+      // 2. Are eligible only for downline sales (level > 1) via the defined multi-level commission tiers (overrides).
+      // 3. Downlines for these 7 profiles must start from the 4 family IDs (MANORANJAN, RAM, DK, VIKAS).
+      const adminIds = ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'VIKAS', 'DK', 'SBR', 'ADMIN1', 'ADMIN2'];
+      const isCorporate = adminIds.includes(currentAgent.id);
+      
+      const isEligible = isCorporate
+        ? (currentLevel > 1 && isFromFamilyDownline)
+        : true;
+
+      if (isEligible) {
+        rebuilt.push({
+          id: payoutId,
+          saleId: sale.id,
+          project: sale.project,
+          unitNumber: sale.unitNumber,
+          saleValue: value,
+          agentId: currentAgent.id,
+          agentName: currentAgent.name,
+          level: currentLevel,
+          percentage: levelConfig.percentage,
+          grossCommission: gross,
+          tdsDeduction: tds,
+          adminFee: admin,
+          netCommission: net,
+          status,
+          payoutDate
+        });
+      }
 
       currentAgentId = currentAgent.sponsorId;
       currentLevel++;

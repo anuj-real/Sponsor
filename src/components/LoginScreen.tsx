@@ -50,8 +50,11 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
           // Dynamic passcode mapping as fallback
           const fallbackPasscodes: Record<string, string> = {
             'SBR': 'SBR@2026',
+            'C': 'C@SBR',
             'ADMIN1': 'Admin1@SBR',
+            'A1': 'A1@SBR',
             'ADMIN2': 'Admin2@SBR',
+            'A2': 'A2@SBR',
             'RAM': 'Ram@SBR',
             'MANORANJAN': 'Manoranjan@SBR',
             'VIKAS': 'Vikas@SBR',
@@ -63,7 +66,7 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
           if (password === expectedPasscode) {
             if (foundAgent.status === 'ACTIVE') {
               // The 7 corporate and family level nodes get full Admin rights/access
-              const isAdminNode = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(foundAgent.id.toUpperCase());
+              const isAdminNode = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
               if (isAdminNode) {
                 onLogin('ADMIN', foundAgent.id);
               } else {

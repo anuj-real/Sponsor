@@ -188,6 +188,41 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
   const nextReward = brokerMilestones.find(m => !m.isUnlocked);
   const highestAchieved = achievedRewards.length > 0 ? achievedRewards[achievedRewards.length - 1] : null;
 
+  const isCorporateNode = ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'VIKAS', 'DK'].includes(agent.id);
+
+  if (isCorporateNode) {
+    return (
+      <div className="bg-white border border-stone-250/90 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shadow-xs border border-amber-200/50">
+            <Award className="w-5.5 h-4.5 text-amber-680 stroke-[2.5]" />
+          </div>
+          <div>
+            <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wider font-sans flex items-center gap-2">
+              Corporate Administrative Node
+              <span className="text-[9px] bg-amber-50 text-amber-800 font-extrabold px-2 py-0.5 rounded border border-amber-200/50 uppercase tracking-wider font-sans">
+                Grandfathered Profile
+              </span>
+            </h3>
+            <p className="text-[11px] text-stone-500 mt-0.5">
+              Designation logic and career milestone tracking are disabled for top-level corporate nodes.
+            </p>
+          </div>
+        </div>
+        <div className="p-4 bg-stone-50/65 rounded-xl border border-stone-200/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <span className="block text-[9.5px] uppercase tracking-wider text-stone-400 font-semibold">Corporate Rank Status</span>
+            <strong className="text-sm font-bold text-stone-500">Exempt</strong>
+          </div>
+          <div className="sm:text-right">
+            <span className="block text-[9.5px] uppercase tracking-wider text-stone-400 font-semibold">Designation Status</span>
+            <strong className="text-sm font-bold text-stone-500">Exempt (Not Applicable)</strong>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-stone-250/90 rounded-2xl p-6 shadow-sm space-y-6">
       {/* Block Header */}

@@ -5,7 +5,7 @@ import {
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
   Search, ShieldAlert, Award, Calendar, Home, CreditCard, Trash2, Plus, Edit, Share2,
-  BarChart3, Download, Printer
+  BarChart3, Download, Printer, Key
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -38,6 +38,7 @@ interface AdminPanelProps {
   onDisbursePayout: (payoutId: string) => void;
   onUpdateSaleBookingStatus?: (saleId: string, bookingStatus: 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE', tokenAmount?: number) => void;
   onUpdateSale?: (sale: Sale) => void;
+  onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
 }
 
 export default function AdminPanel({
@@ -55,7 +56,8 @@ export default function AdminPanel({
   onApprovePayout,
   onDisbursePayout,
   onUpdateSaleBookingStatus,
-  onUpdateSale
+  onUpdateSale,
+  onUpdateUserProfile
 }: AdminPanelProps) {
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS
   const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS'>('SETTINGS');
@@ -163,6 +165,19 @@ export default function AdminPanel({
   const [errorMsg, setErrorMsg] = useState('');
   const [agentFilter, setAgentFilter] = useState('');
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+
+  // Admin changing broker credentials state
+  const [selectedAgentForPassword, setSelectedAgentForPassword] = useState<User | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editDob, setEditDob] = useState('');
+  const [editAadhar, setEditAadhar] = useState('');
+  const [editPan, setEditPan] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordStatusMsg, setPasswordStatusMsg] = useState('');
 
   // Project Creation state
   const [projName, setProjName] = useState('');
@@ -1602,11 +1617,13 @@ export default function AdminPanel({
                     className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 cursor-pointer focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                   >
                     <option value="">No Direct Sponsor (Independent Director)</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.id}) - {u.designation || 'Associate'}
-                      </option>
-                    ))}
+                    {users
+                      .filter((u) => !['C', 'A1', 'A2'].includes(u.id))
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.id}) - {u.designation || 'Associate'}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -1792,6 +1809,28 @@ export default function AdminPanel({
                       </td>
                       <td className="px-5 py-3 text-right font-sans">
                         <div className="flex items-center justify-end gap-1.5">
+                          {!['C', 'A1', 'A2'].includes(agent.id) && (
+                            <button
+                              onClick={() => {
+                                setSelectedAgentForPassword(agent);
+                                setEditName(agent.name || '');
+                                setEditEmail(agent.email || '');
+                                setEditPhone(agent.phone || '');
+                                setEditDob(agent.dob || '');
+                                setEditAadhar(agent.aadhar || '');
+                                setEditPan(agent.pan || '');
+                                setEditAddress(agent.address || '');
+                                setTempPassword(agent.password || 'password');
+                                setPasswordStatusMsg('');
+                              }}
+                              className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
+                              title="Edit secure credentials"
+                            >
+                              <Key className="w-2.5 h-2.5 text-stone-500" />
+                              <span>Credentials</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
@@ -3034,6 +3073,179 @@ export default function AdminPanel({
           </div>
         );
       })()}
+
+      {/* Edit Broker Credentials Modal */}
+      {selectedAgentForPassword && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-stone-200 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-emerald-400" />
+                <div>
+                  <h4 className="font-bold text-xs">Edit Primary Broker Credentials</h4>
+                  <p className="text-[9px] text-stone-300">Sponsor ID: {selectedAgentForPassword.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedAgentForPassword(null);
+                  setPasswordStatusMsg('');
+                }}
+                className="text-stone-300 hover:text-white text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 font-sans max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Full Representative Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    placeholder="Enter full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    placeholder="name@email.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={editDob}
+                    onChange={(e) => setEditDob(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">PAN Card Number</label>
+                  <input
+                    type="text"
+                    value={editPan}
+                    onChange={(e) => setEditPan(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Aadhaar Card Number</label>
+                  <input
+                    type="text"
+                    value={editAadhar}
+                    onChange={(e) => setEditAadhar(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                    placeholder="12-digit Aadhaar"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Complete Residential Address</label>
+                  <textarea
+                    rows={2}
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none resize-none"
+                    placeholder="Enter residential address"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Secure Passcode / Password</label>
+                  <input
+                    type="text"
+                    placeholder="Enter secure passcode"
+                    value={tempPassword}
+                    onChange={(e) => setTempPassword(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {passwordStatusMsg && (
+                <p className="text-[10.5px] font-semibold text-emerald-850 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center animate-pulse">
+                  {passwordStatusMsg}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAgentForPassword(null);
+                    setPasswordStatusMsg('');
+                  }}
+                  className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingPassword || !tempPassword.trim() || !editName.trim()}
+                  onClick={async () => {
+                    if (!tempPassword.trim() || !editName.trim()) return;
+                    setUpdatingPassword(true);
+                    setPasswordStatusMsg('');
+                    try {
+                      if (onUpdateUserProfile) {
+                        await onUpdateUserProfile(selectedAgentForPassword.id, {
+                          name: editName,
+                          email: editEmail,
+                          phone: editPhone,
+                          dob: editDob,
+                          aadhar: editAadhar,
+                          pan: editPan,
+                          address: editAddress,
+                          password: tempPassword,
+                        });
+                        setPasswordStatusMsg('Broker credentials updated successfully!');
+                        setTimeout(() => {
+                          setSelectedAgentForPassword(null);
+                          setPasswordStatusMsg('');
+                        }, 1200);
+                      } else {
+                        setPasswordStatusMsg('Callback not provided.');
+                      }
+                    } catch (err: any) {
+                      setPasswordStatusMsg(err?.message || 'Failed to update credentials.');
+                    } finally {
+                      setUpdatingPassword(false);
+                    }
+                  }}
+                  className="flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-800 text-white hover:bg-emerald-900 cursor-pointer disabled:opacity-50"
+                >
+                  {updatingPassword ? 'Saving...' : 'Save Credentials'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

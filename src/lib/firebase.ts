@@ -170,6 +170,42 @@ export async function resetDatabaseToDefaults(initialData: {
 }): Promise<void> {
   console.log('Resetting database to default seed data...');
 
+  // 0. Clear existing collections to ensure no stray documents remain from old schema
+  const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+  if (!usersSnap.empty) {
+    const batch = writeBatch(db);
+    usersSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+  }
+
+  const projectsSnap = await getDocs(collection(db, COLLECTIONS.PROJECTS));
+  if (!projectsSnap.empty) {
+    const batch = writeBatch(db);
+    projectsSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+  }
+
+  const salesSnap = await getDocs(collection(db, COLLECTIONS.SALES));
+  if (!salesSnap.empty) {
+    const batch = writeBatch(db);
+    salesSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+  }
+
+  const payoutsSnap = await getDocs(collection(db, COLLECTIONS.PAYOUTS));
+  if (!payoutsSnap.empty) {
+    const batch = writeBatch(db);
+    payoutsSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+  }
+
+  const notifsSnap = await getDocs(collection(db, COLLECTIONS.NOTIFICATIONS));
+  if (!notifsSnap.empty) {
+    const batch = writeBatch(db);
+    notifsSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+  }
+
   // 1. Reset MLM Config
   await setDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'), initialData.config);
 
