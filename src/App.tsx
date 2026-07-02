@@ -93,35 +93,6 @@ export default function App() {
         setPayouts(loadedPayouts);
         setConfig(activeConfig);
         setNotifications(loadedNotifs);
-
-        // Delete other sales / payouts that are NOT IMT Sohna from Firestore to keep DB pure
-        const nonImtSohnaSales = (data.sales || []).filter(s => s.project !== 'IMT Sohna');
-        for (const s of nonImtSohnaSales) {
-          try {
-            await deleteDocument(COLLECTIONS.SALES, s.id);
-          } catch (e) {
-            console.warn(`Failed to delete non-IMT Sohna sale ${s.id}:`, e);
-          }
-        }
-        const nonImtSohnaPayouts = (data.payouts || []).filter(p => p.project !== 'IMT Sohna');
-        for (const p of nonImtSohnaPayouts) {
-          try {
-            await deleteDocument(COLLECTIONS.PAYOUTS, p.id);
-          } catch (e) {
-            console.warn(`Failed to delete non-IMT Sohna payout ${p.id}:`, e);
-          }
-        }
-
-        // Overwrite Firestore records with perfectly normalized / filtered data to ensure strict DB-level correctness
-        for (const s of loadedSales) {
-          await setDocumentData(COLLECTIONS.SALES, s.id, s);
-        }
-        for (const p of loadedPayouts) {
-          await setDocumentData(COLLECTIONS.PAYOUTS, p.id, p);
-        }
-        for (const u of loadedUsers) {
-          await setDocumentData(COLLECTIONS.USERS, u.id, u);
-        }
       } catch (error) {
         console.error("Firebase Initialization failed, falling back to LocalStorage:", error);
         
@@ -707,14 +678,14 @@ export default function App() {
 
           {/* Interactive Role Selector / User Identity Block */}
           {session ? (
-            <div className="flex flex-row flex-wrap items-center justify-center md:justify-end gap-1.5 sm:gap-3 z-20 self-center md:self-auto w-full md:w-auto">
+            <div className="flex flex-row flex-wrap items-center justify-end gap-1.5 sm:gap-2 z-20 self-center md:self-auto w-auto">
               
               {/* Authenticated Broker or Admin Badge */}
-              <div className="flex items-center gap-1.5 bg-stone-100 border border-stone-200 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs text-stone-700">
+              <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-lg px-2 py-1 text-[10.5px] sm:text-xs text-stone-700">
                 <div className={`w-1.5 h-1.5 rounded-full ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                <span className="font-semibold text-stone-900">{session.name}</span>
-                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono">
-                  {session.role === 'AGENT' ? 'ASSOCIATE' : session.role}
+                <span className="font-semibold text-stone-900 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{session.name}</span>
+                <span className="text-[8px] uppercase font-bold tracking-wider px-1 py-0.5 rounded bg-stone-200 text-stone-800 font-mono scale-90 origin-right">
+                  {session.role === 'ADMIN' ? 'ADMIN' : 'ASSOCIATE'}
                 </span>
               </div>
 
@@ -723,27 +694,27 @@ export default function App() {
                 <div className="flex p-0.5 bg-stone-100 border border-stone-250 rounded-lg shadow-xs">
                   <button
                     onClick={() => setActiveRole('ADMIN')}
-                    className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`px-2 py-1 rounded text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       activeRole === 'ADMIN' 
-                        ? 'bg-emerald-800 text-white shadow-sm' 
+                        ? 'bg-emerald-800 text-white shadow-xs' 
                         : 'text-stone-500 hover:text-stone-900'
                     }`}
                   >
-                    👑 Owner/Admin
+                    👑 <span className="hidden xs:inline">Owner/Admin</span>
                   </button>
                   <button
                     onClick={() => setActiveRole('AGENT')}
-                    className={`px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`px-1.5 py-1 rounded text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       activeRole === 'AGENT' 
-                        ? 'bg-emerald-800 text-white shadow-sm' 
+                        ? 'bg-emerald-800 text-white shadow-xs' 
                         : 'text-stone-500 hover:text-stone-900'
                     }`}
                   >
-                    💼 Channel Partner Panel
+                    💼 <span className="hidden xs:inline">Channel Partner Panel</span>
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs text-emerald-800 font-medium font-sans">
+                <div className="hidden sm:flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 text-[10.5px] sm:text-xs text-emerald-800 font-medium">
                   🔑 Session Verified
                 </div>
               )}
@@ -752,11 +723,11 @@ export default function App() {
               {session.role === 'ADMIN' && (
                 <button
                   onClick={handleResetDatabase}
-                  className="px-2 py-1.5 sm:px-3.5 sm:py-2 font-bold text-[11px] sm:text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white border border-amber-700/50 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                  className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white border border-amber-700/50 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                   title="Reset database to the standard 7-user SBR Corporate Tree"
                 >
                   <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin-slow" />
-                  <span>Reset SBR Hierarchy</span>
+                  <span className="hidden md:inline">Reset SBR Hierarchy</span>
                 </button>
               )}
 
@@ -764,22 +735,22 @@ export default function App() {
               {session.agentId && (
                 <button
                   onClick={() => setIsSecurityModalOpen(true)}
-                  className="px-2 py-1.5 sm:px-3.5 sm:py-2 font-bold text-[11px] sm:text-xs rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                  className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                   title="Change your secure login passcode"
                 >
                   <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-stone-600" />
-                  <span>Passcode Settings</span>
+                  <span className="hidden sm:inline">Passcode Settings</span>
                 </button>
               )}
 
               {/* Log Out Button */}
               <button
                 onClick={handleLogout}
-                className="px-2 py-1.5 sm:px-3.5 sm:py-2 font-bold text-[11px] sm:text-xs rounded-lg bg-stone-200/60 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-stone-300/80 text-stone-700 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-stone-200/60 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-stone-300/80 text-stone-700 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                 title="Disconnect from session"
               >
                 <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                <span>Disconnect</span>
+                <span className="hidden sm:inline">Disconnect</span>
               </button>
             </div>
           ) : null}

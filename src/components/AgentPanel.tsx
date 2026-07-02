@@ -412,62 +412,6 @@ export default function AgentPanel({
                               </div>
                             </div>
 
-                            {false && proj.imageMapUrl && (
-                              <div className="bg-white border border-stone-200/60 rounded-xl p-3 space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <Map className="w-4 h-4 text-emerald-700" />
-                                    <span className="text-xs font-bold text-stone-800">Project Site Plan & Plot Map</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => setExpandedMapProjId(expandedMapProjId === proj.id ? null : proj.id)}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-150 text-xs font-bold hover:bg-emerald-100/80 transition-colors cursor-pointer select-none"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                      <span>{expandedMapProjId === proj.id ? 'Hide Layout Map' : 'View Layout Map'}</span>
-                                    </button>
-                                    <button
-                                      onClick={() => window.open(proj.imageMapUrl!, '_blank')}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 border border-stone-200 text-xs font-bold hover:bg-stone-200 transition-colors cursor-pointer select-none"
-                                      title="Download layout map file"
-                                    >
-                                      <Download className="w-3.5 h-3.5" />
-                                      <span>Download Map</span>
-                                    </button>
-                                  </div>
-                                </div>
-                                
-                                {expandedMapProjId === proj.id && (
-                                  <div className="space-y-2">
-                                    <div className="overflow-hidden rounded-lg border border-stone-150 bg-stone-50 p-1 max-w-full flex justify-center">
-                                      <img 
-                                        src={proj.imageMapUrl} 
-                                        alt={`${proj.name} Plot Map`} 
-                                        className="w-full max-h-[350px] object-contain rounded-md animate-fade-in"
-                                        referrerPolicy="no-referrer"
-                                        onError={(e) => {
-                                          e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=1200';
-                                        }}
-                                      />
-                                    </div>
-                                    <p className="text-[10px] text-stone-500 text-center mt-1">
-                                      If the layout image does not load inside the secure frame, click the <span className="font-semibold text-stone-700">Download Map</span> button above or{' '}
-                                      <a 
-                                        href={proj.imageMapUrl} 
-                                        download={`${proj.name.replace(/\s+/g, '_')}_layout_map.jpg`}
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className="text-emerald-800 underline font-semibold hover:text-emerald-950"
-                                      >
-                                        click here to open/download directly
-                                      </a>.
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
                             {filteredInventory.length === 0 ? (
                               <p className="text-xs text-stone-400 italic text-center py-2">No units match standard search criteria.</p>
                             ) : (
