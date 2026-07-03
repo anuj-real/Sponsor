@@ -61,9 +61,26 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
             'DK': 'DK@SBR'
           };
 
-          const expectedPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || 'password';
+          // Compute default passcode: Username followed by DDMMYYYY (e.g. ANUJ16021993)
+          let defaultPasscode = 'password';
+          const username = foundAgent.id.toUpperCase();
+          if (foundAgent.dob) {
+            const parts = foundAgent.dob.split('-');
+            if (parts.length === 3) {
+              const year = parts[0];
+              const month = parts[1];
+              const day = parts[2];
+              if (year.length === 4 && month.length === 2 && day.length === 2) {
+                defaultPasscode = `${username}${day}${month}${year}`;
+              }
+            }
+          } else {
+            defaultPasscode = `${username}01011990`;
+          }
 
-          if (password === expectedPasscode) {
+          const expectedPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
+
+          if (password === expectedPasscode || password === defaultPasscode) {
             if (foundAgent.status === 'ACTIVE') {
               // The 7 corporate and family level nodes get full Admin rights/access
               const isAdminNode = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());

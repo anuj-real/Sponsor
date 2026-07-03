@@ -1809,36 +1809,64 @@ export default function AdminPanel({
                       </td>
                       <td className="px-5 py-3 text-right font-sans">
                         <div className="flex items-center justify-end gap-1.5">
-                          {!['C', 'A1', 'A2'].includes(agent.id) && (
-                            <button
-                              onClick={() => {
-                                setSelectedAgentForPassword(agent);
-                                setEditName(agent.name || '');
-                                setEditEmail(agent.email || '');
-                                setEditPhone(agent.phone || '');
-                                setEditDob(agent.dob || '');
-                                setEditAadhar(agent.aadhar || '');
-                                setEditPan(agent.pan || '');
-                                setEditAddress(agent.address || '');
-                                setTempPassword(agent.password || 'password');
-                                setPasswordStatusMsg('');
-                              }}
-                              className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
-                              title="Edit secure credentials"
-                            >
-                              <Key className="w-2.5 h-2.5 text-stone-500" />
-                              <span>Credentials</span>
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedAgentForPassword(agent);
+                              setEditName(agent.name || '');
+                              setEditEmail(agent.email || '');
+                              setEditPhone(agent.phone || '');
+                              setEditDob(agent.dob || '');
+                              setEditAadhar(agent.aadhar || '');
+                              setEditPan(agent.pan || '');
+                              setEditAddress(agent.address || '');
+                              const username = agent.id.toUpperCase();
+                              let calculatedDefaultPass = 'password';
+                              if (agent.dob) {
+                                const parts = agent.dob.split('-');
+                                if (parts.length === 3) {
+                                  const year = parts[0];
+                                  const month = parts[1];
+                                  const day = parts[2];
+                                  if (year.length === 4 && month.length === 2 && day.length === 2) {
+                                    calculatedDefaultPass = `${username}${day}${month}${year}`;
+                                  }
+                                }
+                              } else {
+                                calculatedDefaultPass = `${username}01011990`;
+                              }
+                              setTempPassword(agent.password || calculatedDefaultPass);
+                              setPasswordStatusMsg('');
+                            }}
+                            className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
+                            title="Edit secure credentials"
+                          >
+                            <Key className="w-2.5 h-2.5 text-stone-500" />
+                            <span>Credentials</span>
+                          </button>
 
                           <button
                             onClick={() => {
+                              const username = agent.id.toUpperCase();
+                              let calculatedDefaultPass = 'password';
+                              if (agent.dob) {
+                                const parts = agent.dob.split('-');
+                                if (parts.length === 3) {
+                                  const year = parts[0];
+                                  const month = parts[1];
+                                  const day = parts[2];
+                                  if (year.length === 4 && month.length === 2 && day.length === 2) {
+                                    calculatedDefaultPass = `${username}${day}${month}${year}`;
+                                  }
+                                }
+                              } else {
+                                calculatedDefaultPass = `${username}01011990`;
+                              }
                               const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
                                 `Hello *${agent.name}*,\n` +
                                 `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
                                 `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
                                 `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
-                                `🔑 *Default Passcode:* password\n\n` +
+                                `🔑 *Default Passcode:* ${agent.password || calculatedDefaultPass}\n\n` +
                                 `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
                               navigator.clipboard.writeText(inviteText);
                               setCopiedUserId(agent.id);
@@ -1871,6 +1899,99 @@ export default function AdminPanel({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* SBR Administrative Credentials Directory */}
+          <div className="lg:col-span-12 bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h3 className="font-bold text-stone-900 flex items-center gap-2 text-sm uppercase tracking-wide">
+                  <Key className="w-5 h-5 text-emerald-800" /> SBR Operations Master Passcode Directory
+                </h3>
+                <p className="text-xs text-stone-500 mt-1">
+                  Secure ledger listing active credentials, current passwords, and dynamic login passcodes for all certified sourcing representatives.
+                </p>
+              </div>
+              <div className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+                Authorized Access Only
+              </div>
+            </div>
+
+            <div className="p-5 overflow-x-auto custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredAgents.map((agent) => {
+                  const username = agent.id.toUpperCase();
+                  let calculatedDefaultPass = 'password';
+                  if (agent.dob) {
+                    const parts = agent.dob.split('-');
+                    if (parts.length === 3) {
+                      const year = parts[0];
+                      const month = parts[1];
+                      const day = parts[2];
+                      if (year.length === 4 && month.length === 2 && day.length === 2) {
+                        calculatedDefaultPass = `${username}${day}${month}${year}`;
+                      }
+                    }
+                  } else {
+                    calculatedDefaultPass = `${username}01011990`;
+                  }
+                  const currentPassword = agent.password || calculatedDefaultPass;
+
+                  return (
+                    <div key={`dir-${agent.id}`} className="p-4 rounded-xl border border-stone-150 bg-stone-50/30 hover:border-stone-300 transition-all">
+                      <div className="flex items-center gap-3 border-b border-stone-150 pb-2.5 mb-2.5">
+                        <img 
+                          src={agent.photo} 
+                          alt={agent.name}
+                          className="w-9 h-9 rounded-full object-cover border border-stone-200"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-bold text-stone-900 text-xs truncate">{agent.name}</p>
+                          <p className="text-[10px] text-stone-500 font-mono mt-0.5">ID: {agent.id}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-stone-500">Security Passcode:</span>
+                          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded select-all">
+                            {currentPassword}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-stone-500">System Role:</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase ${
+                            agent.role === 'ADMIN' 
+                              ? 'bg-purple-50 border-purple-200 text-purple-800' 
+                              : 'bg-stone-100 border-stone-200 text-stone-700'
+                          }`}>
+                            {agent.role}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-stone-500">Status:</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase ${
+                            agent.status === 'ACTIVE' 
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                              : 'bg-rose-50 border-rose-200 text-rose-800'
+                          }`}>
+                            {agent.status}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(currentPassword);
+                            alert(`Password for ${agent.name} (${agent.id}) copied to clipboard: ${currentPassword}`);
+                          }}
+                          className="w-full text-center text-[10px] font-bold text-stone-600 hover:text-stone-950 bg-white border border-stone-200 py-1 rounded-lg hover:bg-stone-50 transition-all cursor-pointer mt-1"
+                        >
+                          Copy Passcode
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

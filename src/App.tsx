@@ -642,8 +642,8 @@ export default function App() {
       if (!userToUpdate) {
         throw new Error("User profile not found in SBR organization.");
       }
-      if (['C', 'A1', 'A2'].includes(userId)) {
-        throw new Error("Security Violation: Core Administrative nodes are exempt from manual updates.");
+      if (['C', 'A1', 'A2'].includes(userId) && updatedFields.role && updatedFields.role !== 'ADMIN') {
+        throw new Error("Security Violation: Core Administrative nodes must maintain their ADMIN status.");
       }
       const updatedUser = { ...userToUpdate, ...updatedFields };
       await setDocumentData(COLLECTIONS.USERS, userId, updatedUser);
