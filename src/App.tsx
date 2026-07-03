@@ -31,7 +31,6 @@ import {
   seedDatabase, 
   setDocumentData, 
   deleteDocument, 
-  resetDatabaseToDefaults,
   COLLECTIONS 
 } from './lib/firebase';
 
@@ -72,34 +71,6 @@ export default function App() {
           config: INITIAL_MLM_CONFIG,
           notifications: INITIAL_NOTIFICATIONS
         });
-
-        // Auto-migration: Check if database has old data (contains SBR0005 or is missing top-level C)
-        const hasOldData = data.users.some(u => u.id === 'SBR0005') || !data.users.some(u => u.id === 'C');
-        if (hasOldData) {
-          console.log("SBR Cloud Core: Old seed data detected in Firestore. Auto-migrating to the new 7-user SBR MLM Corporate Structure...");
-          await resetDatabaseToDefaults({
-            users: INITIAL_USERS,
-            projects: INITIAL_PROJECTS,
-            sales: INITIAL_SALES,
-            payouts: INITIAL_PAYOUTS,
-            config: INITIAL_MLM_CONFIG,
-            notifications: INITIAL_NOTIFICATIONS
-          });
-          data = {
-            users: INITIAL_USERS,
-            projects: INITIAL_PROJECTS,
-            sales: INITIAL_SALES,
-            payouts: INITIAL_PAYOUTS,
-            config: INITIAL_MLM_CONFIG,
-            notifications: INITIAL_NOTIFICATIONS
-          };
-          
-          localStorage.setItem('SBR_SESSION', JSON.stringify({
-            role: 'ADMIN',
-            agentId: 'C',
-            name: 'Company Profile C'
-          }));
-        }
 
         const activeConfig = data.config || INITIAL_MLM_CONFIG;
         
@@ -217,6 +188,18 @@ export default function App() {
       localStorage.setItem('SBR_SESSION', JSON.stringify(defaultSession));
     }
   }, []);
+
+  // Synchronize state changes to LocalStorage as a local fallback backup
+  useEffect(() => {
+    if (!dbLoading) {
+      localStorage.setItem('SBR_USERS', JSON.stringify(users));
+      localStorage.setItem('SBR_PROJECTS', JSON.stringify(projects));
+      localStorage.setItem('SBR_SALES', JSON.stringify(sales));
+      localStorage.setItem('SBR_PAYOUTS', JSON.stringify(payouts));
+      localStorage.setItem('SBR_CONFIG', JSON.stringify(config));
+      localStorage.setItem('SBR_NOTIFICATIONS', JSON.stringify(notifications));
+    }
+  }, [dbLoading, users, projects, sales, payouts, config, notifications]);
 
   const handleLogin = (role: UserRole, agentId?: string) => {
     let name = '';
@@ -671,57 +654,7 @@ export default function App() {
     }
   };
 
-  const handleResetDatabase = async () => {
-    if (!window.confirm("Are you sure you want to reset the database? This will overwrite all custom data and seed the standard SBR Corporate MLM structure with Neha Patel and other agents.")) {
-      return;
-    }
-    setDbLoading(true);
-    try {
-      const filteredSales = INITIAL_SALES.filter(s => s.project === 'IMT Sohna');
-      const filteredProjects = INITIAL_PROJECTS.filter(p => p.name === 'IMT Sohna');
-      const filteredUsers = normalizeUsersWithSales(INITIAL_USERS, filteredSales, INITIAL_MLM_CONFIG);
-      const filteredPayouts = rebuildPayoutsFromSales(filteredSales, filteredUsers, INITIAL_MLM_CONFIG, INITIAL_PAYOUTS);
-      const filteredNotifs = INITIAL_NOTIFICATIONS.filter(n => filteredUsers.some(u => u.id === n.userId));
 
-      await resetDatabaseToDefaults({
-        users: filteredUsers,
-        projects: filteredProjects,
-        sales: filteredSales,
-        payouts: filteredPayouts,
-        config: INITIAL_MLM_CONFIG,
-        notifications: filteredNotifs
-      });
-      
-      setUsers(filteredUsers);
-      setProjects(filteredProjects);
-      setSales(filteredSales);
-      setPayouts(filteredPayouts);
-      setConfig(INITIAL_MLM_CONFIG);
-      setNotifications(filteredNotifs);
-      
-      setSelectedTreeUserId('C');
-      setActiveAgentId('C');
-      
-      setSession({
-        role: 'ADMIN',
-        agentId: 'C',
-        name: 'Company Profile C'
-      });
-      setActiveRole('ADMIN');
-      localStorage.setItem('SBR_SESSION', JSON.stringify({
-        role: 'ADMIN',
-        agentId: 'C',
-        name: 'Company Profile C'
-      }));
-      
-      alert("Database successfully reset and seeded with the clean 7-user SBR MLM Corporate Hierarchy!");
-    } catch (e) {
-      console.error("Reset failed", e);
-      alert("Failed to reset database: " + e);
-    } finally {
-      setDbLoading(false);
-    }
-  };
 
   if (dbLoading) {
     return (
@@ -807,17 +740,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Reset Database Button */}
-              {session.role === 'ADMIN' && (
-                <button
-                  onClick={handleResetDatabase}
-                  className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white border border-amber-700/50 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                  title="Reset database to the standard 7-user SBR Corporate Tree"
-                >
-                  <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin-slow" />
-                  <span className="hidden md:inline">Reset SBR Hierarchy</span>
-                </button>
-              )}
+
 
               {/* Security Credentials Button */}
               {session.agentId && (
