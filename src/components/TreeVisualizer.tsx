@@ -6,9 +6,10 @@ interface TreeVisualizerProps {
   users: User[];
   onSelectUser?: (userId: string) => void;
   selectedUserId?: string | null;
+  hideUpline?: boolean;
 }
 
-export default function TreeVisualizer({ users, onSelectUser, selectedUserId }: TreeVisualizerProps) {
+export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hideUpline }: TreeVisualizerProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     'SBR': true,
     'C': true,
@@ -48,6 +49,10 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId }: 
     if (onSelectUser) {
       onSelectUser(userId);
     }
+    setExpandedNodes(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
   };
 
   // Rank-based styling classes
@@ -230,22 +235,24 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId }: 
 
             {/* Hierarchical Connections Info */}
             <div className="bg-zinc-50 rounded-xl p-3.5 border border-zinc-200/50 space-y-3">
-              <div>
-                <dt className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">Upline Sponsor</dt>
-                <dd className="mt-1 flex items-center gap-2">
-                  <Landmark className="w-3.5 h-3.5 text-zinc-400" />
-                  {selectedUser.sponsorId ? (
-                    <div className="text-xs font-medium text-zinc-800 bg-white px-2 py-1.5 rounded border border-zinc-150 inline-flex items-center gap-1">
-                      <span className="font-bold text-indigo-600">{selectedUser.sponsorId}</span>
-                      <span>({users.find(u => u.id === selectedUser.sponsorId)?.name || 'Direct Associate'})</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded font-medium border border-amber-200 select-none">
-                      Direct (Top Level Director)
-                    </span>
-                  )}
-                </dd>
-              </div>
+              {!hideUpline && (
+                <div>
+                  <dt className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">Upline Sponsor</dt>
+                  <dd className="mt-1 flex items-center gap-2">
+                    <Landmark className="w-3.5 h-3.5 text-zinc-400" />
+                    {selectedUser.sponsorId && users.some(u => u.id === selectedUser.sponsorId) ? (
+                      <div className="text-xs font-medium text-zinc-800 bg-white px-2 py-1.5 rounded border border-zinc-150 inline-flex items-center gap-1">
+                        <span className="font-bold text-indigo-600">{selectedUser.sponsorId}</span>
+                        <span>({users.find(u => u.id === selectedUser.sponsorId)?.name || 'Direct Associate'})</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded font-medium border border-amber-200 select-none">
+                        Direct (Top Level Director)
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
 
               <div>
                 <dt className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">Immediate Recruits</dt>

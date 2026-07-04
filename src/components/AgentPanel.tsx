@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
 import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
+import TreeVisualizer from './TreeVisualizer';
 
 interface AgentPanelProps {
   users: User[];
@@ -31,6 +32,7 @@ export default function AgentPanel({
   const [selectedInventoryProjId, setSelectedInventoryProjId] = useState<string>('ALL');
   const [selectedInventoryStatus, setSelectedInventoryStatus] = useState<string>('ALL');
   const [expandedMapProjId, setExpandedMapProjId] = useState<string | null>(null);
+  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
 
   // Campaign date status checker logic
   const now = new Date();
@@ -177,6 +179,17 @@ export default function AgentPanel({
             </p>
           </div>
         </div>
+
+        {/* Active Team Member Count */}
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-150 rounded-xl px-4 py-2 shrink-0 md:self-center">
+          <Users className="w-5 h-5 text-emerald-800" />
+          <div>
+            <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block font-sans">Active Team Members</span>
+            <span className="font-mono font-extrabold text-sm sm:text-base text-emerald-900">
+              {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length} {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length === 1 ? 'Associate' : 'Associates'}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Sizing & Points standard Notice for the active broker */}
@@ -202,7 +215,7 @@ export default function AgentPanel({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Statistics Left */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {/* Direct Sourced Volume */}
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
               <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Closed Sourced Volume</span>
@@ -233,6 +246,17 @@ export default function AgentPanel({
               </h3>
               <p className="text-[10.5px] text-stone-500 mt-1.5">
                 Calculated overrides in pipeline
+              </p>
+            </div>
+
+            {/* Active Team Network */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Active Team Network</span>
+              <h3 className="font-mono font-bold text-xl sm:text-lg text-indigo-900 mt-2">
+                {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length} / {downlineNetwork.length}
+              </h3>
+              <p className="text-[10.5px] text-stone-550 mt-1.5">
+                Active sub-brokers in your downline
               </p>
             </div>
           </div>
@@ -724,6 +748,16 @@ export default function AgentPanel({
               </div>
             )}
           </div>
+        </div>
+
+        {/* SBR Referral Organigram for Associate Downline */}
+        <div className="lg:col-span-12">
+          <TreeVisualizer 
+            users={[agent, ...downlineNetwork.map(item => item.user)]}
+            onSelectUser={(id) => setSelectedTreeUserId(id)}
+            selectedUserId={selectedTreeUserId}
+            hideUpline={true}
+          />
         </div>
 
         {/* Override Ledger */}

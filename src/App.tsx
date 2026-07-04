@@ -796,6 +796,7 @@ export default function App() {
               onUpdateSaleBookingStatus={handleUpdateSaleBookingStatus}
               onUpdateSale={handleUpdateSale}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
+              currentUserAgentId={session?.agentId}
             />
 
             <TreeVisualizer 

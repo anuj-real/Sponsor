@@ -39,6 +39,7 @@ interface AdminPanelProps {
   onUpdateSaleBookingStatus?: (saleId: string, bookingStatus: 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE', tokenAmount?: number) => void;
   onUpdateSale?: (sale: Sale) => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
+  currentUserAgentId?: string;
 }
 
 export default function AdminPanel({
@@ -57,8 +58,27 @@ export default function AdminPanel({
   onDisbursePayout,
   onUpdateSaleBookingStatus,
   onUpdateSale,
-  onUpdateUserProfile
+  onUpdateUserProfile,
+  currentUserAgentId
 }: AdminPanelProps) {
+  const isFamilyId = (id?: string) => {
+    if (!id) return false;
+    return ['MANORANJAN', 'RAM', 'DK', 'VIKAS'].includes(id.toUpperCase());
+  };
+
+  const isAdminId = (id?: string) => {
+    if (!id) return false;
+    return ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'DK', 'VIKAS', 'SBR', 'ADMIN1', 'ADMIN2'].includes(id.toUpperCase());
+  };
+
+  const isRestrictedForCurrentUser = (targetId: string) => {
+    if (!currentUserAgentId) return false;
+    if (isFamilyId(currentUserAgentId)) {
+      return isAdminId(targetId) && targetId.toUpperCase() !== currentUserAgentId.toUpperCase();
+    }
+    return false;
+  };
+
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS
   const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS'>('SETTINGS');
 
@@ -1809,79 +1829,87 @@ export default function AdminPanel({
                       </td>
                       <td className="px-5 py-3 text-right font-sans">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setSelectedAgentForPassword(agent);
-                              setEditName(agent.name || '');
-                              setEditEmail(agent.email || '');
-                              setEditPhone(agent.phone || '');
-                              setEditDob(agent.dob || '');
-                              setEditAadhar(agent.aadhar || '');
-                              setEditPan(agent.pan || '');
-                              setEditAddress(agent.address || '');
-                              const username = agent.id.toUpperCase();
-                              let calculatedDefaultPass = 'password';
-                              if (agent.dob) {
-                                const parts = agent.dob.split('-');
-                                if (parts.length === 3) {
-                                  const year = parts[0];
-                                  const month = parts[1];
-                                  const day = parts[2];
-                                  if (year.length === 4 && month.length === 2 && day.length === 2) {
-                                    calculatedDefaultPass = `${username}${day}${month}${year}`;
+                          {!isRestrictedForCurrentUser(agent.id) ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedAgentForPassword(agent);
+                                  setEditName(agent.name || '');
+                                  setEditEmail(agent.email || '');
+                                  setEditPhone(agent.phone || '');
+                                  setEditDob(agent.dob || '');
+                                  setEditAadhar(agent.aadhar || '');
+                                  setEditPan(agent.pan || '');
+                                  setEditAddress(agent.address || '');
+                                  const username = agent.id.toUpperCase();
+                                  let calculatedDefaultPass = 'password';
+                                  if (agent.dob) {
+                                    const parts = agent.dob.split('-');
+                                    if (parts.length === 3) {
+                                      const year = parts[0];
+                                      const month = parts[1];
+                                      const day = parts[2];
+                                      if (year.length === 4 && month.length === 2 && day.length === 2) {
+                                        calculatedDefaultPass = `${username}${day}${month}${year}`;
+                                      }
+                                    }
+                                  } else {
+                                    calculatedDefaultPass = `${username}01011990`;
                                   }
-                                }
-                              } else {
-                                calculatedDefaultPass = `${username}01011990`;
-                              }
-                              setTempPassword(agent.password || calculatedDefaultPass);
-                              setPasswordStatusMsg('');
-                            }}
-                            className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
-                            title="Edit secure credentials"
-                          >
-                            <Key className="w-2.5 h-2.5 text-stone-500" />
-                            <span>Credentials</span>
-                          </button>
+                                  setTempPassword(agent.password || calculatedDefaultPass);
+                                  setPasswordStatusMsg('');
+                                }}
+                                className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
+                                title="Edit secure credentials"
+                              >
+                                <Key className="w-2.5 h-2.5 text-stone-500" />
+                                <span>Credentials</span>
+                              </button>
 
-                          <button
-                            onClick={() => {
-                              const username = agent.id.toUpperCase();
-                              let calculatedDefaultPass = 'password';
-                              if (agent.dob) {
-                                const parts = agent.dob.split('-');
-                                if (parts.length === 3) {
-                                  const year = parts[0];
-                                  const month = parts[1];
-                                  const day = parts[2];
-                                  if (year.length === 4 && month.length === 2 && day.length === 2) {
-                                    calculatedDefaultPass = `${username}${day}${month}${year}`;
+                              <button
+                                onClick={() => {
+                                  const username = agent.id.toUpperCase();
+                                  let calculatedDefaultPass = 'password';
+                                  if (agent.dob) {
+                                    const parts = agent.dob.split('-');
+                                    if (parts.length === 3) {
+                                      const year = parts[0];
+                                      const month = parts[1];
+                                      const day = parts[2];
+                                      if (year.length === 4 && month.length === 2 && day.length === 2) {
+                                        calculatedDefaultPass = `${username}${day}${month}${year}`;
+                                      }
+                                    }
+                                  } else {
+                                    calculatedDefaultPass = `${username}01011990`;
                                   }
-                                }
-                              } else {
-                                calculatedDefaultPass = `${username}01011990`;
-                              }
-                              const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
-                                `Hello *${agent.name}*,\n` +
-                                `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
-                                `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
-                                `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
-                                `🔑 *Default Passcode:* ${agent.password || calculatedDefaultPass}\n\n` +
-                                `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
-                              navigator.clipboard.writeText(inviteText);
-                              setCopiedUserId(agent.id);
-                              setTimeout(() => setCopiedUserId(null), 2000);
-                            }}
-                            className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-all cursor-pointer flex items-center gap-1 ${
-                              copiedUserId === agent.id
-                                ? 'bg-emerald-800 border-emerald-800 text-white'
-                                : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
-                            }`}
-                            title="Copy Invitation Message"
-                          >
-                            <Share2 className="w-2.5 h-2.5" />
-                            <span>{copiedUserId === agent.id ? 'Copied ✓' : 'Invite'}</span>
-                          </button>
+                                  const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
+                                    `Hello *${agent.name}*,\n` +
+                                    `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
+                                    `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
+                                    `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
+                                    `🔑 *Default Passcode:* ${agent.password || calculatedDefaultPass}\n\n` +
+                                    `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
+                                  navigator.clipboard.writeText(inviteText);
+                                  setCopiedUserId(agent.id);
+                                  setTimeout(() => setCopiedUserId(null), 2000);
+                                }}
+                                className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-all cursor-pointer flex items-center gap-1 ${
+                                  copiedUserId === agent.id
+                                    ? 'bg-emerald-800 border-emerald-800 text-white'
+                                    : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                                }`}
+                                title="Copy Invitation Message"
+                              >
+                                <Share2 className="w-2.5 h-2.5" />
+                                <span>{copiedUserId === agent.id ? 'Copied ✓' : 'Invite'}</span>
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] bg-stone-50 text-stone-400 font-bold px-2 py-1 rounded border border-stone-200 select-none flex items-center gap-1">
+                              🔒 Restricted
+                            </span>
+                          )}
 
                           <button
                             onClick={() => onToggleUserStatus(agent.id)}
@@ -1902,98 +1930,7 @@ export default function AdminPanel({
             </div>
           </div>
 
-          {/* SBR Administrative Credentials Directory */}
-          <div className="lg:col-span-12 bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div>
-                <h3 className="font-bold text-stone-900 flex items-center gap-2 text-sm uppercase tracking-wide">
-                  <Key className="w-5 h-5 text-emerald-800" /> SBR Operations Master Passcode Directory
-                </h3>
-                <p className="text-xs text-stone-500 mt-1">
-                  Secure ledger listing active credentials, current passwords, and dynamic login passcodes for all certified sourcing representatives.
-                </p>
-              </div>
-              <div className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-                Authorized Access Only
-              </div>
-            </div>
 
-            <div className="p-5 overflow-x-auto custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAgents.map((agent) => {
-                  const username = agent.id.toUpperCase();
-                  let calculatedDefaultPass = 'password';
-                  if (agent.dob) {
-                    const parts = agent.dob.split('-');
-                    if (parts.length === 3) {
-                      const year = parts[0];
-                      const month = parts[1];
-                      const day = parts[2];
-                      if (year.length === 4 && month.length === 2 && day.length === 2) {
-                        calculatedDefaultPass = `${username}${day}${month}${year}`;
-                      }
-                    }
-                  } else {
-                    calculatedDefaultPass = `${username}01011990`;
-                  }
-                  const currentPassword = agent.password || calculatedDefaultPass;
-
-                  return (
-                    <div key={`dir-${agent.id}`} className="p-4 rounded-xl border border-stone-150 bg-stone-50/30 hover:border-stone-300 transition-all">
-                      <div className="flex items-center gap-3 border-b border-stone-150 pb-2.5 mb-2.5">
-                        <img 
-                          src={agent.photo} 
-                          alt={agent.name}
-                          className="w-9 h-9 rounded-full object-cover border border-stone-200"
-                        />
-                        <div className="min-w-0">
-                          <p className="font-bold text-stone-900 text-xs truncate">{agent.name}</p>
-                          <p className="text-[10px] text-stone-500 font-mono mt-0.5">ID: {agent.id}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-stone-500">Security Passcode:</span>
-                          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded select-all">
-                            {currentPassword}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-stone-500">System Role:</span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase ${
-                            agent.role === 'ADMIN' 
-                              ? 'bg-purple-50 border-purple-200 text-purple-800' 
-                              : 'bg-stone-100 border-stone-200 text-stone-700'
-                          }`}>
-                            {agent.role}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-stone-500">Status:</span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase ${
-                            agent.status === 'ACTIVE' 
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                              : 'bg-rose-50 border-rose-200 text-rose-800'
-                          }`}>
-                            {agent.status}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(currentPassword);
-                            alert(`Password for ${agent.name} (${agent.id}) copied to clipboard: ${currentPassword}`);
-                          }}
-                          className="w-full text-center text-[10px] font-bold text-stone-600 hover:text-stone-950 bg-white border border-stone-200 py-1 rounded-lg hover:bg-stone-50 transition-all cursor-pointer mt-1"
-                        >
-                          Copy Passcode
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
         </div>
       )}      {/* 3. SBR PROJECTS SETUP & METADATA */}
       {activeSubTab === 'PROJECTS' && (
@@ -3219,150 +3156,169 @@ export default function AdminPanel({
             </div>
 
             <div className="p-5 space-y-4 font-sans max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Full Representative Name</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
-                    placeholder="Enter full name"
-                  />
+              {isRestrictedForCurrentUser(selectedAgentForPassword.id) ? (
+                <div className="text-center p-6 bg-rose-50 border border-rose-100 rounded-2xl text-stone-700">
+                  <ShieldAlert className="w-8 h-8 text-rose-600 mx-auto mb-2 font-serif" />
+                  <p className="font-bold text-xs uppercase tracking-wider text-rose-900 font-sans">Access Restricted</p>
+                  <p className="text-[10px] text-stone-600 mt-2 leading-relaxed">
+                    You are not authorized to view, access, or update the credentials or secure passcode of other SBR administrator nodes.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAgentForPassword(null)}
+                    className="mt-4 w-full py-1.5 bg-white border border-stone-200 text-stone-700 hover:bg-stone-55 text-xs font-bold rounded-lg cursor-pointer"
+                  >
+                    Close
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Full Representative Name</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="Enter full name"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
-                    placeholder="name@email.com"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="name@email.com"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Contact Phone</label>
-                  <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
-                    placeholder="Enter phone number"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Contact Phone</label>
+                      <input
+                        type="tel"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={editDob}
-                    onChange={(e) => setEditDob(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Date of Birth</label>
+                      <input
+                        type="date"
+                        value={editDob}
+                        onChange={(e) => setEditDob(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">PAN Card Number</label>
-                  <input
-                    type="text"
-                    value={editPan}
-                    onChange={(e) => setEditPan(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
-                    placeholder="ABCDE1234F"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">PAN Card Number</label>
+                      <input
+                        type="text"
+                        value={editPan}
+                        onChange={(e) => setEditPan(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        placeholder="ABCDE1234F"
+                      />
+                    </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Aadhaar Card Number</label>
-                  <input
-                    type="text"
-                    value={editAadhar}
-                    onChange={(e) => setEditAadhar(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
-                    placeholder="12-digit Aadhaar"
-                  />
-                </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Aadhaar Card Number</label>
+                      <input
+                        type="text"
+                        value={editAadhar}
+                        onChange={(e) => setEditAadhar(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        placeholder="12-digit Aadhaar"
+                      />
+                    </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Complete Residential Address</label>
-                  <textarea
-                    rows={2}
-                    value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none resize-none"
-                    placeholder="Enter residential address"
-                  />
-                </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Complete Residential Address</label>
+                      <textarea
+                        rows={2}
+                        value={editAddress}
+                        onChange={(e) => setEditAddress(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none resize-none"
+                        placeholder="Enter residential address"
+                      />
+                    </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Secure Passcode / Password</label>
-                  <input
-                    type="text"
-                    placeholder="Enter secure passcode"
-                    value={tempPassword}
-                    onChange={(e) => setTempPassword(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
-                  />
-                </div>
-              </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Secure Passcode / Password</label>
+                      <input
+                        type="text"
+                        placeholder="Enter secure passcode"
+                        value={tempPassword}
+                        onChange={(e) => setTempPassword(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
 
-              {passwordStatusMsg && (
-                <p className="text-[10.5px] font-semibold text-emerald-850 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center animate-pulse">
-                  {passwordStatusMsg}
-                </p>
+                  {passwordStatusMsg && (
+                    <p className="text-[10.5px] font-semibold text-emerald-850 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center animate-pulse font-sans">
+                      {passwordStatusMsg}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAgentForPassword(null);
+                        setPasswordStatusMsg('');
+                      }}
+                      className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 cursor-pointer font-sans"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updatingPassword || !tempPassword.trim() || !editName.trim()}
+                      onClick={async () => {
+                        if (!tempPassword.trim() || !editName.trim()) return;
+                        setUpdatingPassword(true);
+                        setPasswordStatusMsg('');
+                        try {
+                          if (onUpdateUserProfile) {
+                            await onUpdateUserProfile(selectedAgentForPassword.id, {
+                              name: editName,
+                              email: editEmail,
+                              phone: editPhone,
+                              dob: editDob,
+                              aadhar: editAadhar,
+                              pan: editPan,
+                              address: editAddress,
+                              password: tempPassword,
+                            });
+                            setPasswordStatusMsg('Broker credentials updated successfully!');
+                            setTimeout(() => {
+                              setSelectedAgentForPassword(null);
+                              setPasswordStatusMsg('');
+                            }, 1200);
+                          } else {
+                            setPasswordStatusMsg('Callback not provided.');
+                          }
+                        } catch (err: any) {
+                          setPasswordStatusMsg(err?.message || 'Failed to update credentials.');
+                        } finally {
+                          setUpdatingPassword(false);
+                        }
+                      }}
+                      className="flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-800 text-white hover:bg-emerald-900 cursor-pointer disabled:opacity-50 font-sans"
+                    >
+                      {updatingPassword ? 'Saving...' : 'Save Credentials'}
+                    </button>
+                  </div>
+                </>
               )}
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedAgentForPassword(null);
-                    setPasswordStatusMsg('');
-                  }}
-                  className="flex-1 py-1.5 text-xs font-bold rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={updatingPassword || !tempPassword.trim() || !editName.trim()}
-                  onClick={async () => {
-                    if (!tempPassword.trim() || !editName.trim()) return;
-                    setUpdatingPassword(true);
-                    setPasswordStatusMsg('');
-                    try {
-                      if (onUpdateUserProfile) {
-                        await onUpdateUserProfile(selectedAgentForPassword.id, {
-                          name: editName,
-                          email: editEmail,
-                          phone: editPhone,
-                          dob: editDob,
-                          aadhar: editAadhar,
-                          pan: editPan,
-                          address: editAddress,
-                          password: tempPassword,
-                        });
-                        setPasswordStatusMsg('Broker credentials updated successfully!');
-                        setTimeout(() => {
-                          setSelectedAgentForPassword(null);
-                          setPasswordStatusMsg('');
-                        }, 1200);
-                      } else {
-                        setPasswordStatusMsg('Callback not provided.');
-                      }
-                    } catch (err: any) {
-                      setPasswordStatusMsg(err?.message || 'Failed to update credentials.');
-                    } finally {
-                      setUpdatingPassword(false);
-                    }
-                  }}
-                  className="flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-800 text-white hover:bg-emerald-900 cursor-pointer disabled:opacity-50"
-                >
-                  {updatingPassword ? 'Saving...' : 'Save Credentials'}
-                </button>
-              </div>
             </div>
           </div>
         </div>
