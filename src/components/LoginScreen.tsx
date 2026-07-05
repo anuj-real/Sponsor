@@ -80,10 +80,13 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
 
           const expectedPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
 
-          if (password === expectedPasscode || password === defaultPasscode) {
+          // Strict validation: Must match the expected passcode exactly (custom, fallback, or default computed)
+          const isPasscodeCorrect = password === expectedPasscode;
+
+          if (isPasscodeCorrect) {
             if (foundAgent.status === 'ACTIVE') {
-              // The 7 corporate and family level nodes get full Admin rights/access
-              const isAdminNode = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
+              // The 7 corporate and family level nodes get full Admin rights/access if their role is indeed ADMIN
+              const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
               if (isAdminNode) {
                 onLogin('ADMIN', foundAgent.id);
               } else {

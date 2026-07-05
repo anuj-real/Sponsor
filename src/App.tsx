@@ -133,11 +133,7 @@ export default function App() {
           localStorage.setItem('SBR_PAYOUTS', JSON.stringify(INITIAL_PAYOUTS));
           localStorage.setItem('SBR_NOTIFICATIONS', JSON.stringify(INITIAL_NOTIFICATIONS));
           
-          localStorage.setItem('SBR_SESSION', JSON.stringify({
-            role: 'ADMIN',
-            agentId: 'C',
-            name: 'Company Profile C'
-          }));
+          localStorage.removeItem('SBR_SESSION');
         }
 
         const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
@@ -174,18 +170,6 @@ export default function App() {
       } catch (e) {
         console.error('Error loading stored session', e);
       }
-    } else {
-      // By default if no session exists, default to Admin Company Profile C session
-      const defaultSession = {
-        role: 'ADMIN' as UserRole,
-        agentId: 'C',
-        name: 'Company Profile C'
-      };
-      setSession(defaultSession);
-      setActiveRole('ADMIN');
-      setActiveAgentId('C');
-      setSelectedTreeUserId('C');
-      localStorage.setItem('SBR_SESSION', JSON.stringify(defaultSession));
     }
   }, []);
 
