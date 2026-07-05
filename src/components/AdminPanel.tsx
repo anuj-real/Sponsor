@@ -541,10 +541,12 @@ export default function AdminPanel({
     setNewAddress('');
     setTimeout(() => setCreateUserSuccess(''), 6000);
 
-    // Auto-trigger the secure credentials SMS Portal for the newly added user!
+    // Auto-trigger the secure credentials SMS Portal for the newly added user! (Removed/Disabled for now until DLT registration)
+    /*
     setTimeout(() => {
       openSMSPortal(newlyCreatedAgent);
     }, 600);
+    */
   };
 
   // Add Project
@@ -1909,6 +1911,8 @@ export default function AdminPanel({
                                 <span>Credentials</span>
                               </button>
 
+                              {/* SMS button hidden until DLT registration is complete */}
+                              {/*
                               <button
                                 onClick={() => openSMSPortal(agent)}
                                 className="text-[10px] font-bold px-2.5 py-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1"
@@ -1917,6 +1921,7 @@ export default function AdminPanel({
                                 <Smartphone className="w-2.5 h-2.5" />
                                 <span>SMS</span>
                               </button>
+                              */}
 
                               <button
                                 onClick={() => {
@@ -3486,7 +3491,17 @@ export default function AdminPanel({
                             message: smsMessageText,
                           }),
                         });
-                        const data = await response.json();
+
+                        let data;
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                          data = await response.json();
+                        } else {
+                          const text = await response.text();
+                          const snippet = text.length > 80 ? text.substring(0, 80) + '...' : text;
+                          throw new Error(`Server returned non-JSON response (${response.status}). Note: Static hosting like GitHub Pages does not support backend APIs. Response: ${snippet}`);
+                        }
+
                         if (response.ok && data.success) {
                           setSmsSuccessStatus('SENT');
                         } else {
