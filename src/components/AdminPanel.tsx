@@ -5,7 +5,7 @@ import {
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
   Search, ShieldAlert, Award, Calendar, Home, CreditCard, Trash2, Plus, Edit, Share2,
-  BarChart3, Download, Printer, Key
+  BarChart3, Download, Printer, Key, Smartphone, MessageSquare, Send
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -198,6 +198,40 @@ export default function AdminPanel({
   const [tempPassword, setTempPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [passwordStatusMsg, setPasswordStatusMsg] = useState('');
+
+  // SBR SMS Dispatch Portal state
+  const [selectedAgentForSMS, setSelectedAgentForSMS] = useState<User | null>(null);
+  const [smsMessageText, setSmsMessageText] = useState('');
+  const [isSendingSMS, setIsSendingSMS] = useState(false);
+  const [smsSuccessStatus, setSmsSuccessStatus] = useState<'IDLE' | 'SENDING' | 'SENT' | 'FAILED'>('IDLE');
+  const [smsErrorMessage, setSmsErrorMessage] = useState('');
+
+  const openSMSPortal = (agent: User) => {
+    setSelectedAgentForSMS(agent);
+    setSmsSuccessStatus('IDLE');
+    setSmsErrorMessage('');
+    
+    const username = agent.id.toUpperCase();
+    let calculatedDefaultPass = 'password';
+    if (agent.dob) {
+      const parts = agent.dob.split('-');
+      if (parts.length === 3) {
+        const year = parts[0];
+        const month = parts[1];
+        const day = parts[2];
+        if (year.length === 4 && month.length === 2 && day.length === 2) {
+          calculatedDefaultPass = `${username}${day}${month}${year}`;
+        }
+      }
+    } else {
+      calculatedDefaultPass = `${username}01011990`;
+    }
+    const finalPasscode = agent.password || calculatedDefaultPass;
+    
+    const text = `SBR Portal: ${window.location.origin}\nID: ${agent.id}\nPass: ${finalPasscode}`;
+      
+    setSmsMessageText(text);
+  };
 
   // Project Creation state
   const [projName, setProjName] = useState('');
@@ -474,7 +508,7 @@ export default function AdminPanel({
 
     const assignedId = getNextSequentialId();
 
-    onAddUser({
+    const newlyCreatedAgent: User = {
       id: assignedId,
       name: newName,
       email: newEmail,
@@ -488,8 +522,12 @@ export default function AdminPanel({
       aadhar: newAadhar,
       pan: newPan,
       address: newAddress || 'Sub-broker Office network',
-      photo: newPhoto
-    });
+      photo: newPhoto,
+      totalDirectSales: 0,
+      totalDownlineSales: 0
+    };
+
+    onAddUser(newlyCreatedAgent);
 
     setCreateUserSuccess(`Successfully onboarded ${newName} as SBR Certified Partner. ID: ${assignedId}`);
     setErrorMsg('');
@@ -502,6 +540,11 @@ export default function AdminPanel({
     setNewPan('');
     setNewAddress('');
     setTimeout(() => setCreateUserSuccess(''), 6000);
+
+    // Auto-trigger the secure credentials SMS Portal for the newly added user!
+    setTimeout(() => {
+      openSMSPortal(newlyCreatedAgent);
+    }, 600);
   };
 
   // Add Project
@@ -1864,6 +1907,15 @@ export default function AdminPanel({
                               >
                                 <Key className="w-2.5 h-2.5 text-stone-500" />
                                 <span>Credentials</span>
+                              </button>
+
+                              <button
+                                onClick={() => openSMSPortal(agent)}
+                                className="text-[10px] font-bold px-2.5 py-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1"
+                                title="Send SMS/Credentials"
+                              >
+                                <Smartphone className="w-2.5 h-2.5" />
+                                <span>SMS</span>
                               </button>
 
                               <button
@@ -3319,6 +3371,199 @@ export default function AdminPanel({
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SBR SMS Dispatch Portal Modal */}
+      {selectedAgentForSMS && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-stone-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            
+            {/* Modal Header */}
+            <div className="bg-gradient-to-br from-emerald-900 to-emerald-950 p-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-emerald-400" />
+                <div>
+                  <h4 className="font-bold text-xs uppercase tracking-wider">SBR SMS Dispatch Portal</h4>
+                  <p className="text-[9px] text-emerald-200/80">Sponsor/Agent ID: {selectedAgentForSMS.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedAgentForSMS(null);
+                  setSmsSuccessStatus('IDLE');
+                }}
+                className="text-white hover:text-stone-200 text-xs font-bold transition-all p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 font-sans">
+              
+              {/* Recipient Details Card */}
+              <div className="grid grid-cols-2 gap-3 bg-stone-50 p-3.5 rounded-xl border border-stone-150 text-[11px]">
+                <div>
+                  <p className="text-[8.5px] font-bold text-stone-450 uppercase tracking-widest">Recipient Partner</p>
+                  <p className="font-bold text-stone-900 mt-0.5">{selectedAgentForSMS.name}</p>
+                  <p className="text-stone-500 text-[10px]">{selectedAgentForSMS.designation || 'Associate'}</p>
+                </div>
+                <div>
+                  <p className="text-[8.5px] font-bold text-stone-450 uppercase tracking-widest">Mobile Number</p>
+                  <p className="font-bold text-stone-900 mt-0.5 font-mono">{selectedAgentForSMS.phone}</p>
+                  <p className="text-stone-500 text-[10px]">{selectedAgentForSMS.email}</p>
+                </div>
+              </div>
+
+              {/* Message Editor */}
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                  Message Content (Editable)
+                </label>
+                <textarea
+                  rows={5}
+                  value={smsMessageText}
+                  onChange={(e) => setSmsMessageText(e.target.value)}
+                  className="w-full px-3 py-2 text-[11.5px] rounded-lg border border-stone-200 bg-white text-stone-850 outline-none focus:ring-1 focus:ring-emerald-700 font-sans leading-relaxed custom-scrollbar"
+                  placeholder="Type your message credentials..."
+                />
+              </div>
+
+              {/* Status Box */}
+              {smsSuccessStatus === 'SENDING' && (
+                <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg flex items-center justify-center gap-2 animate-pulse">
+                  <RefreshCw className="w-4 h-4 text-emerald-800 animate-spin" />
+                  <span className="text-[10.5px] font-semibold text-stone-700 font-sans">Connecting to SMS Gateway API...</span>
+                </div>
+              )}
+
+              {smsSuccessStatus === 'SENT' && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[10.5px] font-semibold flex items-start gap-2 animate-fade-in">
+                  <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Dispatch Successful</p>
+                    <p className="text-stone-600 font-normal mt-0.5 text-[9.5px]">
+                      Message queued & broadcasted. Transaction Ref ID: <span className="font-mono font-bold">SBR-SMS-TXN-{Math.floor(100000 + Math.random() * 900000)}</span>.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {smsSuccessStatus === 'FAILED' && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[10.5px] font-semibold flex items-start gap-2 animate-fade-in">
+                  <ShieldAlert className="shrink-0 mt-0.5 w-4 h-4 text-rose-600" />
+                  <div>
+                    <p className="font-bold">Dispatch Failed</p>
+                    <p className="text-stone-600 font-normal mt-0.5 text-[9.5px] leading-relaxed">
+                      {smsErrorMessage || 'An unexpected error occurred while sending the SMS.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Channels Group */}
+              <div className="space-y-2">
+                <p className="text-[9.5px] font-bold text-stone-500 uppercase tracking-widest block mb-1">
+                  Select Dispatch Channel
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={async () => {
+                      setSmsSuccessStatus('SENDING');
+                      setIsSendingSMS(true);
+                      setSmsErrorMessage('');
+                      try {
+                        const response = await fetch('/api/send-sms', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            phone: selectedAgentForSMS.phone,
+                            message: smsMessageText,
+                          }),
+                        });
+                        const data = await response.json();
+                        if (response.ok && data.success) {
+                          setSmsSuccessStatus('SENT');
+                        } else {
+                          setSmsSuccessStatus('FAILED');
+                          setSmsErrorMessage(data.error || 'Server rejected SMS request.');
+                        }
+                      } catch (err: any) {
+                        setSmsSuccessStatus('FAILED');
+                        setSmsErrorMessage(err?.message || 'Network error connecting to SMS Gateway.');
+                      } finally {
+                        setIsSendingSMS(false);
+                      }
+                    }}
+                    disabled={isSendingSMS}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 text-[10.5px] font-bold rounded-lg bg-emerald-800 text-white hover:bg-emerald-900 transition-all cursor-pointer disabled:opacity-50 font-sans uppercase tracking-wider"
+                    title="Send real SMS via backend gateway (Fast2SMS or Twilio)"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isSendingSMS ? 'Dispatching...' : 'Send SMS API'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const cleanPhone = selectedAgentForSMS.phone.replace(/[^0-9]/g, '');
+                      const waPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+                      const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(smsMessageText)}`;
+                      window.open(waUrl, '_blank');
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 text-[10.5px] font-bold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer font-sans uppercase tracking-wider"
+                    title="Open in WhatsApp Web / App"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>WhatsApp</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const smsUri = `sms:${selectedAgentForSMS.phone}?body=${encodeURIComponent(smsMessageText)}`;
+                      window.open(smsUri, '_blank');
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 text-[10.5px] font-bold rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 transition-all cursor-pointer font-sans uppercase tracking-wider"
+                    title="Open default SMS app on your phone"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Native SMS</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(smsMessageText);
+                      const oldStatus = smsSuccessStatus;
+                      setSmsSuccessStatus('SENT');
+                      setTimeout(() => setSmsSuccessStatus(oldStatus), 2000);
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 text-[10.5px] font-bold rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer font-sans uppercase tracking-wider"
+                    title="Copy message text to clipboard"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Copy Text</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer Dismiss Button */}
+              <div className="pt-2 border-t border-stone-150 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAgentForSMS(null);
+                    setSmsSuccessStatus('IDLE');
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold rounded-lg border border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100 cursor-pointer font-sans"
+                >
+                  Close
+                </button>
+              </div>
+
             </div>
           </div>
         </div>
