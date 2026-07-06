@@ -363,7 +363,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
             <div
               onClick={() => handleNodeClick(user.id)}
               className={`
-                w-28 bg-white border rounded-lg p-1.5 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col items-center text-center gap-1 relative
+                w-auto min-w-[4.5rem] max-w-[12rem] bg-white border rounded-lg p-1.5 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col items-center text-center gap-1.5 relative whitespace-nowrap
                 ${isSelected 
                   ? 'border-emerald-600 bg-emerald-50/5 ring-2 ring-emerald-600/30 shadow-md shadow-emerald-100' 
                   : matchesSearch 
@@ -377,13 +377,13 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
                 <span className={`w-1 h-1 rounded-full flex-shrink-0 ${
                   user.status === 'ACTIVE' ? 'bg-emerald-500 shadow-xs animate-pulse' : 'bg-stone-300'
                 }`} />
-                <h4 className="font-bold text-stone-900 text-[9.5px] tracking-tight truncate leading-tight w-full" title={user.name}>
+                <h4 className="font-bold text-stone-900 text-[11px] tracking-tight truncate leading-tight w-full" title={user.name}>
                   {user.name}
                 </h4>
               </div>
 
               {/* User ID */}
-              <span className="text-[7.5px] font-mono font-bold text-stone-500 bg-stone-50 px-1 py-0.2 rounded border border-stone-200/30 leading-none">
+              <span className="text-[9px] font-mono font-bold text-stone-500 bg-stone-50 px-1 py-0.2 rounded border border-stone-200/30 leading-none">
                 {user.id}
               </span>
             </div>
@@ -401,7 +401,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
                 {isExpanded ? (
                   <ChevronDown className="w-3.5 h-3.5" />
                 ) : (
-                  <span className="text-[8px] font-bold font-mono flex items-center justify-center">
+                  <span className="text-[9.5px] font-bold font-mono flex items-center justify-center">
                     +{directChildren.length}
                   </span>
                 )}
