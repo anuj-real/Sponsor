@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
-import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
 import TreeVisualizer from './TreeVisualizer';
 
@@ -164,9 +164,6 @@ export default function AgentPanel({
       {/* Partner Identity Banner */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-stone-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-lg select-none text-emerald-800">
-            {agent.name.split(' ').map(n => n[0]).join('')}
-          </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg sm:text-xl font-bold text-stone-900">{agent.name}</h2>
@@ -174,8 +171,19 @@ export default function AgentPanel({
                 {agent.designation || 'Associate'}
               </span>
             </div>
-            <p className="text-xs text-stone-550 mt-1">
-              Associate Sponsor ID: <span className="font-mono font-bold text-stone-900 bg-stone-50 px-2 py-0.5 rounded border border-stone-200">{agent.id}</span> • Joined {agent.joinedDate}
+            <p className="text-xs text-stone-550 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Associate Sponsor ID:</span>
+              <span className="font-mono font-bold text-stone-900 bg-stone-50 px-2 py-0.5 rounded border border-stone-200">{agent.id}</span>
+              <span>• Joined {agent.joinedDate}</span>
+              {agent.bankAccountNumber && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-850 bg-emerald-50/70 px-1.5 py-0.5 rounded border border-emerald-150/30">
+                    <CreditCard className="w-3 h-3 shrink-0 text-emerald-700" />
+                    <span>A/C: *{agent.bankAccountNumber.slice(-4)} ({agent.ifscCode})</span>
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -589,7 +597,7 @@ export default function AgentPanel({
               <Award className="w-4 h-4 text-emerald-800" /> Designation Ranks & Direct Incentive
             </h4>
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-              {['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'VIKAS', 'DK'].includes(agent.id) ? (
+              {['C', 'A1', 'A2'].includes(agent.id) ? (
                 <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl text-stone-500 text-xs leading-relaxed space-y-2">
                   <p className="font-semibold text-stone-700">Administrative Exemption</p>
                   <p>Leadership override tiers and direct incentive eligibility calculations are disabled for SBR corporate nodes.</p>

@@ -3,7 +3,7 @@ export type UserRole = 'ADMIN' | 'AGENT';
 export interface User {
   id: string; // Sequential Sponsor ID, e.g. SBR0001, SBR0002...
   name: string;
-  email: string;
+  email?: string;
   phone: string;
   role: UserRole;
   sponsorId: string | null; // ID of the person who onboarded them
@@ -21,6 +21,12 @@ export interface User {
   address?: string;
   photo?: string; // SBR associate photo URL or base64 placeholder
   password?: string; // Optional user password
+
+  // Bank details section
+  bankAccountNumber?: string;
+  ifscCode?: string;
+  branchName?: string;
+  nominee?: string;
 }
 
 export interface InventoryUnit {

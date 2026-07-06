@@ -188,7 +188,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
   const nextReward = brokerMilestones.find(m => !m.isUnlocked);
   const highestAchieved = achievedRewards.length > 0 ? achievedRewards[achievedRewards.length - 1] : null;
 
-  const isCorporateNode = ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'VIKAS', 'DK'].includes(agent.id);
+  const isCorporateNode = ['C', 'A1', 'A2'].includes(agent.id);
 
   if (isCorporateNode) {
     return (

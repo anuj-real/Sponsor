@@ -181,6 +181,12 @@ export default function AdminPanel({
   const [newAddress, setNewAddress] = useState('');
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=256');
 
+  // Bank details fields for onboarding
+  const [newBankAccountNumber, setNewBankAccountNumber] = useState('');
+  const [newIfscCode, setNewIfscCode] = useState('');
+  const [newBranchName, setNewBranchName] = useState('');
+  const [newNominee, setNewNominee] = useState('');
+
   const [createUserSuccess, setCreateUserSuccess] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [agentFilter, setAgentFilter] = useState('');
@@ -198,6 +204,12 @@ export default function AdminPanel({
   const [tempPassword, setTempPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [passwordStatusMsg, setPasswordStatusMsg] = useState('');
+
+  // Bank details fields for editing
+  const [editBankAccountNumber, setEditBankAccountNumber] = useState('');
+  const [editIfscCode, setEditIfscCode] = useState('');
+  const [editBranchName, setEditBranchName] = useState('');
+  const [editNominee, setEditNominee] = useState('');
 
   // SBR SMS Dispatch Portal state
   const [selectedAgentForSMS, setSelectedAgentForSMS] = useState<User | null>(null);
@@ -497,8 +509,8 @@ export default function AdminPanel({
 
   const handleOnboardAgent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newEmail || !newPhone) {
-      setErrorMsg('Full Name, Email and Mobile Number are required.');
+    if (!newName || !newPhone) {
+      setErrorMsg('Full Name and Mobile Number are required.');
       return;
     }
     if (!newAadhar || !newPan) {
@@ -511,7 +523,7 @@ export default function AdminPanel({
     const newlyCreatedAgent: User = {
       id: assignedId,
       name: newName,
-      email: newEmail,
+      email: newEmail || undefined,
       phone: newPhone,
       role: 'AGENT',
       sponsorId: newSponsor || null,
@@ -524,7 +536,11 @@ export default function AdminPanel({
       address: newAddress || 'Sub-broker Office network',
       photo: newPhoto,
       totalDirectSales: 0,
-      totalDownlineSales: 0
+      totalDownlineSales: 0,
+      bankAccountNumber: newBankAccountNumber || undefined,
+      ifscCode: newIfscCode || undefined,
+      branchName: newBranchName || undefined,
+      nominee: newNominee || undefined
     };
 
     onAddUser(newlyCreatedAgent);
@@ -539,6 +555,10 @@ export default function AdminPanel({
     setNewAadhar('');
     setNewPan('');
     setNewAddress('');
+    setNewBankAccountNumber('');
+    setNewIfscCode('');
+    setNewBranchName('');
+    setNewNominee('');
     setTimeout(() => setCreateUserSuccess(''), 6000);
 
     // Auto-trigger the secure credentials SMS Portal for the newly added user! (Removed/Disabled for now until DLT registration)
@@ -1636,8 +1656,11 @@ export default function AdminPanel({
 
             <form onSubmit={handleOnboardAgent} className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
               
-              <div className="space-y-4 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <h4 className="text-stone-700 font-bold text-xs uppercase tracking-wider col-span-1 md:col-span-2 border-b border-stone-150 pb-1">Primary Broker Credentials</h4>
+              {/* PRIMARY BROKER CREDENTIALS */}
+              <div className="space-y-4 bg-stone-50 p-4 rounded-xl border border-stone-200">
+                <h4 className="text-stone-800 font-bold text-xs uppercase tracking-wider border-b border-stone-200 pb-1 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-emerald-800" /> Primary Broker Credentials
+                </h4>
                 <div>
                   <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Full Representative Name</label>
                   <input
@@ -1646,19 +1669,18 @@ export default function AdminPanel({
                     placeholder="e.g. Anand Satpute"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Email ID</label>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Email ID (Optional)</label>
                   <input
                     type="email"
-                    required
                     placeholder="anand@sbrpartners.in"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                   />
                 </div>
 
@@ -1670,7 +1692,7 @@ export default function AdminPanel({
                     placeholder="+91 98450 11022"
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                   />
                 </div>
 
@@ -1679,7 +1701,7 @@ export default function AdminPanel({
                   <select
                     value={newSponsor}
                     onChange={(e) => setNewSponsor(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 cursor-pointer focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 cursor-pointer focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                   >
                     <option value="">No Direct Sponsor (Independent Director)</option>
                     {users
@@ -1692,14 +1714,14 @@ export default function AdminPanel({
                   </select>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="text-[10px] font-bold text-stone-555 uppercase tracking-widest block mb-1">Representative Profile Photo Link</label>
+                <div>
+                  <label className="text-[10px] font-bold text-stone-555 uppercase tracking-widest block mb-1">Representative Photo Link</label>
                   <input
                     type="text"
                     placeholder="https://images.unsplash.com/photo-..."
                     value={newPhoto}
                     onChange={(e) => setNewPhoto(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
                   />
                 </div>
               </div>
@@ -1752,7 +1774,58 @@ export default function AdminPanel({
                     placeholder="Flat 202, Heights Tower, Hyderabad 500032"
                     value={newAddress}
                     onChange={(e) => setNewAddress(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* BANK DETAILS SECTION */}
+              <div className="space-y-4 bg-stone-50 p-4 rounded-xl border border-stone-200">
+                <h4 className="text-stone-800 font-bold text-xs uppercase tracking-wider border-b border-stone-200 pb-1 flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-emerald-800" /> Bank Details (Commission)
+                </h4>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Bank Account Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 50200012345678"
+                    value={newBankAccountNumber}
+                    onChange={(e) => setNewBankAccountNumber(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">IFSC Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. HDFC0001234"
+                    value={newIfscCode}
+                    onChange={(e) => setNewIfscCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none font-mono uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Branch Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gachibowli, Hyderabad"
+                    value={newBranchName}
+                    onChange={(e) => setNewBranchName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Nominee Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Savita Satpute (Spouse)"
+                    value={newNominee}
+                    onChange={(e) => setNewNominee(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none"
                   />
                 </div>
               </div>
@@ -1839,12 +1912,6 @@ export default function AdminPanel({
                     <tr key={agent.id} className="hover:bg-stone-50/30 transition-colors">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
-                          <img 
-                            src={agent.photo} 
-                            alt={agent.name}
-                            referrerPolicy="no-referrer"
-                            className="w-8 h-8 rounded-full border border-stone-200 object-cover"
-                          />
                           <div className="font-sans">
                             <p className="font-bold text-stone-900 text-xs">{agent.name}</p>
                             <p className="text-[9.5px] text-stone-500 mt-0.5">{agent.email} • {agent.phone}</p>
@@ -1886,6 +1953,10 @@ export default function AdminPanel({
                                   setEditAadhar(agent.aadhar || '');
                                   setEditPan(agent.pan || '');
                                   setEditAddress(agent.address || '');
+                                  setEditBankAccountNumber(agent.bankAccountNumber || '');
+                                  setEditIfscCode(agent.ifscCode || '');
+                                  setEditBranchName(agent.branchName || '');
+                                  setEditNominee(agent.nominee || '');
                                   const username = agent.id.toUpperCase();
                                   let calculatedDefaultPass = 'password';
                                   if (agent.dob) {
@@ -3243,7 +3314,7 @@ export default function AdminPanel({
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Email Address</label>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Email Address (Optional)</label>
                       <input
                         type="email"
                         value={editEmail}
@@ -3307,6 +3378,56 @@ export default function AdminPanel({
                       />
                     </div>
 
+                    <div className="sm:col-span-2 border-t border-stone-150 pt-2.5 mt-1">
+                      <h5 className="font-bold text-stone-700 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                        <CreditCard className="w-3.5 h-3.5 text-emerald-800" /> Bank Account Details (Commission)
+                      </h5>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Bank Account Number</label>
+                      <input
+                        type="text"
+                        value={editBankAccountNumber}
+                        onChange={(e) => setEditBankAccountNumber(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        placeholder="Enter account number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">IFSC Code</label>
+                      <input
+                        type="text"
+                        value={editIfscCode}
+                        onChange={(e) => setEditIfscCode(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono uppercase"
+                        placeholder="IFSC Code"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Branch Name</label>
+                      <input
+                        type="text"
+                        value={editBranchName}
+                        onChange={(e) => setEditBranchName(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="Enter branch name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Nominee</label>
+                      <input
+                        type="text"
+                        value={editNominee}
+                        onChange={(e) => setEditNominee(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="Nominee name"
+                      />
+                    </div>
+
                     <div className="sm:col-span-2">
                       <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Secure Passcode / Password</label>
                       <input
@@ -3354,6 +3475,10 @@ export default function AdminPanel({
                               pan: editPan,
                               address: editAddress,
                               password: tempPassword,
+                              bankAccountNumber: editBankAccountNumber,
+                              ifscCode: editIfscCode,
+                              branchName: editBranchName,
+                              nominee: editNominee,
                             });
                             setPasswordStatusMsg('Broker credentials updated successfully!');
                             setTimeout(() => {

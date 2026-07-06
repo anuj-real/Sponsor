@@ -78,7 +78,77 @@ export default function App() {
         const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
         const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
         
-        const loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+        let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+
+        // --- SELF-HEALING LOCAL-TO-CLOUD SYNC ---
+        // If the user created IDs or logged transactions while offline or during a network blip yesterday,
+        // they exist in their browser's LocalStorage but are missing from Firestore. Let's merge and heal the cloud.
+        const storedUsersStr = localStorage.getItem('SBR_USERS');
+        if (storedUsersStr) {
+          try {
+            const storedUsers = JSON.parse(storedUsersStr);
+            if (Array.isArray(storedUsers)) {
+              const missingUsersInFirestore = storedUsers.filter(
+                localU => localU && localU.id && !loadedUsers.some(cloudU => cloudU.id === localU.id)
+              );
+              if (missingUsersInFirestore.length > 0) {
+                console.log(`[Cloud Sync] Found ${missingUsersInFirestore.length} unsynced users in LocalStorage. Synchronizing to Cloud Firestore...`);
+                for (const localUser of missingUsersInFirestore) {
+                  await setDocumentData(COLLECTIONS.USERS, localUser.id, localUser);
+                  loadedUsers.push(localUser);
+                }
+                // Re-normalize designations and volumes after merging
+                loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to parse or sync LocalStorage users:", err);
+          }
+        }
+
+        const storedSalesStr = localStorage.getItem('SBR_SALES');
+        if (storedSalesStr) {
+          try {
+            const storedSales = JSON.parse(storedSalesStr);
+            if (Array.isArray(storedSales)) {
+              const missingSalesInFirestore = storedSales.filter(
+                localS => localS && localS.id && !loadedSales.some(cloudS => cloudS.id === localS.id)
+              );
+              if (missingSalesInFirestore.length > 0) {
+                console.log(`[Cloud Sync] Found ${missingSalesInFirestore.length} unsynced sales in LocalStorage. Synchronizing to Cloud Firestore...`);
+                for (const localSale of missingSalesInFirestore) {
+                  await setDocumentData(COLLECTIONS.SALES, localSale.id, localSale);
+                  loadedSales.push(localSale);
+                }
+              }
+            }
+          } catch (err) {
+            console.error("Failed to parse or sync LocalStorage sales:", err);
+          }
+        }
+
+        const storedNotifsStr = localStorage.getItem('SBR_NOTIFICATIONS');
+        if (storedNotifsStr) {
+          try {
+            const storedNotifs = JSON.parse(storedNotifsStr);
+            if (Array.isArray(storedNotifs)) {
+              const currentCloudNotifs = data.notifications || INITIAL_NOTIFICATIONS;
+              const missingNotifsInFirestore = storedNotifs.filter(
+                localN => localN && localN.id && !currentCloudNotifs.some(cloudN => cloudN.id === localN.id)
+              );
+              if (missingNotifsInFirestore.length > 0) {
+                console.log(`[Cloud Sync] Found ${missingNotifsInFirestore.length} unsynced notifications in LocalStorage. Synchronizing to Cloud Firestore...`);
+                for (const localNotif of missingNotifsInFirestore) {
+                  await setDocumentData(COLLECTIONS.NOTIFICATIONS, localNotif.id, localNotif);
+                }
+              }
+            }
+          } catch (err) {
+            console.error("Failed to parse or sync LocalStorage notifications:", err);
+          }
+        }
+        // ----------------------------------------
+
         const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
 
         // Filter notifications to match
