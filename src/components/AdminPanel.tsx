@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord } from '../types';
 import { calculatePointsFromSize } from '../lib/points';
+import TreeVisualizer from './TreeVisualizer';
 import { 
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
@@ -83,6 +84,7 @@ export default function AdminPanel({
 
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS
   const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS'>('SETTINGS');
+  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
 
   const formatPoints = (val: number) => {
     return `${Math.round(val).toLocaleString()} PTS`;
@@ -1671,8 +1673,8 @@ export default function AdminPanel({
 
       {/* 2. ONBOARD SPONSORS WITH DETAILED INFO */}
       {activeSubTab === 'AGENTS' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-          <div className="lg:col-span-12 bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50">
               <h3 className="font-bold text-stone-900 flex items-center gap-2 text-sm uppercase tracking-wide">
                 <PlusCircle className="w-5 h-5 text-emerald-800" /> Register Strategic Sponsoring Partner (SBR Series)
@@ -1905,8 +1907,16 @@ export default function AdminPanel({
                 </button>
               </div>
             </form>
+          </div>
 
-            <div className="p-4 border-b border-t border-stone-200 bg-stone-50/50 flex items-center justify-between flex-col md:flex-row gap-4">
+          <TreeVisualizer 
+            users={users}
+            onSelectUser={(id) => setSelectedTreeUserId(id)}
+            selectedUserId={selectedTreeUserId}
+          />
+
+          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex items-center justify-between flex-col md:flex-row gap-4">
               <div>
                 <h4 className="font-bold text-stone-900 text-xs uppercase font-sans">Live Sourcing Team Directory</h4>
                 <p className="text-[10px] text-stone-500">Suspend sub-broker network portals instantly during audits.</p>

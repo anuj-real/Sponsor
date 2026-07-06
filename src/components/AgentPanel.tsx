@@ -513,6 +513,14 @@ export default function AgentPanel({
         </div>
       </div>
 
+      {/* SBR Referral Organigram for Associate Downline */}
+      <TreeVisualizer 
+        users={[agent, ...downlineNetwork.map(item => item.user)]}
+        onSelectUser={(id) => setSelectedTreeUserId(id)}
+        selectedUserId={selectedTreeUserId}
+        hideUpline={true}
+      />
+
       {/* SBR BROKER MOTIVATIONAL DECK */}
       <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden animate-fade-in">
         <div className="p-5 border-b border-stone-200 bg-stone-50/40 flex justify-between items-center flex-col sm:flex-row gap-3">
@@ -756,16 +764,6 @@ export default function AgentPanel({
               </div>
             )}
           </div>
-        </div>
-
-        {/* SBR Referral Organigram for Associate Downline */}
-        <div className="lg:col-span-12">
-          <TreeVisualizer 
-            users={[agent, ...downlineNetwork.map(item => item.user)]}
-            onSelectUser={(id) => setSelectedTreeUserId(id)}
-            selectedUserId={selectedTreeUserId}
-            hideUpline={true}
-          />
         </div>
 
         {/* Override Ledger */}

@@ -920,12 +920,6 @@ export default function App() {
               onUpdateUserProfile={handleAdminUpdateUserProfile}
               currentUserAgentId={session?.agentId}
             />
-
-            <TreeVisualizer 
-              users={users}
-              onSelectUser={(id) => setSelectedTreeUserId(id)}
-              selectedUserId={selectedTreeUserId}
-            />
           </div>
         )}
 
