@@ -149,12 +149,34 @@ export default function App() {
         }
         // ----------------------------------------
 
-        const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
-
         // Filter notifications to match
         const loadedNotifs = (data.notifications || INITIAL_NOTIFICATIONS).filter(n => {
           return loadedUsers.some(u => u.id === n.userId);
         });
+
+        // --- Auto Deletion of SBR0036 ---
+        const sbr36Index = loadedUsers.findIndex(u => u.id === 'SBR0036');
+        if (sbr36Index !== -1) {
+          console.log('[Auto-Deletion] SBR0036 found. Performing requested deletion...');
+          const sbr36Sponsor = loadedUsers[sbr36Index].sponsorId || 'C';
+          loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0036').map(u => {
+            if (u.sponsorId === 'SBR0036') {
+              return { ...u, sponsorId: sbr36Sponsor };
+            }
+            return u;
+          });
+          try {
+            deleteDocument(COLLECTIONS.USERS, 'SBR0036').catch(err => {
+              console.error('[Auto-Deletion] Failed to delete SBR0036 document:', err);
+            });
+          } catch (err) {
+            console.error('[Auto-Deletion] Failed to trigger delete:', err);
+          }
+          loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
+        }
+        // --------------------------------
+
+        const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
 
         setUsers(loadedUsers);
         setProjects(loadedProjects);
@@ -388,6 +410,51 @@ export default function App() {
       return u;
     });
     setUsers(updatedUsers);
+  };
+
+  const handleDeleteUser = async (userIdToDelete: string) => {
+    const deletedUser = users.find(u => u.id === userIdToDelete);
+    if (!deletedUser) return;
+
+    const parentSponsorId = deletedUser.sponsorId || 'C';
+    const remainingUsers = users.filter(u => u.id !== userIdToDelete).map(u => {
+      if (u.sponsorId === userIdToDelete) {
+        return { ...u, sponsorId: parentSponsorId };
+      }
+      return u;
+    });
+
+    const normalizedUsers = normalizeUsersWithSales(remainingUsers, sales, config);
+    setUsers(normalizedUsers);
+
+    // Create a system notification for the deletion
+    const notif: Notification = {
+      id: `NOT-${Math.floor(500 + Math.random() * 500)}`,
+      userId: 'C',
+      title: 'Sponsoring Partner Deleted',
+      message: `Sponsor ${deletedUser.name} (${deletedUser.id}) has been permanently deleted from SBR organization. Downlines reparented to ${parentSponsorId}.`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      isRead: false
+    };
+    setNotifications(prev => [notif, ...prev]);
+
+    try {
+      await deleteDocument(COLLECTIONS.USERS, userIdToDelete);
+      
+      // Save reparented downlines and recalculated designations to Firestore
+      for (const u of normalizedUsers) {
+        const oldUser = users.find(old => old.id === u.id);
+        if (oldUser) {
+          if (oldUser.sponsorId !== u.sponsorId || oldUser.designation !== u.designation) {
+            await setDocumentData(COLLECTIONS.USERS, u.id, u);
+          }
+        }
+      }
+      
+      await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
+    } catch (err) {
+      console.error('Failed to completely delete or update database for user deletion:', err);
+    }
   };
 
   const handleClearNotification = async (notifId: string) => {
@@ -841,6 +908,7 @@ export default function App() {
               sales={sales}
               payouts={payouts}
               onToggleUserStatus={handleToggleUserStatus}
+              onDeleteUser={handleDeleteUser}
               projects={projects}
               onAddProject={handleAddProject}
               onAddSale={handleAddSale}

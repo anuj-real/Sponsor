@@ -16,6 +16,7 @@ interface AdminPanelProps {
   sales: Sale[];
   payouts: CommissionPayout[];
   onToggleUserStatus: (userId: string) => void;
+  onDeleteUser?: (userId: string) => void;
   projects: RealEstateProject[];
   onAddProject: (project: RealEstateProject) => void;
   onAddSale: (saleData: {
@@ -59,7 +60,8 @@ export default function AdminPanel({
   onUpdateSaleBookingStatus,
   onUpdateSale,
   onUpdateUserProfile,
-  currentUserAgentId
+  currentUserAgentId,
+  onDeleteUser
 }: AdminPanelProps) {
   const isFamilyId = (id?: string) => {
     if (!id) return false;
@@ -1699,11 +1701,12 @@ export default function AdminPanel({
                 <div>
                   <label className="text-[10px] font-bold text-stone-555 uppercase tracking-widest block mb-1">Direct Recruiter / Sponsor</label>
                   <select
+                    required
                     value={newSponsor}
                     onChange={(e) => setNewSponsor(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 cursor-pointer focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                   >
-                    <option value="">No Direct Sponsor (Independent Director)</option>
+                    <option value="" disabled>Select Sponsor</option>
                     {users
                       .filter((u) => !['C', 'A1', 'A2'].includes(u.id))
                       .map((u) => (
@@ -1712,17 +1715,6 @@ export default function AdminPanel({
                         </option>
                       ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-stone-555 uppercase tracking-widest block mb-1">Representative Photo Link</label>
-                  <input
-                    type="text"
-                    placeholder="https://images.unsplash.com/photo-..."
-                    value={newPhoto}
-                    onChange={(e) => setNewPhoto(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
-                  />
                 </div>
               </div>
 
@@ -2049,6 +2041,20 @@ export default function AdminPanel({
                           >
                             {agent.status === 'ACTIVE' ? 'Suspend' : 'Authorize'}
                           </button>
+
+                          {!isAdminId(agent.id) && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to permanently delete sponsor ${agent.name} (${agent.id})? This will remove their user profile. Any immediate downlines will be reparented to their sponsor.`)) {
+                                  onDeleteUser?.(agent.id);
+                                }
+                              }}
+                              className="text-[10px] font-bold px-2.5 py-1 rounded bg-rose-600 border border-rose-700 text-white hover:bg-rose-700 transition-all cursor-pointer"
+                              title="Permanently Delete Sponsor"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
