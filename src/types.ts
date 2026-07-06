@@ -27,6 +27,7 @@ export interface User {
   ifscCode?: string;
   branchName?: string;
   nominee?: string;
+  nomineeRelation?: string;
 }
 
 export interface InventoryUnit {

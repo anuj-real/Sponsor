@@ -72,7 +72,59 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     if (onSelectUser) {
       onSelectUser(userId);
     }
+    // Smooth scroll to the details card on mobile
+    if (window.innerWidth < 1024) {
+      setTimeout(() => {
+        const detailsCard = document.getElementById('selected-node-details');
+        if (detailsCard) {
+          detailsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 350);
+    }
   };
+
+  // Detect mobile device on mount to default to MLM Tree with zoomed out view
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setViewMode('MLM');
+      setZoom(0.85); // Nice, crisp readable default zoom on mobile
+      setPan({ x: 0, y: 30 });
+    } else {
+      setViewMode('MLM');
+      setZoom(1.0); // Full scale on desktop
+      setPan({ x: 0, y: 10 });
+    }
+  }, []);
+
+  // Auto-center the selected node in the viewport smoothly
+  useEffect(() => {
+    if (viewMode === 'MLM' && selectedUserId) {
+      const timer = setTimeout(() => {
+        const nodeEl = document.getElementById(`mlm-node-${selectedUserId}`);
+        const viewportEl = treeContainerRef.current;
+        if (nodeEl && viewportEl) {
+          const rectNode = nodeEl.getBoundingClientRect();
+          const rectViewport = viewportEl.getBoundingClientRect();
+          
+          // Calculate screen center delta
+          const viewportCenterX = rectViewport.left + rectViewport.width / 2;
+          const viewportCenterY = rectViewport.top + rectViewport.height / 2;
+          
+          const nodeCenterX = rectNode.left + rectNode.width / 2;
+          const nodeCenterY = rectNode.top + rectNode.height / 2;
+          
+          const dx = viewportCenterX - nodeCenterX;
+          const dy = viewportCenterY - nodeCenterY;
+          
+          setPan(prev => ({
+            x: prev.x + dx,
+            y: prev.y + dy
+          }));
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedUserId, viewMode]);
 
   // Auto-expand ancestors when searched or selected
   useEffect(() => {
@@ -111,7 +163,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     }
   }, [selectedUserId, users]);
 
-  // Drag handlers for pan
+  // Drag handlers for pan (Mouse)
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only drag if left click and clicking background or nodes with pan intent
     if (e.button !== 0) return;
@@ -127,17 +179,66 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     });
   };
 
+  // Multi-touch gesture states for pinch-to-zoom on mobile
+  const touchDistanceStart = useRef<number | null>(null);
+  const lastTouchZoom = useRef<number>(0.85);
+
+  // Drag handlers for pan (Touch/Mobile with Pinch-to-zoom)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      dragStart.current = { x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y };
+      touchDistanceStart.current = null;
+    } else if (e.touches.length === 2) {
+      setIsDragging(false); // Stop standard panning when pinching
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchDistanceStart.current = dist;
+      lastTouchZoom.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && isDragging) {
+      setPan({
+        x: e.touches[0].clientX - dragStart.current.x,
+        y: e.touches[0].clientY - dragStart.current.y
+      });
+    } else if (e.touches.length === 2 && touchDistanceStart.current !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = dist / touchDistanceStart.current;
+      const newZoom = Math.min(1.2, Math.max(0.65, lastTouchZoom.current * factor));
+      setZoom(newZoom);
+    }
+  };
+
   const handleMouseUpOrLeave = () => {
     setIsDragging(false);
   };
 
+  const handleWheel = (e: React.WheelEvent) => {
+    const zoomIntensity = 0.05;
+    const delta = e.deltaY < 0 ? 1 : -1;
+    setZoom(prev => Math.min(1.2, Math.max(0.65, prev + delta * zoomIntensity)));
+  };
+
   const resetPanAndZoom = () => {
-    setZoom(0.85);
-    setPan({ x: 0, y: 0 });
+    if (window.innerWidth < 768) {
+      setZoom(0.85);
+      setPan({ x: 0, y: 30 });
+    } else {
+      setZoom(1.0);
+      setPan({ x: 0, y: 10 });
+    }
   };
 
   const adjustZoom = (amount: number) => {
-    setZoom(prev => Math.min(1.5, Math.max(0.3, prev + amount)));
+    setZoom(prev => Math.min(1.2, Math.max(0.65, prev + amount)));
   };
 
   // Rank-based styling classes
@@ -242,98 +343,80 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     );
   };
 
-  // Recursive MLM Orthogonal Tree Node
-  const renderMLMNode = (user: User) => {
-    const directChildren = users.filter(u => u.sponsorId === user.id);
-    const hasChildren = directChildren.length > 0;
-    const isExpanded = !!expandedNodes[user.id];
-    const isSelected = selectedUserId === user.id;
-    const totalDownlines = getDownlineCount(user.id);
-    const networkVolume = getNetworkVolume(user.id);
+    // Recursive MLM Orthogonal Tree Node
+    const renderMLMNode = (user: User) => {
+      const directChildren = users.filter(u => u.sponsorId === user.id);
+      const hasChildren = directChildren.length > 0;
+      const isExpanded = !!expandedNodes[user.id];
+      const isSelected = selectedUserId === user.id;
+      const totalDownlines = getDownlineCount(user.id);
+      const networkVolume = getNetworkVolume(user.id);
 
-    const matchesSearch = searchQuery 
-      ? user.name.toLowerCase().includes(searchQuery.toLowerCase()) || user.id.toLowerCase().includes(searchQuery.toLowerCase())
-      : false;
+      const matchesSearch = searchQuery 
+        ? user.name.toLowerCase().includes(searchQuery.toLowerCase()) || user.id.toLowerCase().includes(searchQuery.toLowerCase())
+        : false;
 
-    return (
-      <div key={user.id} className="flex flex-col items-center flex-shrink-0" id={`mlm-node-${user.id}`}>
-        {/* Node Card wrapper with floating collapse toggle */}
-        <div className="relative flex flex-col items-center group">
-          <div
-            onClick={() => handleNodeClick(user.id)}
-            className={`
-              w-56 bg-white border rounded-xl p-3.5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col items-center text-center
-              ${isSelected 
-                ? 'border-emerald-600 bg-emerald-50/5 ring-2 ring-emerald-600/30 shadow-lg shadow-emerald-150' 
-                : matchesSearch 
-                  ? 'border-amber-500 bg-amber-50/10 ring-2 ring-amber-500/20'
-                  : 'border-stone-200 hover:border-emerald-400'
-              }
-            `}
-          >
-            {/* Associate Info & Compact Status Dot */}
-            <div className="flex items-center gap-1.5 justify-center">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                user.status === 'ACTIVE' ? 'bg-emerald-500 shadow-sm animate-pulse' : 'bg-stone-300'
-              }`} />
-              <h4 className="font-bold text-stone-900 text-xs tracking-tight line-clamp-1">{user.name}</h4>
-            </div>
+      return (
+        <div key={user.id} className="flex flex-col items-center flex-shrink-0" id={`mlm-node-${user.id}`}>
+          {/* Node Card wrapper with floating collapse toggle */}
+          <div className="relative flex flex-col items-center group">
+            <div
+              onClick={() => handleNodeClick(user.id)}
+              className={`
+                w-28 bg-white border rounded-lg p-1.5 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col items-center text-center gap-1 relative
+                ${isSelected 
+                  ? 'border-emerald-600 bg-emerald-50/5 ring-2 ring-emerald-600/30 shadow-md shadow-emerald-100' 
+                  : matchesSearch 
+                    ? 'border-amber-500 bg-amber-50/10 ring-2 ring-amber-500/20'
+                    : 'border-stone-200 hover:border-emerald-400'
+                }
+              `}
+            >
+              {/* Status dot + Name */}
+              <div className="flex items-center gap-1 justify-center w-full min-w-0">
+                <span className={`w-1 h-1 rounded-full flex-shrink-0 ${
+                  user.status === 'ACTIVE' ? 'bg-emerald-500 shadow-xs animate-pulse' : 'bg-stone-300'
+                }`} />
+                <h4 className="font-bold text-stone-900 text-[9.5px] tracking-tight truncate leading-tight w-full" title={user.name}>
+                  {user.name}
+                </h4>
+              </div>
 
-            <div className="flex items-center justify-center gap-1.5 mt-1.5 flex-wrap">
-              <span className="text-[9.5px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50">
+              {/* User ID */}
+              <span className="text-[7.5px] font-mono font-bold text-stone-500 bg-stone-50 px-1 py-0.2 rounded border border-stone-200/30 leading-none">
                 {user.id}
               </span>
-              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200/50 text-stone-600">
-                {user.designation || 'Associate'}
-              </span>
             </div>
 
-            {/* Stats Breakdown */}
-            <div className="grid grid-cols-2 gap-x-2 w-full mt-3 pt-2 border-t border-stone-150 text-[10px]">
-              <div className="text-left border-r border-stone-100 pr-1">
-                <span className="text-stone-400 block text-[8px] uppercase font-semibold">Team Size</span>
-                <span className="font-bold text-stone-700 font-mono flex items-center gap-0.5">
-                  <Users className="w-2.5 h-2.5 text-stone-400" /> {totalDownlines}
-                </span>
-              </div>
-              <div className="text-right pl-1">
-                <span className="text-stone-400 block text-[8px] uppercase font-semibold">Volume</span>
-                <span className="font-bold text-stone-700 font-mono">
-                  {Math.round(networkVolume)} PTS
-                </span>
-              </div>
-            </div>
+            {/* Dedicated Expand/Collapse Floating Toggle Button */}
+            {hasChildren && (
+              <button
+                onClick={(e) => toggleExpand(user.id, e)}
+                className={`
+                  absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-5.5 h-5.5 rounded-full border border-stone-200 bg-white hover:bg-stone-50 hover:border-emerald-400 text-stone-500 shadow-xs flex items-center justify-center transition-all z-10
+                  ${isExpanded ? 'text-emerald-600 hover:text-emerald-700' : 'text-stone-500'}
+                `}
+                aria-label={isExpanded ? 'Collapse tree branch' : 'Expand tree branch'}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <span className="text-[8px] font-bold font-mono flex items-center justify-center">
+                    +{directChildren.length}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
-
-          {/* Dedicated Expand/Collapse Floating Toggle Button */}
-          {hasChildren && (
-            <button
-              onClick={(e) => toggleExpand(user.id, e)}
-              className={`
-                absolute -bottom-3.5 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full border border-stone-200 bg-white hover:bg-stone-50 hover:border-emerald-400 text-stone-500 shadow-xs flex items-center justify-center transition-all z-10
-                ${isExpanded ? 'text-emerald-600 hover:text-emerald-700' : 'text-stone-500'}
-              `}
-              aria-label={isExpanded ? 'Collapse tree branch' : 'Expand tree branch'}
-            >
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <span className="text-[10px] font-bold font-mono flex items-center justify-center gap-0.5">
-                  +{directChildren.length}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
 
         {/* Orthogonal Connections and Children Row */}
         {hasChildren && isExpanded && (
-          <div className="flex flex-col items-center pt-5">
+          <div className="flex flex-col items-center pt-2 sm:pt-4">
             {/* Direct vertical line dropping from current node */}
-            <div className="w-px h-6 bg-stone-300" />
+            <div className="w-px h-3 sm:h-5 bg-stone-300" />
 
             {/* Row container of child columns */}
-            <div className="relative flex gap-x-8 pt-6">
+            <div className="relative flex gap-x-2.5 sm:gap-x-4 pt-3 sm:pt-4">
               {/* Horizontal bridge connecting all children */}
               {directChildren.length > 1 && (
                 <div 
@@ -348,7 +431,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
               {directChildren.map((child) => (
                 <div key={child.id} className="relative flex flex-col items-center">
                   {/* Vertical drop line connected to the horizontal bridge */}
-                  <div className="w-px h-6 bg-stone-300 absolute top-0" />
+                  <div className="w-px h-3 sm:h-5 bg-stone-300 absolute top-0" />
                   
                   {/* Recurse to render grandchildren */}
                   {renderMLMNode(child)}
@@ -366,7 +449,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Primary Tree Canvas */}
-      <div className="lg:col-span-2 bg-white rounded-2xl border border-stone-250 p-5 shadow-xs flex flex-col h-[650px]">
+      <div className="lg:col-span-2 bg-white rounded-2xl border border-stone-250 p-4 sm:p-5 shadow-xs flex flex-col h-[680px] md:h-[650px] lg:h-[700px]">
         {/* Toolbar Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-150 z-10 bg-white">
           <div>
@@ -448,7 +531,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
             {/* Drag Help Overlay */}
             <div className="absolute bottom-3 left-3 flex items-center gap-1.5 text-stone-400 text-[10px] font-medium font-mono pointer-events-none z-20">
-              <Move className="w-3.5 h-3.5" /> Drag canvas to pan
+              <Move className="w-3.5 h-3.5" /> Drag or Swipe to pan
             </div>
 
             {/* Interactive Tree Viewport */}
@@ -458,13 +541,18 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUpOrLeave}
               onMouseLeave={handleMouseUpOrLeave}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleMouseUpOrLeave}
+              onTouchCancel={handleMouseUpOrLeave}
+              onWheel={handleWheel}
               className={`w-full h-full overflow-hidden select-none relative ${
                 isDragging ? 'cursor-grabbing' : 'cursor-grab'
               }`}
             >
               {/* Inner container applying the pan-and-zoom transformation */}
               <div
-                className="absolute origin-top transition-transform duration-75"
+                className={`absolute origin-top ${isDragging ? 'transition-none' : 'transition-all duration-500 ease-out'}`}
                 style={{
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   left: '50%',
@@ -494,7 +582,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
       </div>
 
       {/* Selected Node Details Card */}
-      <div className="bg-white rounded-2xl border border-stone-250 p-5 shadow-xs flex flex-col justify-between h-[650px] overflow-y-auto custom-scrollbar">
+      <div id="selected-node-details" className="bg-white rounded-2xl border border-stone-250 p-4 sm:p-5 shadow-xs flex flex-col justify-between h-[520px] md:h-[650px] lg:h-[700px] overflow-y-auto custom-scrollbar">
         {selectedUser ? (
           <div className="space-y-5 animate-fade-in">
             {/* Header */}

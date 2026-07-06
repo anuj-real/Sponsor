@@ -188,6 +188,7 @@ export default function AdminPanel({
   const [newIfscCode, setNewIfscCode] = useState('');
   const [newBranchName, setNewBranchName] = useState('');
   const [newNominee, setNewNominee] = useState('');
+  const [newNomineeRelation, setNewNomineeRelation] = useState('');
 
   const [createUserSuccess, setCreateUserSuccess] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -212,6 +213,7 @@ export default function AdminPanel({
   const [editIfscCode, setEditIfscCode] = useState('');
   const [editBranchName, setEditBranchName] = useState('');
   const [editNominee, setEditNominee] = useState('');
+  const [editNomineeRelation, setEditNomineeRelation] = useState('');
 
   // SBR SMS Dispatch Portal state
   const [selectedAgentForSMS, setSelectedAgentForSMS] = useState<User | null>(null);
@@ -564,7 +566,8 @@ export default function AdminPanel({
       bankAccountNumber: newBankAccountNumber || undefined,
       ifscCode: newIfscCode || undefined,
       branchName: newBranchName || undefined,
-      nominee: newNominee || undefined
+      nominee: newNominee || undefined,
+      nomineeRelation: newNomineeRelation || undefined
     };
 
     onAddUser(newlyCreatedAgent);
@@ -583,6 +586,7 @@ export default function AdminPanel({
     setNewIfscCode('');
     setNewBranchName('');
     setNewNominee('');
+    setNewNomineeRelation('');
     setTimeout(() => setCreateUserSuccess(''), 6000);
 
     // Auto-trigger the secure credentials SMS Portal for the newly added user! (Removed/Disabled for now until DLT registration)
@@ -1842,6 +1846,17 @@ export default function AdminPanel({
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none"
                   />
                 </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Nominee Relation</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Spouse, Son, Mother"
+                    value={newNomineeRelation}
+                    onChange={(e) => setNewNomineeRelation(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none"
+                  />
+                </div>
               </div>
 
               <div className="md:col-span-3">
@@ -1971,6 +1986,7 @@ export default function AdminPanel({
                                   setEditIfscCode(agent.ifscCode || '');
                                   setEditBranchName(agent.branchName || '');
                                   setEditNominee(agent.nominee || '');
+                                  setEditNomineeRelation(agent.nomineeRelation || '');
                                   const username = agent.id.toUpperCase();
                                   let calculatedDefaultPass = 'password';
                                   if (agent.dob) {
@@ -3456,6 +3472,17 @@ export default function AdminPanel({
                       />
                     </div>
 
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Nominee Relation</label>
+                      <input
+                        type="text"
+                        value={editNomineeRelation}
+                        onChange={(e) => setEditNomineeRelation(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="Nominee relation"
+                      />
+                    </div>
+
                     <div className="sm:col-span-2">
                       <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Secure Passcode / Password</label>
                       <input
@@ -3507,6 +3534,7 @@ export default function AdminPanel({
                               ifscCode: editIfscCode,
                               branchName: editBranchName,
                               nominee: editNominee,
+                              nomineeRelation: editNomineeRelation,
                             });
                             setPasswordStatusMsg('Broker credentials updated successfully!');
                             setTimeout(() => {
