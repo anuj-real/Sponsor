@@ -520,6 +520,28 @@ export default function AdminPanel({
       return;
     }
 
+    const normalizedNewAadhar = newAadhar.trim().replace(/[-\s]/g, '');
+    const normalizedNewPan = newPan.trim().replace(/[-\s]/g, '').toUpperCase();
+
+    const isDuplicateAadhar = users.some(u => {
+      if (!u.aadhar) return false;
+      return u.aadhar.trim().replace(/[-\s]/g, '') === normalizedNewAadhar;
+    });
+
+    const isDuplicatePan = users.some(u => {
+      if (!u.pan) return false;
+      return u.pan.trim().replace(/[-\s]/g, '').toUpperCase() === normalizedNewPan;
+    });
+
+    if (isDuplicateAadhar) {
+      setErrorMsg(`Validation Error: Aadhaar Card number '${newAadhar}' is already registered to another user.`);
+      return;
+    }
+    if (isDuplicatePan) {
+      setErrorMsg(`Validation Error: PAN Card number '${newPan.toUpperCase()}' is already registered to another user.`);
+      return;
+    }
+
     const assignedId = getNextSequentialId();
 
     const newlyCreatedAgent: User = {
