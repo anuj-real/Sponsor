@@ -57,6 +57,14 @@ export interface RealEstateProject {
       type?: string; // e.g. "Residential" or "Commercial"
     }[];
   }[];
+  // New SBR Project metadata fields:
+  projectStage?: 'Pre-Launch' | 'Under Construction' | 'Near Possession' | 'Launched / Ready to Move';
+  registryStatus?: 'Not Started' | 'In Progress' | 'Completed' | 'On Hold';
+  registryDate?: string; // YYYY-MM-DD
+  sroOffice?: string; // Gurgaon, Sohna, Wazirabad, Indri, Nuh, etc.
+  mutationStatus?: 'Pending' | 'Applied' | 'Approved' | 'Rejected';
+  mutationDate?: string; // YYYY-MM-DD
+  mutationNumber?: string; // Specific Intakal number
 }
 
 export interface Sale {

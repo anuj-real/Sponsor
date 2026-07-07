@@ -6,7 +6,8 @@ import {
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
   Search, ShieldAlert, Award, Calendar, Home, CreditCard, Trash2, Plus, Edit, Share2,
-  BarChart3, Download, Printer, Key, Smartphone, MessageSquare, Send
+  BarChart3, Download, Printer, Key, Smartphone, MessageSquare, Send,
+  ZoomIn, ZoomOut, Maximize2
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -262,6 +263,22 @@ export default function AdminPanel({
   ]);
   const [projSuccess, setProjSuccess] = useState('');
   const [expandedProjUnitsId, setExpandedProjUnitsId] = useState<string | null>(null);
+
+  // New SBR Project metadata states for creation form
+  const [projProjectStage, setProjProjectStage] = useState<'Pre-Launch' | 'Under Construction' | 'Near Possession' | 'Launched / Ready to Move'>('Pre-Launch');
+  const [projRegistryStatus, setProjRegistryStatus] = useState<'Not Started' | 'In Progress' | 'Completed' | 'On Hold'>('Not Started');
+  const [projRegistryDate, setProjRegistryDate] = useState('');
+  const [projSroOffice, setProjSroOffice] = useState('');
+  const [projMutationStatus, setProjMutationStatus] = useState<'Pending' | 'Applied' | 'Approved' | 'Rejected'>('Pending');
+  const [projMutationDate, setProjMutationDate] = useState('');
+  const [projMutationNumber, setProjMutationNumber] = useState('');
+
+  // Editing state for an existing project
+  const [editingProject, setEditingProject] = useState<RealEstateProject | null>(null);
+
+  // Zoomed Map state
+  const [zoomedMap, setZoomedMap] = useState<{ url: string; title: string } | null>(null);
+  const [zoomScale, setZoomScale] = useState<number>(1);
 
   // Plot SBR Booking state
   const [bookProjId, setBookProjId] = useState('');
@@ -678,18 +695,56 @@ export default function AdminPanel({
       minPrice: minVal,
       maxPrice: maxVal,
       imageMapUrl: projMapUrl,
-      inventory: formattedInventory
+      inventory: formattedInventory,
+      projectStage: projProjectStage,
+      registryStatus: projRegistryStatus,
+      registryDate: projRegistryDate,
+      sroOffice: projSroOffice,
+      mutationStatus: projMutationStatus,
+      mutationDate: projMutationDate,
+      mutationNumber: projMutationNumber
     });
 
     setProjSuccess(`Successfully created Real Estate Project: "${projName}" with ${formattedInventory.reduce((acc, c) => acc + c.units.length, 0)} registered inventory units!`);
     setProjName('');
     setProjLocation('');
     setProjMapUrl('https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800');
+    setProjProjectStage('Pre-Launch');
+    setProjRegistryStatus('Not Started');
+    setProjRegistryDate('');
+    setProjSroOffice('');
+    setProjMutationStatus('Pending');
+    setProjMutationDate('');
+    setProjMutationNumber('');
     setSizeTiersInput([
       { unitsRaw: '1-20', size: '100', type: 'Residential' },
       { unitsRaw: '21-25', size: '27', type: 'Commercial' }
     ]);
     setTimeout(() => setProjSuccess(''), 5000);
+  };
+
+  const handleUpdateProjectMetadata = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProject) return;
+
+    const updated = projects.map(p => {
+      if (p.id === editingProject.id) {
+        return {
+          ...p,
+          projectStage: editingProject.projectStage,
+          registryStatus: editingProject.registryStatus,
+          registryDate: editingProject.registryDate,
+          sroOffice: editingProject.sroOffice,
+          mutationStatus: editingProject.mutationStatus,
+          mutationDate: editingProject.mutationDate,
+          mutationNumber: editingProject.mutationNumber
+        };
+      }
+      return p;
+    });
+
+    onUpdateProjects(updated);
+    setEditingProject(null);
   };
 
   // Trigger SBR Booking
@@ -2200,6 +2255,107 @@ export default function AdminPanel({
                 </div>
               </div>
 
+              {/* SBR Project Smart Metadata Fields */}
+              <div className="space-y-3 border-t border-stone-200 pt-3">
+                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wide block">
+                  SBR Project Registration & Legal Metadata
+                </span>
+                
+                <div className="grid grid-cols-2 gap-3 bg-stone-50/50 p-3 rounded-xl border border-stone-150">
+                  <div>
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Project Stage</label>
+                    <select
+                      value={projProjectStage}
+                      onChange={(e) => setProjProjectStage(e.target.value as any)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                    >
+                      <option value="Pre-Launch">Pre-Launch</option>
+                      <option value="Under Construction">Under Construction</option>
+                      <option value="Near Possession">Near Possession</option>
+                      <option value="Launched / Ready to Move">Launched / Ready to Move</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Sub-Registrar Office (SRO)</label>
+                    <input
+                      type="text"
+                      list="sro-suggestions"
+                      placeholder="e.g. Gurgaon, Sohna"
+                      value={projSroOffice}
+                      onChange={(e) => setProjSroOffice(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    />
+                    <datalist id="sro-suggestions">
+                      <option value="Gurgaon" />
+                      <option value="Sohna" />
+                      <option value="Wazirabad" />
+                      <option value="Indri" />
+                      <option value="Nuh" />
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Registry Status</label>
+                    <select
+                      value={projRegistryStatus}
+                      onChange={(e) => setProjRegistryStatus(e.target.value as any)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                    >
+                      <option value="Not Started">Not Started</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="On Hold">On Hold</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Registry Date</label>
+                    <input
+                      type="date"
+                      value={projRegistryDate}
+                      onChange={(e) => setProjRegistryDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Mutation Status</label>
+                    <select
+                      value={projMutationStatus}
+                      onChange={(e) => setProjMutationStatus(e.target.value as any)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Applied">Applied</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Mutation Date</label>
+                    <input
+                      type="date"
+                      value={projMutationDate}
+                      onChange={(e) => setProjMutationDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Mutation Number (Intakal No.)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Intakal 4567-B"
+                      value={projMutationNumber}
+                      onChange={(e) => setProjMutationNumber(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Dynamic Size Slabs Input list */}
               <div className="space-y-3.5 border-t border-stone-200 pt-3">
                 <div className="flex justify-between items-center">
@@ -2300,15 +2456,30 @@ export default function AdminPanel({
 
                 return (
                   <div key={proj.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden flex flex-col justify-between shadow-xs">
-                    <img 
-                      src={proj.imageMapUrl || 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=350'} 
-                      alt={proj.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-36 object-cover bg-stone-100 border-b border-stone-200"
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=600';
-                      }}
-                    />
+                    <div className="relative group cursor-zoom-in overflow-hidden border-b border-stone-200">
+                      <img 
+                        src={proj.imageMapUrl || 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=350'} 
+                        alt={proj.name}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-36 object-cover bg-stone-100 transition-transform duration-350 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=600';
+                        }}
+                      />
+                      <div 
+                        onClick={() => {
+                          setZoomedMap({ 
+                            url: proj.imageMapUrl || 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800', 
+                            title: proj.name 
+                          });
+                          setZoomScale(1);
+                        }}
+                        className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5"
+                      >
+                        <ZoomIn className="w-4 h-4 text-white shrink-0" />
+                        <span>Zoom Layout Map</span>
+                      </div>
+                    </div>
                     <div className="p-4 space-y-3">
                       <div>
                         <div className="flex justify-between items-start">
@@ -2340,13 +2511,105 @@ export default function AdminPanel({
                         </div>
                       </div>
 
-                      <div className="border-t border-stone-150 pt-2 flex flex-col gap-2">
+                      {/* SBR Project Legal & Milestones Metadata details */}
+                      <div className="border-t border-stone-150 pt-2.5 space-y-2">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-stone-500 font-medium">Project Stage:</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            proj.projectStage === 'Launched / Ready to Move' 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : proj.projectStage === 'Near Possession'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : proj.projectStage === 'Under Construction'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
+                              : 'bg-stone-100 text-stone-800 border border-stone-200'
+                          }`}>
+                            {proj.projectStage || 'Pre-Launch'}
+                          </span>
+                        </div>
+
+                        <div className="bg-stone-50/70 rounded-lg p-2 border border-stone-150/70 space-y-1 text-[10px]">
+                          <div className="flex justify-between items-center border-b border-stone-100 pb-1 mb-1">
+                            <span className="font-bold text-stone-600 uppercase text-[8px] tracking-wider">Registry</span>
+                            <span className={`px-1 rounded-sm text-[8px] font-bold ${
+                              proj.registryStatus === 'Completed'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : proj.registryStatus === 'In Progress'
+                                ? 'bg-amber-100 text-amber-800'
+                                : proj.registryStatus === 'On Hold'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-stone-150 text-stone-600'
+                            }`}>
+                              {proj.registryStatus || 'Not Started'}
+                            </span>
+                          </div>
+                          {(proj.registryDate || proj.sroOffice) ? (
+                            <div className="grid grid-cols-2 gap-1 text-[9px] text-stone-650">
+                              {proj.registryDate && (
+                                <div>
+                                  <span className="text-stone-400">Date:</span> <span className="font-mono font-semibold">{proj.registryDate}</span>
+                                </div>
+                              )}
+                              {proj.sroOffice && (
+                                <div className="text-right">
+                                  <span className="text-stone-400">SRO:</span> <span className="font-bold text-emerald-850">{proj.sroOffice}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-[8.5px] text-stone-400 italic">No registration office or deed date recorded.</div>
+                          )}
+                        </div>
+
+                        <div className="bg-stone-50/70 rounded-lg p-2 border border-stone-150/70 space-y-1 text-[10px]">
+                          <div className="flex justify-between items-center border-b border-stone-100 pb-1 mb-1">
+                            <span className="font-bold text-stone-600 uppercase text-[8px] tracking-wider">Mutation (Intakal)</span>
+                            <span className={`px-1 rounded-sm text-[8px] font-bold ${
+                              proj.mutationStatus === 'Approved'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : proj.mutationStatus === 'Applied'
+                                ? 'bg-amber-100 text-amber-800'
+                                : proj.mutationStatus === 'Rejected'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-stone-150 text-stone-600'
+                            }`}>
+                              {proj.mutationStatus || 'Pending'}
+                            </span>
+                          </div>
+                          {(proj.mutationDate || proj.mutationNumber) ? (
+                            <div className="grid grid-cols-2 gap-1 text-[9px] text-stone-655">
+                              {proj.mutationDate && (
+                                <div>
+                                  <span className="text-stone-400">Date:</span> <span className="font-mono font-semibold">{proj.mutationDate}</span>
+                                </div>
+                              )}
+                              {proj.mutationNumber && (
+                                <div className="text-right">
+                                  <span className="text-stone-400">No:</span> <span className="font-mono font-bold text-stone-700">{proj.mutationNumber}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-[8.5px] text-stone-400 italic">No mutation record or sanction date.</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="border-t border-stone-150 pt-2 flex flex-col gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingProject(proj)}
+                          className="w-full text-center py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          Update Legal Metadata & Stage 📝
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => setExpandedProjUnitsId(expandedProjUnitsId === proj.id ? null : proj.id)}
-                          className="w-full text-center py-1.5 bg-stone-100 hover:bg-stone-200/80 text-stone-700 hover:text-stone-900 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          className="w-full text-center py-1.2 bg-stone-100 hover:bg-stone-200/80 text-stone-700 hover:text-stone-900 rounded-lg text-[9.5px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          {expandedProjUnitsId === proj.id ? 'Hide Unit Directory ✕' : 'View Unit Directory (200+ Capacity) 🔍'}
+                          {expandedProjUnitsId === proj.id ? 'Hide Unit Directory ✕' : 'View Unit Directory Capacity 🔍'}
                         </button>
                         
                         {expandedProjUnitsId === proj.id && (
@@ -3314,6 +3577,145 @@ export default function AdminPanel({
         );
       })()}
 
+      {/* Edit SBR Project Metadata Modal */}
+      {editingProject && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-stone-200 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Home className="w-4.5 h-4.5 text-emerald-400" />
+                <div>
+                  <h4 className="font-bold text-xs">Update SBR Project Stage & Legal Metadata</h4>
+                  <p className="text-[9px] text-stone-300">Project: {editingProject.name} ({editingProject.id})</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingProject(null)}
+                className="text-stone-300 hover:text-white text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateProjectMetadata} className="p-5 space-y-4 font-sans max-h-[80vh] overflow-y-auto">
+              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 text-emerald-800 text-[10.5px] leading-relaxed mb-2">
+                <strong>Legal Compliance & Stage Tracking:</strong> Keeping SRO registers, Mutation dates, and Project stage status up-to-date helps brokers and partners close deals more efficiently.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Project Stage</label>
+                  <select
+                    value={editingProject.projectStage || 'Pre-Launch'}
+                    onChange={(e) => setEditingProject({ ...editingProject, projectStage: e.target.value as any })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                  >
+                    <option value="Pre-Launch">Pre-Launch</option>
+                    <option value="Under Construction">Under Construction</option>
+                    <option value="Near Possession">Near Possession</option>
+                    <option value="Launched / Ready to Move">Launched / Ready to Move</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Sub-Registrar Office (SRO)</label>
+                  <input
+                    type="text"
+                    list="edit-sro-suggestions"
+                    placeholder="e.g. Gurgaon, Sohna, Wazirabad"
+                    value={editingProject.sroOffice || ''}
+                    onChange={(e) => setEditingProject({ ...editingProject, sroOffice: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                  />
+                  <datalist id="edit-sro-suggestions">
+                    <option value="Gurgaon" />
+                    <option value="Sohna" />
+                    <option value="Wazirabad" />
+                    <option value="Indri" />
+                    <option value="Nuh" />
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Registry Status</label>
+                  <select
+                    value={editingProject.registryStatus || 'Not Started'}
+                    onChange={(e) => setEditingProject({ ...editingProject, registryStatus: e.target.value as any })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                  >
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="On Hold">On Hold</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Registry Date</label>
+                  <input
+                    type="date"
+                    value={editingProject.registryDate || ''}
+                    onChange={(e) => setEditingProject({ ...editingProject, registryDate: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Mutation Status</label>
+                  <select
+                    value={editingProject.mutationStatus || 'Pending'}
+                    onChange={(e) => setEditingProject({ ...editingProject, mutationStatus: e.target.value as any })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Applied">Applied</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Mutation Date (Sanction Date)</label>
+                  <input
+                    type="date"
+                    value={editingProject.mutationDate || ''}
+                    onChange={(e) => setEditingProject({ ...editingProject, mutationDate: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Mutation Number (Intakal Number)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Intakal 8921/A"
+                    value={editingProject.mutationNumber || ''}
+                    onChange={(e) => setEditingProject({ ...editingProject, mutationNumber: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-4 border-t border-stone-200 mt-4 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingProject(null)}
+                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-55 text-stone-750 text-xs font-bold rounded-lg cursor-pointer transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold rounded-lg cursor-pointer transition-all shadow-xs"
+                >
+                  Save Metadata Updates
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Edit Broker Credentials Modal */}
       {selectedAgentForPassword && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -3770,6 +4172,81 @@ export default function AdminPanel({
                 </button>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zoomable Map Image Lightbox Modal */}
+      {zoomedMap && (
+        <div className="fixed inset-0 bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
+          <div className="bg-stone-900 text-stone-100 rounded-2xl max-w-4xl w-full border border-stone-800 shadow-2xl overflow-hidden flex flex-col h-[85vh]">
+            {/* Header */}
+            <div className="bg-stone-950 p-4 border-b border-stone-850 flex items-center justify-between">
+              <div>
+                <h4 className="font-extrabold text-xs text-white uppercase tracking-wider">Project Layout Map Zoom</h4>
+                <p className="text-[10px] text-stone-400 mt-0.5">{zoomedMap.title}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-stone-850 px-2.5 py-1 rounded-lg flex items-center gap-2 border border-stone-750">
+                  <button 
+                    type="button"
+                    onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
+                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-mono font-bold text-stone-200 min-w-[40px] text-center font-bold">
+                    {Math.round(zoomScale * 100)}%
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={() => setZoomScale(prev => Math.min(4, prev + 0.25))}
+                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setZoomScale(1)}
+                    className="px-1.5 py-0.5 bg-stone-750 hover:bg-stone-700 rounded text-[9px] font-bold text-stone-300 cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setZoomedMap(null);
+                    setZoomScale(1);
+                  }}
+                  className="p-1.5 bg-stone-850 hover:bg-rose-950 hover:text-rose-400 border border-stone-750 rounded-lg text-stone-300 transition-all cursor-pointer text-xs"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Map Body: Zoom and Scrollable area */}
+            <div className="flex-1 bg-stone-950 overflow-auto flex items-center justify-center p-6 relative cursor-grab active:cursor-grabbing">
+              <div className="transition-all duration-150 ease-out" style={{ transform: `scale(${zoomScale})`, transformOrigin: 'center center' }}>
+                <img 
+                  src={zoomedMap.url} 
+                  alt={zoomedMap.title}
+                  referrerPolicy="no-referrer"
+                  className="max-h-[60vh] max-w-full rounded-lg shadow-xl object-contain"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Instruction Footer */}
+            <div className="bg-stone-950 p-2 text-center text-[9px] text-stone-550 border-t border-stone-850">
+              Use the + and - buttons to adjust map scale. Drag or scroll to navigate large project layouts.
             </div>
           </div>
         </div>

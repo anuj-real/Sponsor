@@ -80,6 +80,13 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
     maxPrice: 5.0,
     sqYardStartingPrice: 15000,
     imageMapUrl: '/imt_sohna_map.jpg',
+    projectStage: 'Under Construction',
+    registryStatus: 'In Progress',
+    registryDate: '2026-03-15',
+    sroOffice: 'Sohna',
+    mutationStatus: 'Pending',
+    mutationDate: '',
+    mutationNumber: '',
     inventory: [
       {
         size: '100 Sq Yards',

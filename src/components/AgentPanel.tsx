@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
-import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
 import TreeVisualizer from './TreeVisualizer';
 
@@ -33,6 +33,10 @@ export default function AgentPanel({
   const [selectedInventoryStatus, setSelectedInventoryStatus] = useState<string>('ALL');
   const [expandedMapProjId, setExpandedMapProjId] = useState<string | null>(null);
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
+
+  // Zoomed Map state
+  const [zoomedMap, setZoomedMap] = useState<{ url: string; title: string } | null>(null);
+  const [zoomScale, setZoomScale] = useState<number>(1);
 
   // Campaign date status checker logic
   const now = new Date();
@@ -444,6 +448,101 @@ export default function AgentPanel({
                               </div>
                             </div>
 
+                            {/* Project Map and Legal details */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3 rounded-xl border border-stone-150 shadow-2xs">
+                              {/* Left: Interactive Layout Map with click-to-zoom */}
+                              <div className="relative group cursor-zoom-in overflow-hidden rounded-lg border border-stone-200 h-28 bg-stone-50">
+                                <img 
+                                  src={proj.imageMapUrl || 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=350'} 
+                                  alt={proj.name}
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover transition-transform duration-350 group-hover:scale-105"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=600';
+                                  }}
+                                />
+                                <div 
+                                  onClick={() => {
+                                    setZoomedMap({ 
+                                      url: proj.imageMapUrl || 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800', 
+                                      title: proj.name 
+                                    });
+                                    setZoomScale(1);
+                                  }}
+                                  className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10.5px] font-bold gap-1.5 cursor-pointer"
+                                >
+                                  <ZoomIn className="w-3.5 h-3.5 text-white shrink-0" />
+                                  <span>Zoom Layout Map</span>
+                                </div>
+                              </div>
+
+                              {/* Right: SBR Project Legal & Milestones Metadata details */}
+                              <div className="space-y-1.5 flex flex-col justify-center">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-stone-500 font-bold uppercase tracking-wider text-[8px]">Project Stage:</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    proj.projectStage === 'Launched / Ready to Move' 
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                                      : proj.projectStage === 'Near Possession'
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                      : proj.projectStage === 'Under Construction'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
+                                      : 'bg-stone-100 text-stone-800 border border-stone-200'
+                                  }`}>
+                                    {proj.projectStage || 'Pre-Launch'}
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-stone-50/70 rounded-lg p-1.5 border border-stone-150 text-[10px] space-y-0.5">
+                                    <div className="flex justify-between items-center border-b border-stone-100 pb-0.5">
+                                      <span className="font-bold text-stone-500 uppercase text-[7px] tracking-wider">Registry</span>
+                                      <span className={`px-1 rounded-sm text-[8px] font-bold ${
+                                        proj.registryStatus === 'Completed'
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : proj.registryStatus === 'In Progress'
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-stone-150 text-stone-600'
+                                      }`}>
+                                        {proj.registryStatus || 'Not Started'}
+                                      </span>
+                                    </div>
+                                    <div className="text-[8px] text-stone-600 font-mono">
+                                      {proj.registryDate ? proj.registryDate : <span className="text-stone-400 italic">No date</span>}
+                                    </div>
+                                    {proj.sroOffice && (
+                                      <div className="text-[7.5px] text-stone-500 uppercase font-sans">
+                                        SRO: <span className="font-bold text-emerald-800">{proj.sroOffice}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="bg-stone-50/70 rounded-lg p-1.5 border border-stone-150 text-[10px] space-y-0.5">
+                                    <div className="flex justify-between items-center border-b border-stone-100 pb-0.5">
+                                      <span className="font-bold text-stone-500 uppercase text-[7px] tracking-wider">Mutation</span>
+                                      <span className={`px-1 rounded-sm text-[8px] font-bold ${
+                                        proj.mutationStatus === 'Approved'
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : proj.mutationStatus === 'Applied'
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-stone-150 text-stone-600'
+                                      }`}>
+                                        {proj.mutationStatus || 'Pending'}
+                                      </span>
+                                    </div>
+                                    <div className="text-[8px] text-stone-600 font-mono">
+                                      {proj.mutationDate ? proj.mutationDate : <span className="text-stone-400 italic">No date</span>}
+                                    </div>
+                                    {proj.mutationNumber && (
+                                      <div className="text-[7.5px] text-stone-500 font-mono truncate" title={proj.mutationNumber}>
+                                        No: <span className="font-bold text-stone-700">{proj.mutationNumber}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
                             {filteredInventory.length === 0 ? (
                               <p className="text-xs text-stone-400 italic text-center py-2">No units match standard search criteria.</p>
                             ) : (
@@ -820,6 +919,81 @@ export default function AgentPanel({
           </div>
         </div>
       </div>
+
+      {/* Zoomable Map Image Lightbox Modal */}
+      {zoomedMap && (
+        <div className="fixed inset-0 bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
+          <div className="bg-stone-900 text-stone-100 rounded-2xl max-w-4xl w-full border border-stone-800 shadow-2xl overflow-hidden flex flex-col h-[85vh]">
+            {/* Header */}
+            <div className="bg-stone-950 p-4 border-b border-stone-850 flex items-center justify-between">
+              <div>
+                <h4 className="font-extrabold text-xs text-white uppercase tracking-wider">Project Layout Map Zoom</h4>
+                <p className="text-[10px] text-stone-400 mt-0.5">{zoomedMap.title}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-stone-850 px-2.5 py-1 rounded-lg flex items-center gap-2 border border-stone-750">
+                  <button 
+                    type="button"
+                    onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
+                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-mono font-bold text-stone-200 min-w-[40px] text-center font-bold">
+                    {Math.round(zoomScale * 100)}%
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={() => setZoomScale(prev => Math.min(4, prev + 0.25))}
+                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setZoomScale(1)}
+                    className="px-1.5 py-0.5 bg-stone-750 hover:bg-stone-700 rounded text-[9px] font-bold text-stone-300 cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setZoomedMap(null);
+                    setZoomScale(1);
+                  }}
+                  className="p-1.5 bg-stone-850 hover:bg-rose-950 hover:text-rose-400 border border-stone-750 rounded-lg text-stone-300 transition-all cursor-pointer text-xs"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Map Body: Zoom and Scrollable area */}
+            <div className="flex-1 bg-stone-950 overflow-auto flex items-center justify-center p-6 relative cursor-grab active:cursor-grabbing">
+              <div className="transition-all duration-150 ease-out" style={{ transform: `scale(${zoomScale})`, transformOrigin: 'center center' }}>
+                <img 
+                  src={zoomedMap.url} 
+                  alt={zoomedMap.title}
+                  referrerPolicy="no-referrer"
+                  className="max-h-[60vh] max-w-full rounded-lg shadow-xl object-contain"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?auto=format&fit=crop&q=80&w=800';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Instruction Footer */}
+            <div className="bg-stone-950 p-2 text-center text-[9px] text-stone-550 border-t border-stone-850">
+              Use the + and - buttons to adjust map scale. Drag or scroll to navigate large project layouts.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
