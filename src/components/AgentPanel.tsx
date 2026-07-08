@@ -345,6 +345,14 @@ export default function AgentPanel({
             </div>
           </div>
 
+          {/* SBR Referral Organigram for Associate Downline */}
+          <TreeVisualizer 
+            users={[agent, ...downlineNetwork.map(item => item.user)]}
+            onSelectUser={(id) => setSelectedTreeUserId(id)}
+            selectedUserId={selectedTreeUserId}
+            hideUpline={true}
+          />
+
           {/* Designation Progress Multi-bar Component */}
           <DesignationProgress 
             agent={agent} 
@@ -683,14 +691,6 @@ export default function AgentPanel({
           </div>
         </div>
       </div>
-
-      {/* SBR Referral Organigram for Associate Downline */}
-      <TreeVisualizer 
-        users={[agent, ...downlineNetwork.map(item => item.user)]}
-        onSelectUser={(id) => setSelectedTreeUserId(id)}
-        selectedUserId={selectedTreeUserId}
-        hideUpline={true}
-      />
 
       {/* SBR BROKER MOTIVATIONAL DECK */}
       <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden animate-fade-in">

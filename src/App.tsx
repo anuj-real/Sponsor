@@ -151,55 +151,48 @@ export default function App() {
         return loadedUsers.some(u => u.id === n.userId);
       });
 
-      // --- Auto Deletion of SBR0036 ---
-      const sbr36Index = loadedUsers.findIndex(u => u.id === 'SBR0036');
-      if (sbr36Index !== -1) {
-        const sbr36Sponsor = loadedUsers[sbr36Index].sponsorId || 'C';
-        loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0036').map(u => {
-          if (u.sponsorId === 'SBR0036') {
-            return { ...u, sponsorId: sbr36Sponsor };
-          }
-          return u;
-        });
-        try {
-          deleteDocument(COLLECTIONS.USERS, 'SBR0036').catch(err => {
-            console.error('[Auto-Deletion] Failed to delete SBR0036 document:', err);
+      // --- Auto Deletion / Reparenting of Deleted SBR Users ---
+      const deletionsToApply = [
+        { id: 'SBR0016', targetSponsor: 'SBR0009' },
+        { id: 'SBR0021', targetSponsor: 'SBR0009' },
+        { id: 'SBR0011', targetSponsor: 'SBR0009' },
+        { id: 'SBR0007', targetSponsor: 'SBR0006' },
+        { id: 'SBR0015', targetSponsor: 'SBR0006' },
+        { id: 'SBR0036', targetSponsor: 'C' }
+      ];
+
+      let needsNormalization = false;
+      for (const del of deletionsToApply) {
+        const delUserIndex = loadedUsers.findIndex(u => u.id === del.id);
+        const hasDelUser = delUserIndex !== -1;
+        const hasChildrenOfDel = loadedUsers.some(u => u.sponsorId === del.id);
+
+        if (hasDelUser || hasChildrenOfDel) {
+          const resolvedSponsor = hasDelUser ? (loadedUsers[delUserIndex].sponsorId || del.targetSponsor) : del.targetSponsor;
+
+          loadedUsers = loadedUsers.map(u => {
+            if (u.sponsorId === del.id) {
+              const updated = { ...u, sponsorId: resolvedSponsor };
+              setDocumentData(COLLECTIONS.USERS, u.id, updated).catch(e => 
+                console.error(`[Auto-Deletion] Failed to update sponsor for ${u.id}:`, e)
+              );
+              needsNormalization = true;
+              return updated;
+            }
+            return u;
           });
-        } catch (err) {
-          console.error('[Auto-Deletion] Failed to trigger delete:', err);
+
+          if (hasDelUser) {
+            loadedUsers = loadedUsers.filter(u => u.id !== del.id);
+            deleteDocument(COLLECTIONS.USERS, del.id).catch(err => {
+              console.error(`[Auto-Deletion] Failed to delete ${del.id} document:`, err);
+            });
+            needsNormalization = true;
+          }
         }
-        loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
       }
 
-      // --- Auto Deletion of SBR0007 & SBR0015 ---
-      const hasSbr7 = loadedUsers.some(u => u.id === 'SBR0007');
-      const hasSbr15 = loadedUsers.some(u => u.id === 'SBR0015');
-      if (hasSbr7 || hasSbr15) {
-        loadedUsers = loadedUsers.map(u => {
-          if (u.sponsorId === 'SBR0007') {
-            const updated = { ...u, sponsorId: 'SBR0006' };
-            setDocumentData(COLLECTIONS.USERS, u.id, updated).catch(e => console.error(e));
-            return updated;
-          }
-          if (u.sponsorId === 'SBR0015') {
-            const updated = { ...u, sponsorId: 'SBR0006' };
-            setDocumentData(COLLECTIONS.USERS, u.id, updated).catch(e => console.error(e));
-            return updated;
-          }
-          return u;
-        });
-        if (hasSbr7) {
-          loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0007');
-          deleteDocument(COLLECTIONS.USERS, 'SBR0007').catch(err => {
-            console.error('[Auto-Deletion] Failed to delete SBR0007 document:', err);
-          });
-        }
-        if (hasSbr15) {
-          loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0015');
-          deleteDocument(COLLECTIONS.USERS, 'SBR0015').catch(err => {
-            console.error('[Auto-Deletion] Failed to delete SBR0015 document:', err);
-          });
-        }
+      if (needsNormalization) {
         loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
       }
 
