@@ -890,7 +890,7 @@ export default function App() {
       </header>
 
       {/* Primary Dashboard Content Area */}
-      <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 z-10">
+      <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         {activeRole === 'ADMIN' && (
           <div className="space-y-6">
             <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
@@ -951,7 +951,7 @@ export default function App() {
       </main>
 
       {/* Bottom Professional Whitelabel Footer */}
-      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center z-10">
+      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
           <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
           <div className="flex gap-4 justify-center text-stone-400">

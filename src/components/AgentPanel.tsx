@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
-import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ArrowLeft } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
 import TreeVisualizer from './TreeVisualizer';
 
@@ -42,6 +42,8 @@ export default function AgentPanel({
 
   // Broker Profile States
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isKycExpanded, setIsKycExpanded] = useState(false);
+  const [isProfileExpanded, setIsProfileExpanded] = useState(false);
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [branchName, setBranchName] = useState('');
@@ -146,6 +148,10 @@ export default function AgentPanel({
       setNominee(agent.nominee || '');
       setNomineeRelation(agent.nomineeRelation || '');
       setFatherOrHusbandName(agent.fatherOrHusbandName || '');
+    }
+    if (isProfileOpen) {
+      setIsKycExpanded(false);
+      setIsProfileExpanded(false);
     }
   }, [agent, isProfileOpen]);
 
@@ -1063,38 +1069,52 @@ export default function AgentPanel({
 
       {/* View/Edit Profile Modal - Screen Overlay on Mobile */}
       {isProfileOpen && (
-        <div className="fixed inset-0 bg-white md:bg-stone-900/60 md:backdrop-blur-xs flex flex-col md:items-center md:justify-center p-0 md:p-4 z-50 animate-fade-in overflow-y-auto">
-          <form onSubmit={handleSaveProfile} className="bg-white w-full min-h-screen md:min-h-0 md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-2xl md:border md:border-stone-200 md:shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <form onSubmit={handleSaveProfile} className="bg-white w-full max-w-2xl h-[82dvh] sm:h-auto sm:max-h-[85vh] md:max-h-[90vh] rounded-2xl border border-stone-200 shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             {/* Header */}
-            <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-4 md:p-5 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-4 sm:p-5 text-white flex items-center justify-between shrink-0 border-b border-stone-850">
+              <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
                   onClick={() => setIsProfileOpen(false)}
-                  className="md:hidden text-stone-300 hover:text-white p-1 hover:bg-stone-800 rounded transition-all mr-1"
-                  aria-label="Back"
+                  className="text-stone-400 hover:text-white p-1.5 hover:bg-stone-850 rounded-lg transition-all shrink-0 cursor-pointer"
+                  aria-label="Close"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="w-9 h-9 rounded-full bg-emerald-800 flex items-center justify-center text-white font-serif font-bold text-sm shrink-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-800/25 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-serif font-bold text-sm shrink-0">
                   {agent.name.charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <h4 className="font-bold text-sm">SBR Channel Partner Profile</h4>
-                  <p className="text-[10px] text-stone-300">Sponsor ID: <span className="font-mono font-bold text-emerald-400">{agent.id}</span></p>
+                <div className="min-w-0">
+                  <h4 className="font-bold text-xs sm:text-sm text-stone-100 truncate">Partner Profile</h4>
+                  <p className="text-[10px] text-stone-400 truncate">
+                    Sponsor ID: <span className="font-mono font-bold text-emerald-400">{agent.id}</span>
+                  </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsProfileOpen(false)}
-                className="hidden md:flex text-stone-300 hover:text-white bg-stone-850 hover:bg-stone-800 p-2 rounded-full transition-all cursor-pointer text-xs items-center gap-1 px-3"
-              >
-                <span>✕</span> <span>Close</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-stone-800 disabled:text-stone-500 disabled:border-stone-800 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] border border-emerald-500/30"
+                >
+                  {isSavingProfile ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="hidden xs:inline">Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Scrollable Fields Content */}
-            <div className="p-5 md:p-6 space-y-6 font-sans md:overflow-y-auto md:flex-1 bg-white">
+            <div className="p-5 md:p-6 space-y-6 font-sans bg-white overflow-y-auto flex-1">
                 
                 {/* Profile alerts / banners */}
                 {profileSuccess && (
@@ -1112,171 +1132,199 @@ export default function AgentPanel({
                 )}
 
                 {/* SECTION 1: Locked KYC fields */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-1 border-b border-stone-150">
-                    <Lock className="w-4 h-4 text-stone-400" />
-                    <h5 className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">KYC Compliance & Sponsoring details (Locked)</h5>
-                  </div>
+                <div className="border border-stone-200 rounded-xl overflow-hidden bg-stone-50/30">
+                  <button
+                    type="button"
+                    onClick={() => setIsKycExpanded(!isKycExpanded)}
+                    className="w-full flex items-center justify-between p-4 bg-stone-50 hover:bg-stone-100/80 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Lock className="w-4 h-4 text-stone-500 shrink-0" />
+                      <div>
+                        <h5 className="text-[11px] font-bold text-stone-700 uppercase tracking-wider">KYC Compliance (Locked)</h5>
+                        <p className="text-[9.5px] text-stone-450 font-sans mt-0.5">Verified identity & sponsor records</p>
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${isKycExpanded ? 'rotate-180' : ''}`} />
+                  </button>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Full Name */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Full Name</label>
-                      <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
-                        <span>{agent.name}</span>
-                        <Lock className="w-3 h-3 text-stone-300" />
-                      </div>
-                    </div>
+                  {isKycExpanded && (
+                    <div className="p-4 space-y-4 bg-white border-t border-stone-200 animate-fade-in">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Full Name */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Full Name</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
+                            <span>{agent.name}</span>
+                            <Lock className="w-3 h-3 text-stone-300" />
+                          </div>
+                        </div>
 
-                    {/* Mobile */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Mobile Sourcing Phone</label>
-                      <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
-                        <span>{agent.phone}</span>
-                        <Lock className="w-3 h-3 text-stone-300" />
-                      </div>
-                    </div>
+                        {/* Mobile */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Mobile Sourcing Phone</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                            <span>{agent.phone}</span>
+                            <Lock className="w-3 h-3 text-stone-300" />
+                          </div>
+                        </div>
 
-                    {/* Sponsor */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Upstream Sponsor</label>
-                      <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
-                        <span>{users.find(u => u.id === agent.sponsorId)?.name ? `${users.find(u => u.id === agent.sponsorId)?.name} (${agent.sponsorId})` : (agent.sponsorId || 'SBR Root Core')}</span>
-                        <Lock className="w-3 h-3 text-stone-300" />
-                      </div>
-                    </div>
+                        {/* Sponsor */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Upstream Sponsor</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
+                            <span>{users.find(u => u.id === agent.sponsorId)?.name ? `${users.find(u => u.id === agent.sponsorId)?.name} (${agent.sponsorId})` : (agent.sponsorId || 'SBR Root Core')}</span>
+                            <Lock className="w-3 h-3 text-stone-300" />
+                          </div>
+                        </div>
 
-                    {/* DOB */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Date of Birth (DOB)</label>
-                      <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
-                        <span>{agent.dob || 'Not Provided'}</span>
-                        <Lock className="w-3 h-3 text-stone-300" />
-                      </div>
-                    </div>
+                        {/* DOB */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Date of Birth (DOB)</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                            <span>{agent.dob || 'Not Provided'}</span>
+                            <Lock className="w-3 h-3 text-stone-300" />
+                          </div>
+                        </div>
 
-                    {/* Aadhar */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Aadhar Card Number</label>
-                      <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
-                        <span>{agent.aadhar || 'Not Provided'}</span>
-                        <Lock className="w-3 h-3 text-stone-300" />
-                      </div>
-                    </div>
+                        {/* Aadhar */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Aadhar Card Number</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                            <span>{agent.aadhar || 'Not Provided'}</span>
+                            <Lock className="w-3 h-3 text-stone-300" />
+                          </div>
+                        </div>
 
-                    {/* PAN */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Permanent Account Number (PAN)</label>
-                      <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
-                        <span>{agent.pan || 'Not Provided'}</span>
-                        <Lock className="w-3 h-3 text-stone-300" />
+                        {/* PAN */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Permanent Account Number (PAN)</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                            <span>{agent.pan || 'Not Provided'}</span>
+                            <Lock className="w-3 h-3 text-stone-300" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <p className="text-[9.5px] text-stone-450 italic font-sans">
-                    * Locked fields can only be modified with administrative verification of legal identity documents.
-                  </p>
+                      <p className="text-[9.5px] text-stone-450 italic font-sans">
+                        * Locked fields can only be modified with administrative verification of legal identity documents.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* SECTION 2: Editable bank/nominee details */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center gap-2 pb-1 border-b border-stone-150">
-                    <CreditCard className="w-4 h-4 text-emerald-850" />
-                    <h5 className="text-[11px] font-bold text-emerald-850 uppercase tracking-wider">Profile Information & Payout Bank Details</h5>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Father's / Husband's Name */}
-                    <div className="col-span-1 sm:col-span-2">
-                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Father's / Husband's Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Ramesh Satpute"
-                        value={fatherOrHusbandName}
-                        onChange={(e) => setFatherOrHusbandName(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-medium"
-                      />
+                <div className="border border-stone-200 rounded-xl overflow-hidden bg-stone-50/30">
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileExpanded(!isProfileExpanded)}
+                    className="w-full flex items-center justify-between p-4 bg-stone-50 hover:bg-stone-100/80 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <CreditCard className="w-4 h-4 text-emerald-850 shrink-0" />
+                      <div>
+                        <h5 className="text-[11px] font-bold text-emerald-850 uppercase tracking-wider">Profile Info & Bank Details</h5>
+                        <p className="text-[9.5px] text-emerald-700/70 font-sans mt-0.5">Edit nominee, father/husband & bank accounts</p>
+                      </div>
                     </div>
+                    <ChevronDown className={`w-4 h-4 text-emerald-800 transition-transform duration-200 ${isProfileExpanded ? 'rotate-180' : ''}`} />
+                  </button>
 
-                    {/* Bank Account Number */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Bank Account Number</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. 501002931289"
-                        value={bankAccountNumber}
-                        onChange={(e) => setBankAccountNumber(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                      />
-                    </div>
+                  {isProfileExpanded && (
+                    <div className="p-4 space-y-4 bg-white border-t border-stone-200 animate-fade-in">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Father's / Husband's Name */}
+                        <div className="col-span-1 sm:col-span-2">
+                          <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Father's / Husband's Name</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Ramesh Satpute"
+                            value={fatherOrHusbandName}
+                            onChange={(e) => setFatherOrHusbandName(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-medium"
+                          />
+                        </div>
 
-                    {/* IFSC */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">IFSC Code</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. HDFC0000240"
-                        value={ifscCode}
-                        onChange={(e) => setIfscCode(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 font-mono uppercase focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                      />
-                    </div>
+                        {/* Bank Account Number */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Bank Account Number</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. 501002931289"
+                            value={bankAccountNumber}
+                            onChange={(e) => setBankAccountNumber(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
+                        </div>
 
-                    {/* Branch Name */}
-                    <div className="col-span-1 sm:col-span-2">
-                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Branch Name & Location</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. HDFC Bank, Sector 56, Gurgaon"
-                        value={branchName}
-                        onChange={(e) => setBranchName(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                      />
-                    </div>
+                        {/* IFSC */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">IFSC Code</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. HDFC0000240"
+                            value={ifscCode}
+                            onChange={(e) => setIfscCode(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 font-mono uppercase focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
+                        </div>
 
-                    {/* Nominee Name */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Nominee Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Sarita Devi"
-                        value={nominee}
-                        onChange={(e) => setNominee(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                      />
-                    </div>
+                        {/* Branch Name */}
+                        <div className="col-span-1 sm:col-span-2">
+                          <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Branch Name & Location</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. HDFC Bank, Sector 56, Gurgaon"
+                            value={branchName}
+                            onChange={(e) => setBranchName(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
+                        </div>
 
-                    {/* Nominee Relation */}
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Nominee Relation</label>
-                      <select
-                        value={nomineeRelation}
-                        onChange={(e) => setNomineeRelation(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
-                      >
-                        <option value="">Select Relation</option>
-                        <option value="Spouse">Spouse</option>
-                        <option value="Mother">Mother</option>
-                        <option value="Father">Father</option>
-                        <option value="Son">Son</option>
-                        <option value="Daughter">Daughter</option>
-                        <option value="Brother">Brother</option>
-                        <option value="Sister">Sister</option>
-                        <option value="Other">Other</option>
-                      </select>
+                        {/* Nominee Name */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Nominee Name</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Sarita Devi"
+                            value={nominee}
+                            onChange={(e) => setNominee(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
+                        </div>
+
+                        {/* Nominee Relation */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-600 uppercase block mb-1">Nominee Relation</label>
+                          <select
+                            value={nomineeRelation}
+                            onChange={(e) => setNomineeRelation(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer"
+                          >
+                            <option value="">Select Relation</option>
+                            <option value="Spouse">Spouse</option>
+                            <option value="Mother">Mother</option>
+                            <option value="Father">Father</option>
+                            <option value="Son">Son</option>
+                            <option value="Daughter">Daughter</option>
+                            <option value="Brother">Brother</option>
+                            <option value="Sister">Sister</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
               {/* Action buttons (pinned at bottom of modal) */}
-              <div className="bg-stone-50 border-t border-stone-150 p-4 md:p-5 flex gap-3 justify-end shrink-0">
+              <div className="bg-stone-50 border-t border-stone-150 p-4 sm:p-5 flex gap-3 justify-end shrink-0 mt-auto">
                 <button
                   type="button"
                   onClick={() => setIsProfileOpen(false)}
