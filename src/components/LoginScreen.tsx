@@ -14,11 +14,11 @@ import {
 } from 'lucide-react';
 
 interface LoginScreenProps {
-  users: User[];
   onLogin: (role: UserRole, agentId?: string) => void;
+  onVerifyCredentials: (identifier: string, pass: string) => Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string }>;
 }
 
-export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScreenProps) {
   // Login form states (strictly empty/blank by default, no prefilled demo credentials)
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -26,83 +26,23 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleFormLogin = (e: React.FormEvent) => {
+  const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
 
-    setTimeout(() => {
+    try {
+      const result = await onVerifyCredentials(identifier, password);
       setIsLoading(false);
-      const inputId = identifier.trim();
-      const inputIdUpper = inputId.toUpperCase();
-      const inputIdLower = inputId.toLowerCase();
-
-      // Smart role and credential verification
-      if (inputIdLower === 'admin') {
-        if (password === 'Admin@SBRassociates') {
-          onLogin('ADMIN');
-        } else {
-          setErrorMsg('Invalid Administrator credentials.');
-        }
+      if (result.success) {
+        onLogin(result.role!, result.agentId);
       } else {
-        const foundAgent = users.find(u => u.id.toUpperCase() === inputIdUpper);
-        if (foundAgent) {
-          // Dynamic passcode mapping as fallback
-          const fallbackPasscodes: Record<string, string> = {
-            'SBR': 'SBR@2026',
-            'C': 'C@SBR',
-            'ADMIN1': 'Admin1@SBR',
-            'A1': 'A1@SBR',
-            'ADMIN2': 'Admin2@SBR',
-            'A2': 'A2@SBR',
-            'RAM': 'Ram@SBR',
-            'MANORANJAN': 'Manoranjan@SBR',
-            'VIKAS': 'Vikas@SBR',
-            'DK': 'DK@SBR'
-          };
-
-          // Compute default passcode: Username followed by DDMMYYYY (e.g. ANUJ16021993)
-          let defaultPasscode = 'password';
-          const username = foundAgent.id.toUpperCase();
-          if (foundAgent.dob) {
-            const parts = foundAgent.dob.split('-');
-            if (parts.length === 3) {
-              const year = parts[0];
-              const month = parts[1];
-              const day = parts[2];
-              if (year.length === 4 && month.length === 2 && day.length === 2) {
-                defaultPasscode = `${username}${day}${month}${year}`;
-              }
-            }
-          } else {
-            defaultPasscode = `${username}01011990`;
-          }
-
-          const expectedPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
-
-          // Strict validation: Must match the expected passcode exactly (custom, fallback, or default computed)
-          const isPasscodeCorrect = password === expectedPasscode;
-
-          if (isPasscodeCorrect) {
-            if (foundAgent.status === 'ACTIVE') {
-              // The 7 corporate and family level nodes get full Admin rights/access if their role is indeed ADMIN
-              const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
-              if (isAdminNode) {
-                onLogin('ADMIN', foundAgent.id);
-              } else {
-                onLogin('AGENT', foundAgent.id);
-              }
-            } else {
-              setErrorMsg('Access Blocked: This account has been marked INACTIVE by Admin.');
-            }
-          } else {
-            setErrorMsg('Invalid passcode. Please try again.');
-          }
-        } else {
-          setErrorMsg('Account ID not recognized.');
-        }
+        setErrorMsg(result.errorMsg || 'Invalid credentials.');
       }
-    }, 600);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err?.message || 'An error occurred during authentication.');
+    }
   };
 
   return (

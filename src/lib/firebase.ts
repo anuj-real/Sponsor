@@ -9,6 +9,7 @@ import {
   deleteDoc, 
   writeBatch 
 } from 'firebase/firestore';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App
@@ -16,6 +17,24 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with custom database ID from config if present
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+
+// Initialize Firebase Auth
+export const auth = getAuth(app);
+
+/**
+ * Ensures that the client has an active authenticated session (anonymous)
+ * before making any Firestore database calls.
+ */
+export async function ensureAuthenticated(): Promise<void> {
+  try {
+    if (!auth.currentUser) {
+      await signInAnonymously(auth);
+      console.log('Successfully established secure background auth session.');
+    }
+  } catch (error) {
+    console.error('Failed to establish secure auth session:', error);
+  }
+}
 
 // Dynamic collections names
 export const COLLECTIONS = {
@@ -31,6 +50,7 @@ export const COLLECTIONS = {
  * Fetch all documents in a collection and return them as an array.
  */
 export async function getCollectionData<T>(collectionName: string): Promise<T[]> {
+  await ensureAuthenticated();
   const colRef = collection(db, collectionName);
   const snapshot = await getDocs(colRef);
   return snapshot.docs.map(doc => ({
@@ -43,6 +63,7 @@ export async function getCollectionData<T>(collectionName: string): Promise<T[]>
  * Set/Overwrite a document in a collection.
  */
 export async function setDocumentData<T extends object>(collectionName: string, docId: string, data: T): Promise<void> {
+  await ensureAuthenticated();
   const docRef = doc(db, collectionName, docId);
   await setDoc(docRef, data, { merge: true });
 }
@@ -51,6 +72,7 @@ export async function setDocumentData<T extends object>(collectionName: string, 
  * Update dynamic fields in a document.
  */
 export async function updateDocumentData(collectionName: string, docId: string, data: Record<string, any>): Promise<void> {
+  await ensureAuthenticated();
   const docRef = doc(db, collectionName, docId);
   await updateDoc(docRef, data);
 }
@@ -59,6 +81,7 @@ export async function updateDocumentData(collectionName: string, docId: string, 
  * Delete a document.
  */
 export async function deleteDocument(collectionName: string, docId: string): Promise<void> {
+  await ensureAuthenticated();
   const docRef = doc(db, collectionName, docId);
   await deleteDoc(docRef);
 }
@@ -81,6 +104,7 @@ export async function seedDatabase(initialData: {
   config: any;
   notifications: any[];
 }> {
+  await ensureAuthenticated();
   // Check if users collection is empty. If yes, seed all collections.
   const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
   if (usersSnapshot.empty) {
@@ -168,6 +192,7 @@ export async function resetDatabaseToDefaults(initialData: {
   config: any;
   notifications: any[];
 }): Promise<void> {
+  await ensureAuthenticated();
   console.log('Resetting database to default seed data...');
 
   // 0. Clear existing collections to ensure no stray documents remain from old schema

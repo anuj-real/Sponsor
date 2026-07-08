@@ -2,33 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Catch-all rule for this demo SBR Sponsors application. 
-    // Since the app uses client-side simulated sessions (SBR0001, SBR0005) 
-    // without Firebase Auth, we allow read and write access to collections 
-    // so that the database and simulated auth can synchronize properly.
+    // Helper to check if user is authenticated (via background anonymous or custom auth)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
 
     match /config/{configId} {
-      allow read, write: if true;
+      allow read: if true; // Public config can be read on mount
+      allow write: if isAuthenticated();
     }
 
     match /users/{userId} {
-      allow read, write: if true;
+      // Anyone can get a single user document by ID (for login credential checking)
+      allow get: if true;
+      // Listing, querying, and updating users requires authenticated state
+      allow list: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
 
     match /projects/{projectId} {
-      allow read, write: if true;
+      allow read: if true; // Projects are publicly readable to display on loading
+      allow write: if isAuthenticated();
     }
 
     match /sales/{saleId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /payouts/{payoutId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
   }
 }

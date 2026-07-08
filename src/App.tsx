@@ -31,8 +31,10 @@ import {
   seedDatabase, 
   setDocumentData, 
   deleteDocument, 
-  COLLECTIONS 
+  COLLECTIONS,
+  ensureAuthenticated
 } from './lib/firebase';
+import { hashPassword, hashPasswordIfNeeded, isSha256 } from './lib/crypto';
 
 export default function App() {
   const [activeRole, setActiveRole] = useState<UserRole>('ADMIN');
@@ -59,11 +61,251 @@ export default function App() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  const loadPrivateData = async (sessionParsed: { role: UserRole; agentId?: string; name: string }) => {
+    setDbLoading(true);
+    try {
+      await ensureAuthenticated();
+      
+      const data = await seedDatabase({
+        users: INITIAL_USERS,
+        projects: INITIAL_PROJECTS,
+        sales: INITIAL_SALES,
+        payouts: INITIAL_PAYOUTS,
+        config: INITIAL_MLM_CONFIG,
+        notifications: INITIAL_NOTIFICATIONS
+      });
+
+      const activeConfig = data.config || INITIAL_MLM_CONFIG;
+      setConfig(activeConfig);
+      
+      const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
+      const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+      setProjects(loadedProjects);
+
+      let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+
+      // --- SELF-HEALING LOCAL-TO-CLOUD SYNC ---
+      const storedUsersStr = localStorage.getItem('SBR_USERS');
+      if (storedUsersStr) {
+        try {
+          const storedUsers = JSON.parse(storedUsersStr);
+          if (Array.isArray(storedUsers)) {
+            const missingUsersInFirestore = storedUsers.filter(
+              localU => localU && localU.id && !loadedUsers.some(cloudU => cloudU.id === localU.id)
+            );
+            if (missingUsersInFirestore.length > 0) {
+              for (const localUser of missingUsersInFirestore) {
+                await setDocumentData(COLLECTIONS.USERS, localUser.id, localUser);
+                loadedUsers.push(localUser);
+              }
+              loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      // Sync sales and notifications
+      const storedSalesStr = localStorage.getItem('SBR_SALES');
+      if (storedSalesStr) {
+        try {
+          const storedSales = JSON.parse(storedSalesStr);
+          if (Array.isArray(storedSales)) {
+            const missingSalesInFirestore = storedSales.filter(
+              localS => localS && localS.id && !loadedSales.some(cloudS => cloudS.id === localS.id)
+            );
+            if (missingSalesInFirestore.length > 0) {
+              for (const localSale of missingSalesInFirestore) {
+                await setDocumentData(COLLECTIONS.SALES, localSale.id, localSale);
+                loadedSales.push(localSale);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const storedNotifsStr = localStorage.getItem('SBR_NOTIFICATIONS');
+      if (storedNotifsStr) {
+        try {
+          const storedNotifs = JSON.parse(storedNotifsStr);
+          if (Array.isArray(storedNotifs)) {
+            const currentCloudNotifs = data.notifications || INITIAL_NOTIFICATIONS;
+            const missingNotifsInFirestore = storedNotifs.filter(
+              localN => localN && localN.id && !currentCloudNotifs.some(cloudN => cloudN.id === localN.id)
+            );
+            if (missingNotifsInFirestore.length > 0) {
+              for (const localNotif of missingNotifsInFirestore) {
+                await setDocumentData(COLLECTIONS.NOTIFICATIONS, localNotif.id, localNotif);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const loadedNotifs = (data.notifications || INITIAL_NOTIFICATIONS).filter(n => {
+        return loadedUsers.some(u => u.id === n.userId);
+      });
+
+      // --- Auto Deletion of SBR0036 ---
+      const sbr36Index = loadedUsers.findIndex(u => u.id === 'SBR0036');
+      if (sbr36Index !== -1) {
+        const sbr36Sponsor = loadedUsers[sbr36Index].sponsorId || 'C';
+        loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0036').map(u => {
+          if (u.sponsorId === 'SBR0036') {
+            return { ...u, sponsorId: sbr36Sponsor };
+          }
+          return u;
+        });
+        try {
+          deleteDocument(COLLECTIONS.USERS, 'SBR0036').catch(err => {
+            console.error('[Auto-Deletion] Failed to delete SBR0036 document:', err);
+          });
+        } catch (err) {
+          console.error('[Auto-Deletion] Failed to trigger delete:', err);
+        }
+        loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
+      }
+
+      // --- Auto Deletion of SBR0007 & SBR0015 ---
+      const hasSbr7 = loadedUsers.some(u => u.id === 'SBR0007');
+      const hasSbr15 = loadedUsers.some(u => u.id === 'SBR0015');
+      if (hasSbr7 || hasSbr15) {
+        loadedUsers = loadedUsers.map(u => {
+          if (u.sponsorId === 'SBR0007') {
+            const updated = { ...u, sponsorId: 'SBR0006' };
+            setDocumentData(COLLECTIONS.USERS, u.id, updated).catch(e => console.error(e));
+            return updated;
+          }
+          if (u.sponsorId === 'SBR0015') {
+            const updated = { ...u, sponsorId: 'SBR0006' };
+            setDocumentData(COLLECTIONS.USERS, u.id, updated).catch(e => console.error(e));
+            return updated;
+          }
+          return u;
+        });
+        if (hasSbr7) {
+          loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0007');
+          deleteDocument(COLLECTIONS.USERS, 'SBR0007').catch(err => {
+            console.error('[Auto-Deletion] Failed to delete SBR0007 document:', err);
+          });
+        }
+        if (hasSbr15) {
+          loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0015');
+          deleteDocument(COLLECTIONS.USERS, 'SBR0015').catch(err => {
+            console.error('[Auto-Deletion] Failed to delete SBR0015 document:', err);
+          });
+        }
+        loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
+      }
+
+      const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
+
+      // Self-healing database password encryption migration
+      let updatedUsers = [...loadedUsers];
+      let updatedAny = false;
+      for (let i = 0; i < updatedUsers.length; i++) {
+        const u = updatedUsers[i];
+        if (u.password && !isSha256(u.password)) {
+          const hashedPass = await hashPassword(u.password);
+          updatedUsers[i] = { ...u, password: hashedPass };
+          await setDocumentData(COLLECTIONS.USERS, u.id, updatedUsers[i]);
+          updatedAny = true;
+        }
+      }
+      if (updatedAny) {
+        loadedUsers = normalizeUsersWithSales(updatedUsers, loadedSales, activeConfig);
+      }
+
+      // SECURE FIELD SANITIZATION - Strip secret fields of other users for non-admin sessions
+      let sanitizedUsers = [...loadedUsers];
+      if (sessionParsed.role !== 'ADMIN') {
+        sanitizedUsers = loadedUsers.map(u => {
+          if (u.id !== sessionParsed.agentId) {
+            const { password, bankAccountNumber, ifscCode, aadhar, pan, nominee, nomineeRelation, fatherOrHusbandName, ...publicFields } = u;
+            return publicFields as any;
+          }
+          return u;
+        });
+      }
+
+      setUsers(sanitizedUsers);
+      setSales(loadedSales);
+      setPayouts(loadedPayouts);
+      setNotifications(loadedNotifs);
+
+      setSession(sessionParsed);
+      setActiveRole(sessionParsed.role);
+      if (sessionParsed.agentId) {
+        setActiveAgentId(sessionParsed.agentId);
+        setSelectedTreeUserId(sessionParsed.agentId);
+      }
+    } catch (error) {
+      console.error("Failed to load private data from Firestore:", error);
+      // Fallback to LocalStorage
+      const storedUsers = localStorage.getItem('SBR_USERS');
+      const storedProjects = localStorage.getItem('SBR_PROJECTS');
+      const storedSales = localStorage.getItem('SBR_SALES');
+      const storedPayouts = localStorage.getItem('SBR_PAYOUTS');
+      const storedConfig = localStorage.getItem('SBR_CONFIG');
+      const storedNotifs = localStorage.getItem('SBR_NOTIFICATIONS');
+
+      let activeConfig = INITIAL_MLM_CONFIG;
+      if (storedConfig) {
+        try {
+          activeConfig = JSON.parse(storedConfig);
+        } catch (_) {}
+      }
+
+      let localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
+      let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
+      let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
+
+      const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
+      const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
+
+      // Sanitize localUsers if not admin
+      let sanitizedLocalUsers = [...localUsers];
+      if (sessionParsed.role !== 'ADMIN') {
+        sanitizedLocalUsers = localUsers.map(u => {
+          if (u.id !== sessionParsed.agentId) {
+            const { password, bankAccountNumber, ifscCode, aadhar, pan, nominee, nomineeRelation, fatherOrHusbandName, ...publicFields } = u;
+            return publicFields as any;
+          }
+          return u;
+        });
+      }
+
+      setUsers(sanitizedLocalUsers);
+      setProjects(localProjects);
+      setSales(localSales);
+      setPayouts(localPayouts);
+      setNotifications(localNotifs);
+
+      setSession(sessionParsed);
+      setActiveRole(sessionParsed.role);
+      if (sessionParsed.agentId) {
+        setActiveAgentId(sessionParsed.agentId);
+        setSelectedTreeUserId(sessionParsed.agentId);
+      }
+    } finally {
+      setDbLoading(false);
+    }
+  };
+
   // Load from Firestore on mount
   useEffect(() => {
     async function initFirestore() {
       try {
-        let data = await seedDatabase({
+        // Sign in anonymously first to establish secure DB sessions
+        await ensureAuthenticated();
+
+        // Load project configuration publicly
+        const data = await seedDatabase({
           users: INITIAL_USERS,
           projects: INITIAL_PROJECTS,
           sales: INITIAL_SALES,
@@ -73,201 +315,41 @@ export default function App() {
         });
 
         const activeConfig = data.config || INITIAL_MLM_CONFIG;
-        
-        // Strictly filter to "IMT Sohna" across the platform
-        const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
-        const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
-        
-        let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
-
-        // --- SELF-HEALING LOCAL-TO-CLOUD SYNC ---
-        // If the user created IDs or logged transactions while offline or during a network blip yesterday,
-        // they exist in their browser's LocalStorage but are missing from Firestore. Let's merge and heal the cloud.
-        const storedUsersStr = localStorage.getItem('SBR_USERS');
-        if (storedUsersStr) {
-          try {
-            const storedUsers = JSON.parse(storedUsersStr);
-            if (Array.isArray(storedUsers)) {
-              const missingUsersInFirestore = storedUsers.filter(
-                localU => localU && localU.id && !loadedUsers.some(cloudU => cloudU.id === localU.id)
-              );
-              if (missingUsersInFirestore.length > 0) {
-                console.log(`[Cloud Sync] Found ${missingUsersInFirestore.length} unsynced users in LocalStorage. Synchronizing to Cloud Firestore...`);
-                for (const localUser of missingUsersInFirestore) {
-                  await setDocumentData(COLLECTIONS.USERS, localUser.id, localUser);
-                  loadedUsers.push(localUser);
-                }
-                // Re-normalize designations and volumes after merging
-                loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
-              }
-            }
-          } catch (err) {
-            console.error("Failed to parse or sync LocalStorage users:", err);
-          }
-        }
-
-        const storedSalesStr = localStorage.getItem('SBR_SALES');
-        if (storedSalesStr) {
-          try {
-            const storedSales = JSON.parse(storedSalesStr);
-            if (Array.isArray(storedSales)) {
-              const missingSalesInFirestore = storedSales.filter(
-                localS => localS && localS.id && !loadedSales.some(cloudS => cloudS.id === localS.id)
-              );
-              if (missingSalesInFirestore.length > 0) {
-                console.log(`[Cloud Sync] Found ${missingSalesInFirestore.length} unsynced sales in LocalStorage. Synchronizing to Cloud Firestore...`);
-                for (const localSale of missingSalesInFirestore) {
-                  await setDocumentData(COLLECTIONS.SALES, localSale.id, localSale);
-                  loadedSales.push(localSale);
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Failed to parse or sync LocalStorage sales:", err);
-          }
-        }
-
-        const storedNotifsStr = localStorage.getItem('SBR_NOTIFICATIONS');
-        if (storedNotifsStr) {
-          try {
-            const storedNotifs = JSON.parse(storedNotifsStr);
-            if (Array.isArray(storedNotifs)) {
-              const currentCloudNotifs = data.notifications || INITIAL_NOTIFICATIONS;
-              const missingNotifsInFirestore = storedNotifs.filter(
-                localN => localN && localN.id && !currentCloudNotifs.some(cloudN => cloudN.id === localN.id)
-              );
-              if (missingNotifsInFirestore.length > 0) {
-                console.log(`[Cloud Sync] Found ${missingNotifsInFirestore.length} unsynced notifications in LocalStorage. Synchronizing to Cloud Firestore...`);
-                for (const localNotif of missingNotifsInFirestore) {
-                  await setDocumentData(COLLECTIONS.NOTIFICATIONS, localNotif.id, localNotif);
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Failed to parse or sync LocalStorage notifications:", err);
-          }
-        }
-        // ----------------------------------------
-
-        // Filter notifications to match
-        const loadedNotifs = (data.notifications || INITIAL_NOTIFICATIONS).filter(n => {
-          return loadedUsers.some(u => u.id === n.userId);
-        });
-
-        // --- Auto Deletion of SBR0036 ---
-        const sbr36Index = loadedUsers.findIndex(u => u.id === 'SBR0036');
-        if (sbr36Index !== -1) {
-          console.log('[Auto-Deletion] SBR0036 found. Performing requested deletion...');
-          const sbr36Sponsor = loadedUsers[sbr36Index].sponsorId || 'C';
-          loadedUsers = loadedUsers.filter(u => u.id !== 'SBR0036').map(u => {
-            if (u.sponsorId === 'SBR0036') {
-              return { ...u, sponsorId: sbr36Sponsor };
-            }
-            return u;
-          });
-          try {
-            deleteDocument(COLLECTIONS.USERS, 'SBR0036').catch(err => {
-              console.error('[Auto-Deletion] Failed to delete SBR0036 document:', err);
-            });
-          } catch (err) {
-            console.error('[Auto-Deletion] Failed to trigger delete:', err);
-          }
-          loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
-        }
-        // --------------------------------
-
-        const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
-
-        setUsers(loadedUsers);
-        setProjects(loadedProjects);
-        setSales(loadedSales);
-        setPayouts(loadedPayouts);
         setConfig(activeConfig);
-        setNotifications(loadedNotifs);
-      } catch (error) {
-        console.error("Firebase Initialization failed, falling back to LocalStorage:", error);
         
-        // Local fallback
-        const storedUsers = localStorage.getItem('SBR_USERS');
-        const storedProjects = localStorage.getItem('SBR_PROJECTS');
-        const storedSales = localStorage.getItem('SBR_SALES');
-        const storedPayouts = localStorage.getItem('SBR_PAYOUTS');
-        const storedConfig = localStorage.getItem('SBR_CONFIG');
-        const storedNotifs = localStorage.getItem('SBR_NOTIFICATIONS');
+        const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+        setProjects(loadedProjects);
 
-        let activeConfig = INITIAL_MLM_CONFIG;
-        if (storedConfig) {
+        const storedSession = localStorage.getItem('SBR_SESSION');
+        if (storedSession) {
           try {
-            activeConfig = JSON.parse(storedConfig);
-            setConfig(activeConfig);
+            const parsed = JSON.parse(storedSession);
+            // Upgrade legacy agent sessions if applicable
+            if (parsed.agentId === 'SBR0005') {
+              parsed.agentId = 'C';
+              parsed.name = 'Company Profile C';
+              parsed.role = 'ADMIN';
+            }
+            await loadPrivateData(parsed);
           } catch (e) {
-            setConfig(INITIAL_MLM_CONFIG);
+            console.error('Error loading stored session', e);
+            setDbLoading(false);
           }
         } else {
-          setConfig(INITIAL_MLM_CONFIG);
+          setDbLoading(false);
         }
-
-        let localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
-        let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
-        let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
-
-        // Auto-migration for local fallback
-        const hasOldLocalData = localUsers.some(u => u.id === 'SBR0005') || !localUsers.some(u => u.id === 'C');
-        if (hasOldLocalData) {
-          console.log("SBR Cloud Core: Old seed data detected in LocalStorage. Auto-migrating to the new 7-user SBR MLM Corporate Structure...");
-          localSales = INITIAL_SALES;
-          localProjects = INITIAL_PROJECTS;
-          localUsers = normalizeUsersWithSales(INITIAL_USERS, localSales, activeConfig);
-          
-          localStorage.setItem('SBR_USERS', JSON.stringify(localUsers));
-          localStorage.setItem('SBR_PROJECTS', JSON.stringify(localProjects));
-          localStorage.setItem('SBR_SALES', JSON.stringify(localSales));
-          localStorage.setItem('SBR_PAYOUTS', JSON.stringify(INITIAL_PAYOUTS));
-          localStorage.setItem('SBR_NOTIFICATIONS', JSON.stringify(INITIAL_NOTIFICATIONS));
-          
-          localStorage.removeItem('SBR_SESSION');
-        }
-
-        const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
-        const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
-
-        setUsers(localUsers);
-        setProjects(localProjects);
-        setSales(localSales);
-        setPayouts(localPayouts);
-        setNotifications(localNotifs);
-      } finally {
+      } catch (error) {
+        console.error("Initialization failed on mount:", error);
         setDbLoading(false);
       }
     }
 
     initFirestore();
-
-    const storedSession = localStorage.getItem('SBR_SESSION');
-    if (storedSession) {
-      try {
-        const parsed = JSON.parse(storedSession);
-        // If stored session is for Neha Patel, redirect it to C
-        if (parsed.agentId === 'SBR0005') {
-          parsed.agentId = 'C';
-          parsed.name = 'Company Profile C';
-          parsed.role = 'ADMIN';
-        }
-        setSession(parsed);
-        setActiveRole(parsed.role);
-        if (parsed.agentId) {
-          setActiveAgentId(parsed.agentId);
-          setSelectedTreeUserId(parsed.agentId);
-        }
-      } catch (e) {
-        console.error('Error loading stored session', e);
-      }
-    }
   }, []);
 
   // Synchronize state changes to LocalStorage as a local fallback backup
   useEffect(() => {
-    if (!dbLoading) {
+    if (!dbLoading && session) {
       localStorage.setItem('SBR_USERS', JSON.stringify(users));
       localStorage.setItem('SBR_PROJECTS', JSON.stringify(projects));
       localStorage.setItem('SBR_SALES', JSON.stringify(sales));
@@ -275,27 +357,176 @@ export default function App() {
       localStorage.setItem('SBR_CONFIG', JSON.stringify(config));
       localStorage.setItem('SBR_NOTIFICATIONS', JSON.stringify(notifications));
     }
-  }, [dbLoading, users, projects, sales, payouts, config, notifications]);
+  }, [dbLoading, session, users, projects, sales, payouts, config, notifications]);
 
-  const handleLogin = (role: UserRole, agentId?: string) => {
+  // Secure credential verification callback called asynchronously by LoginScreen
+  const handleVerifyCredentials = async (identifier: string, pass: string): Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string }> => {
+    try {
+      await ensureAuthenticated();
+      const inputId = identifier.trim();
+      const inputIdUpper = inputId.toUpperCase();
+      const inputIdLower = inputId.toLowerCase();
+
+      // Admin verification
+      if (inputIdLower === 'admin') {
+        if (pass === 'Admin@SBRassociates') {
+          return { success: true, role: 'ADMIN', agentId: 'C', name: 'Company Profile C' };
+        } else {
+          return { success: false, errorMsg: 'Invalid Administrator credentials.' };
+        }
+      }
+
+      // Fetch the specific user document directly from Firestore
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      const userRef = doc(db, COLLECTIONS.USERS, inputIdUpper);
+      const docSnap = await getDoc(userRef);
+
+      if (docSnap.exists()) {
+        const foundAgent = docSnap.data() as User;
+        
+        // Compute expected passcode hash
+        const fallbackPasscodes: Record<string, string> = {
+          'SBR': 'SBR@2026',
+          'C': 'C@SBR',
+          'ADMIN1': 'Admin1@SBR',
+          'A1': 'A1@SBR',
+          'ADMIN2': 'Admin2@SBR',
+          'A2': 'A2@SBR',
+          'RAM': 'Ram@SBR',
+          'MANORANJAN': 'Manoranjan@SBR',
+          'VIKAS': 'Vikas@SBR',
+          'DK': 'DK@SBR'
+        };
+
+        let defaultPasscode = 'password';
+        const username = foundAgent.id.toUpperCase();
+        if (foundAgent.dob) {
+          const parts = foundAgent.dob.split('-');
+          if (parts.length === 3) {
+            const year = parts[0];
+            const month = parts[1];
+            const day = parts[2];
+            if (year.length === 4 && month.length === 2 && day.length === 2) {
+              defaultPasscode = `${username}${day}${month}${year}`;
+            }
+          }
+        } else {
+          defaultPasscode = `${username}01011990`;
+        }
+
+        const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
+        const enteredPasswordHash = await hashPassword(pass);
+
+        // Check if password matches
+        const isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+
+        if (isPasscodeCorrect) {
+          if (foundAgent.status === 'ACTIVE') {
+            // Self-healing migration: hash the plaintext password in Firestore if it isn't hashed yet
+            if (pass === expectedPlaintextPasscode && !isSha256(foundAgent.password || '')) {
+              await setDocumentData(COLLECTIONS.USERS, foundAgent.id, {
+                ...foundAgent,
+                password: enteredPasswordHash
+              });
+            }
+
+            const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
+            const role = isAdminNode ? 'ADMIN' : 'AGENT';
+            return { success: true, role, agentId: foundAgent.id, name: foundAgent.name };
+          } else {
+            return { success: false, errorMsg: 'Access Blocked: This account has been marked INACTIVE by Admin.' };
+          }
+        } else {
+          return { success: false, errorMsg: 'Invalid passcode. Please try again.' };
+        }
+      } else {
+        // Check local storage / seed fallback if document doesn't exist in Firestore
+        const storedUsersStr = localStorage.getItem('SBR_USERS');
+        let localUsers: User[] = INITIAL_USERS;
+        if (storedUsersStr) {
+          try {
+            localUsers = JSON.parse(storedUsersStr);
+          } catch (_) {}
+        }
+        const foundAgent = localUsers.find(u => u.id.toUpperCase() === inputIdUpper);
+        if (foundAgent) {
+          const fallbackPasscodes: Record<string, string> = {
+            'SBR': 'SBR@2026',
+            'C': 'C@SBR',
+            'ADMIN1': 'Admin1@SBR',
+            'A1': 'A1@SBR',
+            'ADMIN2': 'Admin2@SBR',
+            'A2': 'A2@SBR',
+            'RAM': 'Ram@SBR',
+            'MANORANJAN': 'Manoranjan@SBR',
+            'VIKAS': 'Vikas@SBR',
+            'DK': 'DK@SBR'
+          };
+
+          let defaultPasscode = 'password';
+          const username = foundAgent.id.toUpperCase();
+          if (foundAgent.dob) {
+            const parts = foundAgent.dob.split('-');
+            if (parts.length === 3) {
+              const year = parts[0];
+              const month = parts[1];
+              const day = parts[2];
+              if (year.length === 4 && month.length === 2 && day.length === 2) {
+                defaultPasscode = `${username}${day}${month}${year}`;
+              }
+            }
+          } else {
+            defaultPasscode = `${username}01011990`;
+          }
+
+          const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
+          const enteredPasswordHash = await hashPassword(pass);
+          const isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+
+          if (isPasscodeCorrect) {
+            if (foundAgent.status === 'ACTIVE') {
+              const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
+              const role = isAdminNode ? 'ADMIN' : 'AGENT';
+              return { success: true, role, agentId: foundAgent.id, name: foundAgent.name };
+            } else {
+              return { success: false, errorMsg: 'Access Blocked: This account has been marked INACTIVE by Admin.' };
+            }
+          } else {
+            return { success: false, errorMsg: 'Invalid passcode. Please try again.' };
+          }
+        }
+        return { success: false, errorMsg: 'Account ID not recognized.' };
+      }
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, errorMsg: 'Security verification failed: ' + e.message };
+    }
+  };
+
+  const handleLogin = async (role: UserRole, agentId?: string) => {
     let name = '';
+    let resolvedAgentId = agentId || 'C';
     if (role === 'ADMIN' && !agentId) {
       name = 'Company Profile C';
-      agentId = 'C';
+      resolvedAgentId = 'C';
     } else if (agentId) {
-      const agent = users.find((u: User) => u.id === agentId);
-      name = agent ? agent.name : 'SBR Broker';
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('./lib/firebase');
+        const userRef = doc(db, COLLECTIONS.USERS, agentId);
+        const docSnap = await getDoc(userRef);
+        name = docSnap.exists() ? (docSnap.data() as User).name : 'SBR Broker';
+      } catch (e) {
+        name = 'SBR Broker';
+      }
     } else {
       name = 'SBR Administrator';
     }
 
-    const newSession = { role, agentId, name };
-    setSession(newSession);
-    setActiveRole(role);
-    if (agentId) {
-      setActiveAgentId(agentId);
-    }
+    const newSession = { role, agentId: resolvedAgentId, name };
     localStorage.setItem('SBR_SESSION', JSON.stringify(newSession));
+    await loadPrivateData(newSession);
   };
 
   const handleLogout = () => {
@@ -359,8 +590,10 @@ export default function App() {
   };
 
   const handleAddUser = async (newUserData: Omit<User, 'totalDirectSales' | 'totalDownlineSales'>) => {
+    const hashedPassword = newUserData.password ? await hashPassword(newUserData.password) : '';
     const newUser: User = {
       ...newUserData,
+      password: hashedPassword,
       totalDirectSales: 0,
       totalDownlineSales: 0
     };
@@ -733,7 +966,8 @@ export default function App() {
       if (!userToUpdate) {
         throw new Error("User profile not found in active session.");
       }
-      const updatedUser = { ...userToUpdate, password: newPass };
+      const hashedPass = await hashPassword(newPass);
+      const updatedUser = { ...userToUpdate, password: hashedPass };
       
       // Update in Firestore
       await setDocumentData(COLLECTIONS.USERS, userId, updatedUser);
@@ -766,6 +1000,9 @@ export default function App() {
       if (['C', 'A1', 'A2'].includes(userId) && updatedFields.role && updatedFields.role !== 'ADMIN') {
         throw new Error("Security Violation: Core Administrative nodes must maintain their ADMIN status.");
       }
+      if (updatedFields.password) {
+        updatedFields.password = await hashPasswordIfNeeded(updatedFields.password);
+      }
       const updatedUser = { ...userToUpdate, ...updatedFields };
       await setDocumentData(COLLECTIONS.USERS, userId, updatedUser);
       setUsers(prevUsers => prevUsers.map(u => u.id === userId ? updatedUser : u));
@@ -792,7 +1029,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginScreen users={users} onLogin={handleLogin} />;
+    return <LoginScreen onLogin={handleLogin} onVerifyCredentials={handleVerifyCredentials} />;
   }
 
 
