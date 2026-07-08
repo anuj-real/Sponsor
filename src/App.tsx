@@ -944,6 +944,7 @@ export default function App() {
               onClearNotification={handleClearNotification}
               config={config}
               projects={projects}
+              onUpdateUserProfile={handleAdminUpdateUserProfile}
             />
           </div>
         )}

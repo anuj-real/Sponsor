@@ -21,6 +21,7 @@ export interface User {
   address?: string;
   photo?: string; // SBR associate photo URL or base64 placeholder
   password?: string; // Optional user password
+  fatherOrHusbandName?: string;
 
   // Bank details section
   bankAccountNumber?: string;

@@ -184,6 +184,7 @@ export default function AdminPanel({
   const [newAadhar, setNewAadhar] = useState('');
   const [newPan, setNewPan] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [newFatherOrHusbandName, setNewFatherOrHusbandName] = useState('');
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=256');
 
   // Bank details fields for onboarding
@@ -207,6 +208,7 @@ export default function AdminPanel({
   const [editAadhar, setEditAadhar] = useState('');
   const [editPan, setEditPan] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editFatherOrHusbandName, setEditFatherOrHusbandName] = useState('');
   const [tempPassword, setTempPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [passwordStatusMsg, setPasswordStatusMsg] = useState('');
@@ -579,6 +581,7 @@ export default function AdminPanel({
       aadhar: newAadhar,
       pan: newPan,
       address: newAddress || 'Sub-broker Office network',
+      fatherOrHusbandName: newFatherOrHusbandName || undefined,
       photo: newPhoto,
       totalDirectSales: 0,
       totalDownlineSales: 0,
@@ -601,6 +604,7 @@ export default function AdminPanel({
     setNewAadhar('');
     setNewPan('');
     setNewAddress('');
+    setNewFatherOrHusbandName('');
     setNewBankAccountNumber('');
     setNewIfscCode('');
     setNewBranchName('');
@@ -1843,6 +1847,18 @@ export default function AdminPanel({
                 </div>
 
                 <div>
+                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Father's / Husband's Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Satpute"
+                    value={newFatherOrHusbandName}
+                    onChange={(e) => setNewFatherOrHusbandName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-900 outline-none"
+                  />
+                </div>
+
+                <div>
                   <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Residential Address</label>
                   <textarea
                     rows={2}
@@ -2047,6 +2063,7 @@ export default function AdminPanel({
                                   setEditAadhar(agent.aadhar || '');
                                   setEditPan(agent.pan || '');
                                   setEditAddress(agent.address || '');
+                                  setEditFatherOrHusbandName(agent.fatherOrHusbandName || '');
                                   setEditBankAccountNumber(agent.bankAccountNumber || '');
                                   setEditIfscCode(agent.ifscCode || '');
                                   setEditBranchName(agent.branchName || '');
@@ -3812,6 +3829,17 @@ export default function AdminPanel({
                       />
                     </div>
 
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Father's / Husband's Name</label>
+                      <input
+                        type="text"
+                        value={editFatherOrHusbandName}
+                        onChange={(e) => setEditFatherOrHusbandName(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        placeholder="Father's or Husband's Name"
+                      />
+                    </div>
+
                     <div className="sm:col-span-2">
                       <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Aadhaar Card Number</label>
                       <input
@@ -3941,6 +3969,7 @@ export default function AdminPanel({
                               aadhar: editAadhar,
                               pan: editPan,
                               address: editAddress,
+                              fatherOrHusbandName: editFatherOrHusbandName,
                               password: tempPassword,
                               bankAccountNumber: editBankAccountNumber,
                               ifscCode: editIfscCode,
