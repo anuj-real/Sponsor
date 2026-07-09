@@ -43,7 +43,8 @@ export const COLLECTIONS = {
   SALES: 'sales',
   PAYOUTS: 'payouts',
   CONFIG: 'config',
-  NOTIFICATIONS: 'notifications'
+  NOTIFICATIONS: 'notifications',
+  USER_LOGS: 'user_logs'
 };
 
 /**

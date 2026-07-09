@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord } from '../types';
+import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog } from '../types';
 import { calculatePointsFromSize } from '../lib/points';
 import TreeVisualizer from './TreeVisualizer';
 import { 
@@ -43,6 +43,7 @@ interface AdminPanelProps {
   onUpdateSale?: (sale: Sale) => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
   currentUserAgentId?: string;
+  userLogs?: UserLog[];
 }
 
 export default function AdminPanel({
@@ -63,7 +64,8 @@ export default function AdminPanel({
   onUpdateSale,
   onUpdateUserProfile,
   currentUserAgentId,
-  onDeleteUser
+  onDeleteUser,
+  userLogs = []
 }: AdminPanelProps) {
   const isFamilyId = (id?: string) => {
     if (!id) return false;
@@ -83,8 +85,8 @@ export default function AdminPanel({
     return false;
   };
 
-  // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS
-  const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS'>('SETTINGS');
+  // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, LOGS
+  const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'LOGS'>('SETTINGS');
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
 
   const formatPoints = (val: number) => {
@@ -105,6 +107,21 @@ export default function AdminPanel({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportLogsCSV = () => {
+    const headers = ['Timestamp', 'Action', 'User ID', 'User Name', 'Sponsor ID', 'Role', 'Performed By', 'Details'];
+    const rows = userLogs.map(log => [
+      log.timestamp || '',
+      log.action || '',
+      log.userId || '',
+      log.userName || '',
+      log.sponsorId || '',
+      log.role || '',
+      log.performedBy || '',
+      log.details || ''
+    ]);
+    exportToCSV('sbr_lifecycle_logs.csv', headers, rows);
   };
 
   // MLM config state (10 levels)
@@ -930,6 +947,14 @@ export default function AdminPanel({
           }`}
         >
           <CreditCard className="w-4 h-4" /> Operations & Payouts Auditing
+        </button>
+        <button
+          onClick={() => setActiveSubTab('LOGS')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeSubTab === 'LOGS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+          }`}
+        >
+          <Calendar className="w-4 h-4" /> Daily Lifecycle Logs
         </button>
       </div>
 
@@ -3291,6 +3316,121 @@ export default function AdminPanel({
                         </td>
                       </tr>
                     ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. DAILY USER LIFECYCLE AUDIT LOGS */}
+      {activeSubTab === 'LOGS' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Summary metrics cards for logs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block">Total Recorded Lifecycle Events</span>
+              <h3 className="text-xl sm:text-2xl font-bold font-mono text-emerald-800 mt-1">
+                {userLogs.length}
+              </h3>
+              <p className="text-[9.5px] text-stone-500 mt-2">
+                User onboarding and deletions audit trail
+              </p>
+            </div>
+            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block font-sans text-green-700">Total User Additions</span>
+              <h3 className="text-xl sm:text-2xl font-bold font-mono text-green-800 mt-1">
+                {userLogs.filter(l => l.action === 'ADDITION').length}
+              </h3>
+              <p className="text-[9.5px] text-stone-500 mt-2">
+                New sub-brokers registered in system
+              </p>
+            </div>
+            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block font-sans text-rose-700">Total User Deletions</span>
+              <h3 className="text-xl sm:text-2xl font-bold font-mono text-rose-800 mt-1">
+                {userLogs.filter(l => l.action === 'DELETION').length}
+              </h3>
+              <p className="text-[9.5px] text-stone-500 mt-2">
+                Accounts purged and downlines reparented
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wide flex items-center gap-2">
+                  🛡️ SBR Daily Lifecycle Audit Ledger
+                </h3>
+                <p className="text-xs text-stone-500 mt-1">Official security log tracking personnel additions and hierarchy modifications.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportLogsCSV}
+                className="px-3.5 py-1.5 bg-emerald-850 hover:bg-emerald-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all font-sans uppercase tracking-wider"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Logs to CSV
+              </button>
+            </div>
+
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
+                    <th className="px-5 py-3">Timestamp</th>
+                    <th className="px-5 py-3">Action</th>
+                    <th className="px-5 py-3">Subject ID</th>
+                    <th className="px-5 py-3">Subject Name</th>
+                    <th className="px-5 py-3">Sponsor ID</th>
+                    <th className="px-5 py-3">Performed By</th>
+                    <th className="px-5 py-3">System Log Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-150 text-stone-800 font-sans">
+                  {userLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-5 py-10 text-center text-stone-400 font-medium font-sans">
+                        No user lifecycle activities have been logged yet today.
+                      </td>
+                    </tr>
+                  ) : (
+                    userLogs.map((log) => {
+                      const formattedTime = new Date(log.timestamp).toLocaleString('en-IN', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true
+                      });
+                      return (
+                        <tr key={log.id} className="hover:bg-stone-50/30 transition-colors">
+                          <td className="px-5 py-3.5 font-mono text-stone-550 whitespace-nowrap text-[11px]">{formattedTime}</td>
+                          <td className="px-5 py-3.5">
+                            <span className={`inline-flex items-center gap-1 text-[9px] font-extrabold uppercase rounded-full px-2.5 py-0.5 border ${
+                              log.action === 'ADDITION'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              <span className={`w-1 h-1 rounded-full ${
+                                log.action === 'ADDITION' ? 'bg-green-500' : 'bg-rose-500'
+                              }`} />
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 font-mono font-bold text-stone-900 text-[11px]">{log.userId}</td>
+                          <td className="px-5 py-3.5 font-bold text-stone-850">{log.userName}</td>
+                          <td className="px-5 py-3.5 font-mono text-stone-550 text-[11px]">{log.sponsorId}</td>
+                          <td className="px-5 py-3.5 text-stone-700 font-medium whitespace-nowrap">{log.performedBy}</td>
+                          <td className="px-5 py-3.5 text-stone-600 leading-relaxed text-[11px] max-w-[320px] truncate" title={log.details}>
+                            {log.details}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

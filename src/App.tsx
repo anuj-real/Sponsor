@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole } from './types';
+import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
   INITIAL_MLM_CONFIG, 
   INITIAL_PROJECTS, 
@@ -32,7 +32,8 @@ import {
   setDocumentData, 
   deleteDocument, 
   COLLECTIONS,
-  ensureAuthenticated
+  ensureAuthenticated,
+  getCollectionData
 } from './lib/firebase';
 import { hashPassword, hashPasswordIfNeeded, isSha256 } from './lib/crypto';
 
@@ -49,6 +50,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [config, setConfig] = useState<MLMConfig>(INITIAL_MLM_CONFIG);
   const [dbLoading, setDbLoading] = useState(true);
+  const [userLogs, setUserLogs] = useState<UserLog[]>([]);
 
   // Selected User in the Tree diagram
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('C');
@@ -198,21 +200,8 @@ export default function App() {
 
       const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
 
-      // Self-healing database password encryption migration
-      let updatedUsers = [...loadedUsers];
-      let updatedAny = false;
-      for (let i = 0; i < updatedUsers.length; i++) {
-        const u = updatedUsers[i];
-        if (u.password && !isSha256(u.password)) {
-          const hashedPass = await hashPassword(u.password);
-          updatedUsers[i] = { ...u, password: hashedPass };
-          await setDocumentData(COLLECTIONS.USERS, u.id, updatedUsers[i]);
-          updatedAny = true;
-        }
-      }
-      if (updatedAny) {
-        loadedUsers = normalizeUsersWithSales(updatedUsers, loadedSales, activeConfig);
-      }
+      // Automatic background passcode modification migration is disabled to ensure passcodes are not altered
+      // unless explicitly requested by the admin or user.
 
       // SECURE FIELD SANITIZATION - Strip secret fields of other users for non-admin sessions
       let sanitizedUsers = [...loadedUsers];
@@ -225,6 +214,16 @@ export default function App() {
           return u;
         });
       }
+
+      // Fetch user activity logs
+      let loadedLogs: UserLog[] = [];
+      try {
+        loadedLogs = await getCollectionData<UserLog>(COLLECTIONS.USER_LOGS);
+        loadedLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      } catch (err) {
+        console.error('Failed to load user logs:', err);
+      }
+      setUserLogs(loadedLogs);
 
       setUsers(sanitizedUsers);
       setSales(loadedSales);
@@ -272,6 +271,16 @@ export default function App() {
           return u;
         });
       }
+
+      const storedLogs = localStorage.getItem('SBR_USER_LOGS');
+      let localLogs: UserLog[] = [];
+      if (storedLogs) {
+        try {
+          localLogs = JSON.parse(storedLogs);
+          localLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        } catch (_) {}
+      }
+      setUserLogs(localLogs);
 
       setUsers(sanitizedLocalUsers);
       setProjects(localProjects);
@@ -349,8 +358,9 @@ export default function App() {
       localStorage.setItem('SBR_PAYOUTS', JSON.stringify(payouts));
       localStorage.setItem('SBR_CONFIG', JSON.stringify(config));
       localStorage.setItem('SBR_NOTIFICATIONS', JSON.stringify(notifications));
+      localStorage.setItem('SBR_USER_LOGS', JSON.stringify(userLogs));
     }
-  }, [dbLoading, session, users, projects, sales, payouts, config, notifications]);
+  }, [dbLoading, session, users, projects, sales, payouts, config, notifications, userLogs]);
 
   // Secure credential verification callback called asynchronously by LoginScreen
   const handleVerifyCredentials = async (identifier: string, pass: string): Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string }> => {
@@ -416,13 +426,7 @@ export default function App() {
 
         if (isPasscodeCorrect) {
           if (foundAgent.status === 'ACTIVE') {
-            // Self-healing migration: hash the plaintext password in Firestore if it isn't hashed yet
-            if (pass === expectedPlaintextPasscode && !isSha256(foundAgent.password || '')) {
-              await setDocumentData(COLLECTIONS.USERS, foundAgent.id, {
-                ...foundAgent,
-                password: enteredPasswordHash
-              });
-            }
+            // Automatic passcode self-healing write-back is disabled to keep original passcodes unchanged.
 
             const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
             const role = isAdminNode ? 'ADMIN' : 'AGENT';
@@ -620,6 +624,23 @@ export default function App() {
         }
       }
 
+      // Record in Daily Log
+      const logId = `LOG-ADD-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newLog: UserLog = {
+        id: logId,
+        timestamp: new Date().toISOString(),
+        date: new Date().toISOString().substring(0, 10),
+        action: 'ADDITION',
+        userId: finalNewUser.id,
+        userName: finalNewUser.name,
+        sponsorId: finalNewUser.sponsorId || 'C',
+        role: finalNewUser.role,
+        performedBy: session ? `${session.name} (${session.role})` : 'Administrator',
+        details: `Partner ${finalNewUser.name} (${finalNewUser.id}) onboarded onto SBR hierarchy under Sponsor: ${finalNewUser.sponsorId || 'C'}. Role: ${finalNewUser.role}.`
+      };
+      await setDocumentData(COLLECTIONS.USER_LOGS, logId, newLog);
+      setUserLogs(prev => [newLog, ...prev]);
+
       await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
     } catch (e) {
       console.error('Firestore save failed', e);
@@ -676,6 +697,23 @@ export default function App() {
           }
         }
       }
+
+      // Record in Daily Log
+      const logId = `LOG-DEL-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newLog: UserLog = {
+        id: logId,
+        timestamp: new Date().toISOString(),
+        date: new Date().toISOString().substring(0, 10),
+        action: 'DELETION',
+        userId: deletedUser.id,
+        userName: deletedUser.name,
+        sponsorId: deletedUser.sponsorId || 'C',
+        role: deletedUser.role,
+        performedBy: session ? `${session.name} (${session.role})` : 'Administrator',
+        details: `Sponsor ${deletedUser.name} (${deletedUser.id}) permanently deleted. Downlines reparented to ${parentSponsorId}.`
+      };
+      await setDocumentData(COLLECTIONS.USER_LOGS, logId, newLog);
+      setUserLogs(prev => [newLog, ...prev]);
       
       await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
     } catch (err) {
@@ -1149,6 +1187,7 @@ export default function App() {
               onUpdateSale={handleUpdateSale}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
               currentUserAgentId={session?.agentId}
+              userLogs={userLogs}
             />
           </div>
         )}

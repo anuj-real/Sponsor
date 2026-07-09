@@ -80,20 +80,10 @@ export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScree
             </p>
           </div>
 
-          {/* SBR Sizing Rules card */}
-          <div className="p-5 border border-stone-200/80 bg-white rounded-2xl shadow-xs space-y-2">
-            <h4 className="text-xs font-bold text-stone-850 uppercase tracking-widest flex items-center gap-1.5 font-sans">
-              <span className="text-emerald-600">✦</span> Sourcing Standard Ledger Rules
-            </h4>
-            <p className="text-xs text-stone-600 leading-relaxed font-sans">
-              <strong className="text-stone-900">Tiered Points System.</strong> Points are calculated from plot sizes in square yards (e.g. up to 80 sq yds = 1.0 Point; 81-130 = 2.0 Points; 131-180 = 3.0 Points; up to 10.0 Points for 481-530 sq yds). All real estate transactions, team override bonuses, and final monthly commission payouts are calculated, logged, and tracked strictly in points (PTS) for operations consistency.
-            </p>
-          </div>
-
         </div>
 
         {/* Right Side: Simple Clean Login Card */}
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-5 space-y-6">
           <div className="bg-white border border-stone-200 shadow-md rounded-2xl p-6 sm:p-8 space-y-6">
             
             <div className="space-y-1">
@@ -178,6 +168,16 @@ export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScree
               </div>
             </div>
 
+          </div>
+
+          {/* SBR Sizing Rules card */}
+          <div className="p-5 border border-stone-200/80 bg-white rounded-2xl shadow-xs space-y-2">
+            <h4 className="text-xs font-bold text-stone-850 uppercase tracking-widest flex items-center gap-1.5 font-sans">
+              <span className="text-emerald-600">✦</span> Sourcing Standard Ledger Rules
+            </h4>
+            <p className="text-xs text-stone-600 leading-relaxed font-sans">
+              <strong className="text-stone-900">Tiered Points System.</strong> Points are calculated from plot sizes in square yards (e.g. up to 80 sq yds = 1.0 Point; 81-130 = 2.0 Points; 131-180 = 3.0 Points; up to 10.0 Points for 481-530 sq yds). All real estate transactions, team override bonuses, and final monthly commission payouts are calculated, logged, and tracked strictly in points (PTS) for operations consistency.
+            </p>
           </div>
         </div>
 

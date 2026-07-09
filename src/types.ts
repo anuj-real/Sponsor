@@ -177,3 +177,17 @@ export interface MLMConfig {
   termsAndConditions: string[];
 }
 
+export interface UserLog {
+  id: string; // Dynamic ID, e.g. "LOG-12345"
+  timestamp: string; // ISO timestamp
+  date: string; // YYYY-MM-DD for easy daily grouping
+  action: 'ADDITION' | 'DELETION';
+  userId: string;
+  userName: string;
+  sponsorId: string;
+  role: string;
+  performedBy: string; // Admin id, name or "System"
+  details: string; // Detailed description of the action
+}
+
+
