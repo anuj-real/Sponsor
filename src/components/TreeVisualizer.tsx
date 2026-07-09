@@ -9,6 +9,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize2, 
+  Minimize2, 
   Move, 
   User as UserIcon, 
   CheckCircle2, 
@@ -26,6 +27,8 @@ interface TreeVisualizerProps {
 
 export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hideUpline }: TreeVisualizerProps) {
   const [viewMode, setViewMode] = useState<'MLM' | 'LIST'>('MLM');
+  const [isMobile, setIsMobile] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     'SBR': true,
     'C': true,
@@ -35,6 +38,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     'A2': true,
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [centerTrigger, setCenterTrigger] = useState(0);
   
   // Pan and Zoom State
   const [zoom, setZoom] = useState(0.85);
@@ -42,6 +46,18 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const treeContainerRef = useRef<HTMLDivElement>(null);
+
+  // Toggle body scroll locking when fullscreen is active
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isFullscreen]);
 
   // Find root users (users who do not have an active sponsor in the system)
   const rootUsers = users.filter(u => !u.sponsorId || !users.some(parent => parent.id === u.sponsorId));
@@ -60,18 +76,50 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     return directSales + subVolume;
   };
 
+  // Helper to highlight lineage path for the selected node
+  const isLineHighlighted = (parentUserId: string) => {
+    if (!selectedUserId) return false;
+    if (selectedUserId === parentUserId) return true;
+    
+    // Check if selectedUser is a descendant of parentUserId
+    let current = users.find(u => u.id === selectedUserId);
+    while (current) {
+      if (current.sponsorId === parentUserId) return true;
+      current = users.find(u => u.id === current.sponsorId);
+    }
+    return false;
+  };
+
   const toggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const willBeExpanded = !expandedNodes[id];
     setExpandedNodes(prev => ({
       ...prev,
-      [id]: !prev[id]
+      [id]: willBeExpanded
     }));
+    
+    if (willBeExpanded) {
+      if (onSelectUser) {
+        onSelectUser(id);
+      }
+      setCenterTrigger(prev => prev + 1);
+    }
   };
 
   const handleNodeClick = (userId: string) => {
     if (onSelectUser) {
       onSelectUser(userId);
     }
+    
+    // Auto-expand this node so downlines are revealed immediately upon click
+    setExpandedNodes(prev => ({
+      ...prev,
+      [userId]: true
+    }));
+
+    // Trigger auto-centering immediately
+    setCenterTrigger(prev => prev + 1);
+
     // Smooth scroll to the details card on mobile
     if (window.innerWidth < 1024) {
       setTimeout(() => {
@@ -83,17 +131,24 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     }
   };
 
-  // Detect mobile device on mount to default to MLM Tree with zoomed out view
+  // Detect mobile device on mount to default to MLM graphic tree and handle resize events
   useEffect(() => {
-    if (window.innerWidth < 768) {
-      setViewMode('MLM');
-      setZoom(0.85); // Nice, crisp readable default zoom on mobile
-      setPan({ x: 0, y: 30 });
-    } else {
-      setViewMode('MLM');
-      setZoom(1.0); // Full scale on desktop
-      setPan({ x: 0, y: 10 });
-    }
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setViewMode('MLM'); // Always default to the beautiful 2D Graphic organigram tree!
+      if (mobile) {
+        setZoom(0.9); // Comfortable fixed zoom level on mobile
+        setPan({ x: 0, y: 15 });
+      } else {
+        setZoom(1.0); // Full scale on desktop
+        setPan({ x: 0, y: 10 });
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Auto-center the selected node in the viewport smoothly
@@ -106,25 +161,35 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
           const rectNode = nodeEl.getBoundingClientRect();
           const rectViewport = viewportEl.getBoundingClientRect();
           
-          // Calculate screen center delta
-          const viewportCenterX = rectViewport.left + rectViewport.width / 2;
-          const viewportCenterY = rectViewport.top + rectViewport.height / 2;
+          // Center of viewport (relative to viewport top-left)
+          const targetX = rectViewport.width / 2;
           
+          // On mobile, offset the center focus point slightly upwards so the bottom details drawer doesn't obstruct the active node
+          const isMobileViewport = window.innerWidth < 768;
+          const targetY = isMobileViewport ? (rectViewport.height / 2 - 80) : (rectViewport.height / 2);
+          
+          // Current center of the node on the screen
           const nodeCenterX = rectNode.left + rectNode.width / 2;
           const nodeCenterY = rectNode.top + rectNode.height / 2;
           
-          const dx = viewportCenterX - nodeCenterX;
-          const dy = viewportCenterY - nodeCenterY;
+          // Current relative center of the node to the viewport top-left
+          const currentRelX = nodeCenterX - rectViewport.left;
+          const currentRelY = nodeCenterY - rectViewport.top;
           
+          // Calculate the delta needed to align current center with target center
+          const dx = targetX - currentRelX;
+          const dy = targetY - currentRelY;
+          
+          // Update pan by adding the screen-space delta
           setPan(prev => ({
             x: prev.x + dx,
             y: prev.y + dy
           }));
         }
-      }, 100);
+      }, 200); // 200ms is perfect to allow structural expansions to settle in DOM before measurement
       return () => clearTimeout(timer);
     }
-  }, [selectedUserId, viewMode]);
+  }, [selectedUserId, viewMode, centerTrigger]);
 
   // Auto-expand ancestors when searched or selected
   useEffect(() => {
@@ -179,18 +244,18 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     });
   };
 
-  // Multi-touch gesture states for pinch-to-zoom on mobile
+  // Multi-touch gesture states for pinch-to-zoom on desktop
   const touchDistanceStart = useRef<number | null>(null);
   const lastTouchZoom = useRef<number>(0.85);
 
-  // Drag handlers for pan (Touch/Mobile with Pinch-to-zoom)
+  // Drag handlers for pan (Touch/Mobile)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       setIsDragging(true);
       dragStart.current = { x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y };
       touchDistanceStart.current = null;
-    } else if (e.touches.length === 2) {
-      setIsDragging(false); // Stop standard panning when pinching
+    } else if (e.touches.length === 2 && !isMobile) {
+      setIsDragging(false); // Stop standard panning when pinching on desktop
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -202,11 +267,16 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 1 && isDragging) {
+      // Prevent default page scrolling only if dragging inside the canvas
+      // This stops the body/page from bouncing and fighting with the drag gesture!
+      if (e.cancelable) {
+        e.preventDefault();
+      }
       setPan({
         x: e.touches[0].clientX - dragStart.current.x,
         y: e.touches[0].clientY - dragStart.current.y
       });
-    } else if (e.touches.length === 2 && touchDistanceStart.current !== null) {
+    } else if (e.touches.length === 2 && touchDistanceStart.current !== null && !isMobile) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -222,6 +292,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
   };
 
   const handleWheel = (e: React.WheelEvent) => {
+    if (isMobile) return; // Prevent erratic trackpad wheel zoom on mobile/tablets
     const zoomIntensity = 0.05;
     const delta = e.deltaY < 0 ? 1 : -1;
     setZoom(prev => Math.min(1.2, Math.max(0.65, prev + delta * zoomIntensity)));
@@ -229,8 +300,8 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
   const resetPanAndZoom = () => {
     if (window.innerWidth < 768) {
-      setZoom(0.85);
-      setPan({ x: 0, y: 30 });
+      setZoom(0.9);
+      setPan({ x: 0, y: 15 });
     } else {
       setZoom(1.0);
       setPan({ x: 0, y: 10 });
@@ -238,6 +309,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
   };
 
   const adjustZoom = (amount: number) => {
+    if (isMobile) return; // Lock zoom on mobile devices
     setZoom(prev => Math.min(1.2, Math.max(0.65, prev + amount)));
   };
 
@@ -251,6 +323,15 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     return 'from-emerald-500 to-emerald-600 text-white shadow-emerald-200';
   };
 
+  const getDesignationTheme = (designation?: string) => {
+    const d = designation?.toUpperCase() || '';
+    if (d.includes('CROWN')) return { border: 'border-amber-400', text: 'text-amber-800', bg: 'bg-amber-50/70' };
+    if (d.includes('PLATINUM')) return { border: 'border-slate-400', text: 'text-slate-800', bg: 'bg-slate-50/70' };
+    if (d.includes('GOLD') || d.includes('GM')) return { border: 'border-yellow-400', text: 'text-yellow-800', bg: 'bg-yellow-50/70' };
+    if (d.includes('SILVER') || d.includes('MANAGER')) return { border: 'border-teal-400', text: 'text-teal-800', bg: 'bg-teal-50/70' };
+    return { border: 'border-emerald-400', text: 'text-emerald-800', bg: 'bg-emerald-50/70' };
+  };
+
   // Recursive Directory Tree (LIST View)
   const renderTreeNodeList = (user: User, level: number = 0) => {
     const directChildren = users.filter(u => u.sponsorId === user.id);
@@ -259,6 +340,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     const isSelected = selectedUserId === user.id;
     const totalDownlines = getDownlineCount(user.id);
     const networkVolume = getNetworkVolume(user.id);
+    const theme = getDesignationTheme(user.designation);
 
     const matchesSearch = searchQuery 
       ? user.name.toLowerCase().includes(searchQuery.toLowerCase()) || user.id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -281,25 +363,42 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
         <div className="pt-2 pb-1">
           <div
-            onClick={() => handleNodeClick(user.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNodeClick(user.id);
+              if (hasChildren) {
+                setExpandedNodes(prev => ({
+                  ...prev,
+                  [user.id]: !prev[user.id]
+                }));
+              }
+            }}
             className={`
-              flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer max-w-2xl
+              flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer max-w-2xl relative overflow-hidden
               ${isSelected 
-                ? 'border-emerald-600 bg-emerald-55 shadow-sm ring-2 ring-emerald-600/25' 
+                ? 'border-emerald-600 bg-emerald-50/10 shadow-sm ring-2 ring-emerald-600/25' 
                 : matchesSearch 
                   ? 'border-amber-500 bg-amber-50/20'
                   : 'border-stone-200 bg-white hover:border-emerald-300 hover:bg-stone-50'
               }
             `}
           >
-            <div className="flex items-center gap-3">
+            {/* Color-coded indicator bar based on rank */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b ${getDesignationColorClasses(user.designation)}`} />
+
+            <div className="flex items-center gap-3 pl-1.5">
               {hasChildren ? (
                 <button
-                  onClick={(e) => toggleExpand(user.id, e)}
-                  className="p-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-500 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpand(user.id, e);
+                  }}
+                  className={`p-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-500 transition-transform duration-200 ${
+                    isExpanded ? 'rotate-0' : '-rotate-90'
+                  }`}
                   aria-label={isExpanded ? 'Collapse downlines' : 'Expand downlines'}
                 >
-                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  <ChevronDown className="w-3.5 h-3.5" />
                 </button>
               ) : (
                 <div className="w-5.5 h-5.5 flex items-center justify-center">
@@ -309,25 +408,26 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
               <div>
                 <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-stone-900 text-sm">{user.name}</h4>
-                  <span className="text-[11px] font-mono font-medium text-emerald-700 px-1.5 py-0.5 rounded-md bg-emerald-50">
+                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-stone-300'}`} />
+                  <h4 className="font-semibold text-stone-900 text-sm tracking-tight">{user.name}</h4>
+                  <span className="text-[10px] font-mono font-bold text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">
                     {user.id}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800">
+                  <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${theme.border} ${theme.bg} ${theme.text}`}>
                     {user.designation || 'Associate'}
                   </span>
-                  <span className="text-[10.5px] text-stone-500 flex items-center gap-0.5">
-                    <Users className="w-3 h-3" /> {totalDownlines} Downlines
+                  <span className="text-[10px] text-stone-500 font-semibold flex items-center gap-0.5">
+                    <Users className="w-3 h-3 text-stone-400" /> {totalDownlines} Downlines
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-2.5 sm:mt-0 pt-2.5 sm:pt-0 sm:text-right border-t sm:border-t-0 border-stone-100 flex justify-between sm:block">
-              <span className="text-[10px] uppercase tracking-wider font-medium text-stone-400 block">Network Vol.</span>
-              <span className="font-mono font-bold text-stone-800 text-xs sm:text-sm">
+            <div className="mt-2.5 sm:mt-0 pt-2.5 sm:pt-0 sm:text-right border-t sm:border-t-0 border-stone-100 flex justify-between sm:block pl-1.5 sm:pl-0">
+              <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block font-sans">Network Vol.</span>
+              <span className="font-mono font-extrabold text-stone-800 text-xs sm:text-sm">
                 {Math.round(networkVolume).toLocaleString()} PTS
               </span>
             </div>
@@ -349,12 +449,13 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
       const hasChildren = directChildren.length > 0;
       const isExpanded = !!expandedNodes[user.id];
       const isSelected = selectedUserId === user.id;
-      const totalDownlines = getDownlineCount(user.id);
-      const networkVolume = getNetworkVolume(user.id);
 
       const matchesSearch = searchQuery 
         ? user.name.toLowerCase().includes(searchQuery.toLowerCase()) || user.id.toLowerCase().includes(searchQuery.toLowerCase())
         : false;
+
+      // Highlight the lines connecting the selected node back to the root
+      const parentHighlighted = isLineHighlighted(user.id);
 
       return (
         <div key={user.id} className="flex flex-col items-center flex-shrink-0" id={`mlm-node-${user.id}`}>
@@ -365,10 +466,10 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
               className={`
                 w-auto min-w-[4.5rem] max-w-[12rem] bg-white border rounded-lg p-1.5 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col items-center text-center gap-1.5 relative whitespace-nowrap
                 ${isSelected 
-                  ? 'border-emerald-600 bg-emerald-50/5 ring-2 ring-emerald-600/30 shadow-md shadow-emerald-100' 
+                  ? 'border-emerald-600 bg-emerald-55 shadow-sm ring-2 ring-emerald-600/25' 
                   : matchesSearch 
-                    ? 'border-amber-500 bg-amber-50/10 ring-2 ring-amber-500/20'
-                    : 'border-stone-200 hover:border-emerald-400'
+                    ? 'border-amber-500 bg-amber-50/20'
+                    : 'border-stone-200 bg-white hover:border-emerald-300 hover:bg-stone-50'
                 }
               `}
             >
@@ -393,7 +494,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
               <button
                 onClick={(e) => toggleExpand(user.id, e)}
                 className={`
-                  absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-5.5 h-5.5 rounded-full border border-stone-200 bg-white hover:bg-stone-50 hover:border-emerald-400 text-stone-500 shadow-xs flex items-center justify-center transition-all z-10
+                  absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-5.5 h-5.5 rounded-full border border-stone-200 bg-white hover:bg-stone-50 hover:border-emerald-400 text-stone-500 shadow-xs flex items-center justify-center transition-all z-10 cursor-pointer
                   ${isExpanded ? 'text-emerald-600 hover:text-emerald-700' : 'text-stone-500'}
                 `}
                 aria-label={isExpanded ? 'Collapse tree branch' : 'Expand tree branch'}
@@ -428,82 +529,95 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
                 />
               )}
 
-              {directChildren.map((child) => (
-                <div key={child.id} className="relative flex flex-col items-center">
-                  {/* Vertical drop line connected to the horizontal bridge */}
-                  <div className="w-px h-3 sm:h-5 bg-stone-300 absolute top-0" />
-                  
-                  {/* Recurse to render grandchildren */}
-                  {renderMLMNode(child)}
-                </div>
-              ))}
+              {directChildren.map((child) => {
+                return (
+                  <div key={child.id} className="relative flex flex-col items-center">
+                    {/* Vertical drop line connected to the horizontal bridge */}
+                    <div className="w-px h-3 sm:h-5 bg-stone-300 absolute top-0" />
+                    
+                    {/* Recurse to render grandchildren */}
+                    <div className="pt-3 sm:pt-5">
+                      {renderMLMNode(child)}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
       </div>
-    );
-  };
+      );
+    };
 
   const selectedUser = users.find(u => u.id === selectedUserId);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Primary Tree Canvas */}
-      <div className="lg:col-span-2 bg-white rounded-2xl border border-stone-250 p-4 sm:p-5 shadow-xs flex flex-col h-[680px] md:h-[650px] lg:h-[700px]">
-        {/* Toolbar Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-150 z-10 bg-white">
-          <div>
-            <h3 className="font-bold text-stone-900 flex items-center gap-2 text-base font-serif">
-              <Network className="w-5 h-5 text-emerald-800" /> SBR Referral Organigram
-            </h3>
-            <p className="text-xs text-stone-500 mt-1">
-              Select any node to inspect metrics. Use controls or drag canvas to explore the MLM structure.
-            </p>
+      <div className={`
+        ${isFullscreen 
+          ? 'fixed inset-0 z-[100] bg-white p-4 sm:p-6 flex flex-col w-screen h-screen overflow-hidden' 
+          : 'lg:col-span-2 bg-white rounded-2xl border border-stone-250 p-4 sm:p-5 shadow-xs flex flex-col h-[680px] md:h-[650px] lg:h-[700px]'
+        }
+      `}>
+        {/* Fullscreen Header banner */}
+        {isFullscreen && (
+          <div className="bg-stone-50 border-b border-stone-200 px-4 py-3 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="font-extrabold text-stone-900 text-xs sm:text-sm uppercase tracking-wider font-sans">
+                Full-Screen SBR referral Organigram
+              </h3>
+            </div>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-850 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md flex items-center gap-1.5"
+            >
+              <Minimize2 className="w-3.5 h-3.5" /> Close Fullscreen
+            </button>
           </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* View Mode Toggle */}
-            <div className="inline-flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
-              <button
-                onClick={() => setViewMode('MLM')}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                  viewMode === 'MLM' 
-                    ? 'bg-white text-emerald-950 shadow-xs border border-stone-200/50' 
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                <Network className="w-3.5 h-3.5" /> MLM Tree
-              </button>
-              <button
-                onClick={() => setViewMode('LIST')}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                  viewMode === 'LIST' 
-                    ? 'bg-white text-emerald-950 shadow-xs border border-stone-200/50' 
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                <List className="w-3.5 h-3.5" /> List View
-              </button>
+        {/* Toolbar Header (rendered only when NOT fullscreen or as custom title inside fullscreen) */}
+        {!isFullscreen && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-150 z-10 bg-white">
+            <div>
+              <h3 className="font-bold text-stone-900 flex items-center gap-2 text-base font-serif">
+                <Network className="w-5 h-5 text-emerald-800" /> SBR Referral Organigram
+              </h3>
+              <p className="text-xs text-stone-500 mt-1">
+                Select any node to inspect metrics. Touch & drag canvas to explore.
+              </p>
             </div>
 
-            {/* Search Input */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search partner by name/ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 w-full sm:w-52 text-xs rounded-lg border border-stone-200 outline-none focus:ring-2 focus:ring-emerald-800/20 transition-all bg-stone-50/50 focus:bg-white"
-              />
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-stone-400" />
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Fullscreen Button */}
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/50 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-emerald-800" /> Fullscreen View
+              </button>
+
+              {/* Search Input */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search partner by ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 w-full sm:w-52 text-xs rounded-lg border border-stone-200 outline-none focus:ring-2 focus:ring-emerald-800/20 transition-all bg-stone-50/50 focus:bg-white"
+                />
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-stone-400" />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Dynamic Canvas Container */}
-        {viewMode === 'MLM' ? (
-          <div className="relative flex-1 bg-stone-50/40 rounded-xl border border-stone-100 overflow-hidden mt-4">
-            {/* Floating Navigation Controls */}
+        <div className="relative flex-1 bg-stone-50/40 rounded-xl border border-stone-100 overflow-hidden mt-4">
+          {/* Floating Navigation Controls */}
+          {!isMobile ? (
             <div className="absolute top-3 right-3 flex items-center gap-1 bg-white rounded-lg border border-stone-200 p-1 shadow-sm z-20">
               <button
                 onClick={() => adjustZoom(0.1)}
@@ -528,57 +642,94 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
                 <Maximize2 className="w-3.5 h-3.5" /> Fit
               </button>
             </div>
-
-            {/* Drag Help Overlay */}
-            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 text-stone-400 text-[10px] font-medium font-mono pointer-events-none z-20">
-              <Move className="w-3.5 h-3.5" /> Drag or Swipe to pan
-            </div>
-
-            {/* Interactive Tree Viewport */}
-            <div
-              ref={treeContainerRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUpOrLeave}
-              onMouseLeave={handleMouseUpOrLeave}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleMouseUpOrLeave}
-              onTouchCancel={handleMouseUpOrLeave}
-              onWheel={handleWheel}
-              className={`w-full h-full overflow-hidden select-none relative ${
-                isDragging ? 'cursor-grabbing' : 'cursor-grab'
-              }`}
-            >
-              {/* Inner container applying the pan-and-zoom transformation */}
-              <div
-                className={`absolute origin-top ${isDragging ? 'transition-none' : 'transition-all duration-500 ease-out'}`}
-                style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                  left: '50%',
-                  top: '40px',
-                  transformOrigin: 'top center'
-                }}
+          ) : (
+            /* Floating Recenter button on mobile */
+            <div className="absolute top-3 right-3 flex items-center gap-1 bg-white rounded-lg border border-stone-200 p-1.5 shadow-sm z-20">
+              <button
+                onClick={resetPanAndZoom}
+                className="p-1.5 rounded hover:bg-stone-50 text-stone-600 transition-colors flex items-center gap-1 text-[11px] font-bold"
+                title="Center View"
               >
-                {/* Centering spacer */}
-                <div className="relative -left-1/2 flex justify-center pb-20">
-                  {rootUsers.map((rootUser) => (
-                    <div key={rootUser.id} className="mx-6">
-                      {renderMLMNode(rootUser)}
-                    </div>
-                  ))}
+                <Maximize2 className="w-3.5 h-3.5 text-emerald-800" /> Center
+              </button>
+            </div>
+          )}
+
+          {/* Floating details summary in fullscreen mode */}
+          {isFullscreen && selectedUser && (
+            <div className="absolute bottom-3 right-3 w-[260px] bg-white/95 backdrop-blur-md rounded-xl border border-stone-200 p-3.5 shadow-lg z-30 animate-fade-in flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <h4 className="font-extrabold text-stone-900 text-xs truncate leading-tight w-full">{selectedUser.name}</h4>
+                <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold ${
+                  selectedUser.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-800'
+                }`}>
+                  {selectedUser.status}
+                </span>
+              </div>
+              <div className="text-[9.5px] text-stone-550 font-mono">
+                ID: <span className="font-bold text-stone-800">{selectedUser.id}</span> • Rank: <span className="font-bold text-teal-700">{selectedUser.designation || 'Associate'}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] border-t border-stone-100 pt-2 mt-1">
+                <div>
+                  <span className="text-stone-400 block text-[7.5px] uppercase font-bold">Downlines</span>
+                  <span className="font-extrabold text-stone-800">{getDownlineCount(selectedUser.id)} Partners</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-stone-400 block text-[7.5px] uppercase font-bold">Volume</span>
+                  <span className="font-mono font-extrabold text-emerald-800">{Math.round(getNetworkVolume(selectedUser.id)).toLocaleString()} PTS</span>
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          /* Directory List Mode (Expanded Scrollable List) */
-          <div className="flex-1 overflow-y-auto overflow-x-auto py-4 pr-2 custom-scrollbar mt-4">
-            <div className="space-y-2 min-w-max">
-              {rootUsers.map(rootUser => renderTreeNodeList(rootUser))}
+          )}
+
+          {/* Drag Help Overlay */}
+          {isMobile ? (
+            <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-emerald-55 border border-emerald-100 text-emerald-950 px-2 py-1 rounded-md text-[9.5px] font-semibold pointer-events-none z-20">
+              💡 Swipe to pan. Click any node card to select & expand downline.
+            </div>
+          ) : (
+            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 text-stone-400 text-[10px] font-medium font-mono pointer-events-none z-20">
+              <Move className="w-3.5 h-3.5" /> Drag or Swipe to pan
+            </div>
+          )}
+
+          {/* Interactive Tree Viewport */}
+          <div
+            ref={treeContainerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleMouseUpOrLeave}
+            onTouchCancel={handleMouseUpOrLeave}
+            onWheel={handleWheel}
+            className={`w-full h-full overflow-hidden select-none relative ${
+              isDragging ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
+          >
+            {/* Inner container applying the pan-and-zoom transformation */}
+            <div
+              className={`absolute origin-top ${isDragging ? 'transition-none' : 'transition-all duration-500 ease-out'}`}
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                left: '50%',
+                top: '40px',
+                transformOrigin: 'top center'
+              }}
+            >
+              {/* Centering spacer */}
+              <div className="relative -left-1/2 flex justify-center pb-20">
+                {rootUsers.map((rootUser) => (
+                  <div key={rootUser.id} className="mx-6">
+                    {renderMLMNode(rootUser)}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Selected Node Details Card */}
