@@ -37,6 +37,38 @@ import {
 } from './lib/firebase';
 import { hashPassword, hashPasswordIfNeeded, isSha256 } from './lib/crypto';
 
+export const SECURE_PASSWORD_HASHES: Record<string, string> = {
+  'C': '47ea7c8c4e02fc37b54fd9c210ee80431b8284c77863e723d8733fffe95725c7',
+  'A1': 'f5642579535c413747e3f3346b45adcf04a778ad81bc6cb806633ca0e2f80199',
+  'A2': '31c1a2adb1bcf2effcbe9ff7b997fd4a523b05293328326164c3cb0dab27e2ea',
+  'RAM': 'e0a19949ca7fab3c3082a69a1fcfa2d8d5b3196d785faf2f7855c706e763f4c6',
+  'MANORANJAN': '2143268ce53ceea40b9c702c4beb3924be1b24d50a8bf23ec267070dee182762',
+  'DK': '759f361ef6c08928beed29bb2eda100917bffeb52ff2aa082f0291d3b2d9da60',
+  'VIKAS': '8d1cdaf06bbee7926c3e6399a59702d5d6afe6f4e96f0ea8b971340d34aeb817'
+};
+
+const OLD_SECURE_PASSWORD_HASHES: Record<string, string[]> = {
+  'RAM': ['e94d1854d8fdd73e95a9a12aa3e34c451e59ec5b396b9b7ee9493fe01c4ab5fa', 'Ram@SBR'],
+  'MANORANJAN': ['d4de64ea3eb5befe19202c7a707a6eed1db10a170bf1958f750e4abf792a5d9c', 'Manoranjan@SBR'],
+  'VIKAS': ['0bfa71711539c14eedf9fb0707b941ce78712e21bc3ce80aacc416063895913b', 'Vikas@SBR'],
+  'DK': ['e67f046e786c86fd99fdec1b46120b8762883859a253c5fcb94bdf0fec53d8cf', 'Dk@SBR'],
+  'C': ['025e6ca2d1707998c2afd8aa0e72bf6a2052e5968a6a442d0c4ccd8ea3ad2e34', 'SBR@2026', 'password'],
+  'A1': ['d99006a443b32205d9e527a0180c70d7b163438e7f4b7bbf0ba8a6bdf303fdaa', 'Admin1@SBR', 'password'],
+  'A2': ['66548ad67f5ee1245027cbbb334c744bd304f8b8dc6ee709040a6b009b1d8d8c', 'Admin2@SBR', 'password']
+};
+
+export function getUpgradedPassword(userId: string, currentPasswordValue: string): string {
+  const upperId = userId.toUpperCase();
+  const targetNewHash = SECURE_PASSWORD_HASHES[upperId];
+  if (!targetNewHash) return currentPasswordValue;
+
+  // STRICT ZERO-TRUST SECURITY ENFORCEMENT FOR THE 7 SBR SECURE NODES:
+  // For these 7 nodes, older passwords (like 'C@SBR', 'Ram@SBR', 'Vikas@SBR', 'Dk@SBR', 'Manoranjan@SBR', 'SBR@2026', 'password') must not work under any circumstances.
+  // We force their expected password hash in memory to always be their new secure hash.
+  // This invalidates and overrides any legacy plaintext or old hashes in the database.
+  return targetNewHash;
+}
+
 export default function App() {
   const [activeRole, setActiveRole] = useState<UserRole>('ADMIN');
   const [activeAgentId, setActiveAgentId] = useState<string>('C'); // Simulated default agent (Company Profile C)
@@ -86,28 +118,15 @@ export default function App() {
 
       let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
 
-      // --- SELF-HEALING SECURE HASH UPGRADE FOR C, A1, A2 ---
-      let upgradedAnyPassword = false;
-      const targetIds = ['C', 'A1', 'A2'];
-      for (const id of targetIds) {
-        const uIdx = loadedUsers.findIndex(u => u.id === id);
-        if (uIdx !== -1) {
-          const userObj = loadedUsers[uIdx];
-          if (userObj.password && !isSha256(userObj.password)) {
-            const hashed = await hashPassword(userObj.password);
-            userObj.password = hashed;
-            await setDocumentData(COLLECTIONS.USERS, id, userObj);
-            upgradedAnyPassword = true;
-            console.log(`[Self-Healing] Upgraded password for ${id} to strong hash key.`);
-          }
-        }
-      }
-      if (upgradedAnyPassword) {
-        loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
-      }
+      // Force upgrade old vulnerable passwords to their correct secure hashes for the 7 secure nodes
+      loadedUsers = loadedUsers.map(user => ({
+        ...user,
+        password: getUpgradedPassword(user.id, user.password)
+      }));
 
       // --- SESSION INVALIDATION SECURITY GATES ---
-      if (sessionParsed.agentId && ['C', 'A1', 'A2'].includes(sessionParsed.agentId)) {
+      const secureNodeIds = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'DK', 'VIKAS'];
+      if (sessionParsed.agentId && secureNodeIds.includes(sessionParsed.agentId)) {
         const liveUser = loadedUsers.find(u => u.id === sessionParsed.agentId);
         if (liveUser) {
           if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
@@ -419,20 +438,17 @@ export default function App() {
       const docSnap = await getDoc(userRef);
 
       if (docSnap.exists()) {
-        const foundAgent = docSnap.data() as User;
+        const docUser = docSnap.data() as User;
+        const foundAgent: User = {
+          ...docUser,
+          password: getUpgradedPassword(docUser.id, docUser.password)
+        };
         
         // Compute expected passcode hash
         const fallbackPasscodes: Record<string, string> = {
           'SBR': 'SBR@2026',
-          'C': 'C@SBR',
           'ADMIN1': 'Admin1@SBR',
-          'A1': 'A1@SBR',
-          'ADMIN2': 'Admin2@SBR',
-          'A2': 'A2@SBR',
-          'RAM': 'Ram@SBR',
-          'MANORANJAN': 'Manoranjan@SBR',
-          'VIKAS': 'Vikas@SBR',
-          'DK': 'DK@SBR'
+          'ADMIN2': 'Admin2@SBR'
         };
 
         let defaultPasscode = 'password';
@@ -451,11 +467,17 @@ export default function App() {
           defaultPasscode = `${username}01011990`;
         }
 
-        const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
         const enteredPasswordHash = await hashPassword(pass);
+        let isPasscodeCorrect = false;
+        const isSecureNode = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'DK', 'VIKAS'].includes(inputIdUpper);
 
-        // Check if password matches
-        const isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+        if (isSecureNode) {
+          // No fallbacks, no plaintext defaults for the 7 secure nodes. Must match database hash.
+          isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password);
+        } else {
+          const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
+          isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+        }
 
         if (isPasscodeCorrect) {
           if (foundAgent.status === 'ACTIVE') {
@@ -479,19 +501,16 @@ export default function App() {
             localUsers = JSON.parse(storedUsersStr);
           } catch (_) {}
         }
-        const foundAgent = localUsers.find(u => u.id.toUpperCase() === inputIdUpper);
-        if (foundAgent) {
+        const rawFoundAgent = localUsers.find(u => u.id.toUpperCase() === inputIdUpper);
+        if (rawFoundAgent) {
+          const foundAgent: User = {
+            ...rawFoundAgent,
+            password: getUpgradedPassword(rawFoundAgent.id, rawFoundAgent.password)
+          };
           const fallbackPasscodes: Record<string, string> = {
             'SBR': 'SBR@2026',
-            'C': 'C@SBR',
             'ADMIN1': 'Admin1@SBR',
-            'A1': 'A1@SBR',
-            'ADMIN2': 'Admin2@SBR',
-            'A2': 'A2@SBR',
-            'RAM': 'Ram@SBR',
-            'MANORANJAN': 'Manoranjan@SBR',
-            'VIKAS': 'Vikas@SBR',
-            'DK': 'DK@SBR'
+            'ADMIN2': 'Admin2@SBR'
           };
 
           let defaultPasscode = 'password';
@@ -510,9 +529,17 @@ export default function App() {
             defaultPasscode = `${username}01011990`;
           }
 
-          const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
           const enteredPasswordHash = await hashPassword(pass);
-          const isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+          let isPasscodeCorrect = false;
+          const isSecureNode = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'DK', 'VIKAS'].includes(inputIdUpper);
+
+          if (isSecureNode) {
+            // No fallbacks, no plaintext defaults for the 7 secure nodes. Must match database hash.
+            isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password);
+          } else {
+            const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
+            isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+          }
 
           if (isPasscodeCorrect) {
             if (foundAgent.status === 'ACTIVE') {

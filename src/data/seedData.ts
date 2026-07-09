@@ -151,7 +151,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'SBRCO1234A',
     address: 'SBR Corporate Headquarters, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=150',
-    password: '52b741be183420f107e80b882a1a4635c6bbb84edb7fc5eaed1ea04590c3eb8b'
+    password: '47ea7c8c4e02fc37b54fd9c210ee80431b8284c77863e723d8733fffe95725c7'
   },
   {
     id: 'A1',
@@ -170,7 +170,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'ADMN15012A',
     address: 'SBR Office, Leg 1 Wing, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
-    password: '0d2a6e1e1ea84e3e29115d11240e13cafbda501cf8ab2c1a8bb910aaf9499456'
+    password: 'f5642579535c413747e3f3346b45adcf04a778ad81bc6cb806633ca0e2f80199'
   },
   {
     id: 'A2',
@@ -189,7 +189,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'ADMN25012B',
     address: 'SBR Office, Leg 2 Wing, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
-    password: 'b39f635e29d62a4449b82187ec4aad97a136ef6ffa4a72fe68d221fa6cfa0687'
+    password: '31c1a2adb1bcf2effcbe9ff7b997fd4a523b05293328326164c3cb0dab27e2ea'
   },
   {
     id: 'MANORANJAN',
@@ -208,7 +208,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'MANO5012B',
     address: 'HSR Layout, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
-    password: 'Manoranjan@SBR'
+    password: '2143268ce53ceea40b9c702c4beb3924be1b24d50a8bf23ec267070dee182762'
   },
   {
     id: 'RAM',
@@ -227,7 +227,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'RAMP5012A',
     address: 'Indiranagar, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-    password: 'Ram@SBR'
+    password: 'e0a19949ca7fab3c3082a69a1fcfa2d8d5b3196d785faf2f7855c706e763f4c6'
   },
   {
     id: 'DK',
@@ -246,7 +246,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'DKP5012D',
     address: 'Jayanagar, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
-    password: 'DK@SBR'
+    password: '759f361ef6c08928beed29bb2eda100917bffeb52ff2aa082f0291d3b2d9da60'
   },
   {
     id: 'VIKAS',
@@ -265,7 +265,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'VIKA5012C',
     address: 'Koramanagala, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-    password: 'Vikas@SBR'
+    password: '8d1cdaf06bbee7926c3e6399a59702d5d6afe6f4e96f0ea8b971340d34aeb817'
   }
 ];
 
