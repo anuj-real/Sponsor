@@ -124,18 +124,46 @@ export default function App() {
         password: getUpgradedPassword(user.id, user.password)
       }));
 
-      // --- SESSION INVALIDATION SECURITY GATES ---
-      const secureNodeIds = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'DK', 'VIKAS'];
-      if (sessionParsed.agentId && secureNodeIds.includes(sessionParsed.agentId)) {
-        const liveUser = loadedUsers.find(u => u.id === sessionParsed.agentId);
-        if (liveUser) {
-          if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
-            console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated due to password change.`);
-            handleLogout();
-            setDbLoading(false);
-            return;
-          }
+      // --- ZERO-TRUST SESSION INVALIDATION SECURITY GATES ---
+      if (sessionParsed.agentId) {
+        const upperAgentId = sessionParsed.agentId.toUpperCase();
+        const liveUser = loadedUsers.find(u => u.id.toUpperCase() === upperAgentId);
+        if (!liveUser) {
+          console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (User does not exist).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
         }
+
+        if (liveUser.status !== 'ACTIVE') {
+          console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Account INACTIVE).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
+        }
+
+        // Verify password hash matches perfectly
+        if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
+          console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Password changed/mismatched).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
+        }
+
+        // Verify session role matches the user's designated role
+        const isCoreAdmin = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(upperAgentId);
+        const expectedRole = (liveUser.role === 'ADMIN' && isCoreAdmin) ? 'ADMIN' : 'AGENT';
+        if (sessionParsed.role !== expectedRole) {
+          console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Role mismatch).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
+        }
+      } else {
+        console.log(`[Session Invalidation] Invalid session structure.`);
+        handleLogout();
+        setDbLoading(false);
+        return;
       }
 
       // --- SELF-HEALING LOCAL-TO-CLOUD SYNC ---
@@ -378,12 +406,6 @@ export default function App() {
         if (storedSession) {
           try {
             const parsed = JSON.parse(storedSession);
-            // Upgrade legacy agent sessions if applicable
-            if (parsed.agentId === 'SBR0005') {
-              parsed.agentId = 'C';
-              parsed.name = 'Company Profile C';
-              parsed.role = 'ADMIN';
-            }
             await loadPrivateData(parsed);
           } catch (e) {
             console.error('Error loading stored session', e);
@@ -420,16 +442,6 @@ export default function App() {
       await ensureAuthenticated();
       const inputId = identifier.trim();
       const inputIdUpper = inputId.toUpperCase();
-      const inputIdLower = inputId.toLowerCase();
-
-      // Admin verification
-      if (inputIdLower === 'admin') {
-        if (pass === 'Admin@SBRassociates') {
-          return { success: true, role: 'ADMIN', agentId: 'C', name: 'Company Profile C' };
-        } else {
-          return { success: false, errorMsg: 'Invalid Administrator credentials.' };
-        }
-      }
 
       // Fetch the specific user document directly from Firestore
       const { doc, getDoc } = await import('firebase/firestore');
