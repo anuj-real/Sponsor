@@ -151,7 +151,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'SBRCO1234A',
     address: 'SBR Corporate Headquarters, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=150',
-    password: 'C@SBR'
+    password: '52b741be183420f107e80b882a1a4635c6bbb84edb7fc5eaed1ea04590c3eb8b'
   },
   {
     id: 'A1',
@@ -170,7 +170,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'ADMN15012A',
     address: 'SBR Office, Leg 1 Wing, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
-    password: 'A1@SBR'
+    password: '0d2a6e1e1ea84e3e29115d11240e13cafbda501cf8ab2c1a8bb910aaf9499456'
   },
   {
     id: 'A2',
@@ -189,7 +189,7 @@ export const INITIAL_USERS: User[] = [
     pan: 'ADMN25012B',
     address: 'SBR Office, Leg 2 Wing, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150',
-    password: 'A2@SBR'
+    password: 'b39f635e29d62a4449b82187ec4aad97a136ef6ffa4a72fe68d221fa6cfa0687'
   },
   {
     id: 'MANORANJAN',

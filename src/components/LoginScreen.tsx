@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 
 interface LoginScreenProps {
-  onLogin: (role: UserRole, agentId?: string) => void;
-  onVerifyCredentials: (identifier: string, pass: string) => Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string }>;
+  onLogin: (role: UserRole, agentId?: string, passwordHash?: string) => void;
+  onVerifyCredentials: (identifier: string, pass: string) => Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string; passwordHash?: string }>;
 }
 
 export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScreenProps) {
@@ -35,7 +35,7 @@ export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScree
       const result = await onVerifyCredentials(identifier, password);
       setIsLoading(false);
       if (result.success) {
-        onLogin(result.role!, result.agentId);
+        onLogin(result.role!, result.agentId, result.passwordHash);
       } else {
         setErrorMsg(result.errorMsg || 'Invalid credentials.');
       }

@@ -40,7 +40,7 @@ import { hashPassword, hashPasswordIfNeeded, isSha256 } from './lib/crypto';
 export default function App() {
   const [activeRole, setActiveRole] = useState<UserRole>('ADMIN');
   const [activeAgentId, setActiveAgentId] = useState<string>('C'); // Simulated default agent (Company Profile C)
-  const [session, setSession] = useState<{ role: UserRole; agentId?: string; name: string } | null>(null);
+  const [session, setSession] = useState<{ role: UserRole; agentId?: string; name: string; passwordHash?: string } | null>(null);
   
   // Master states
   const [users, setUsers] = useState<User[]>([]);
@@ -63,7 +63,7 @@ export default function App() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
-  const loadPrivateData = async (sessionParsed: { role: UserRole; agentId?: string; name: string }) => {
+  const loadPrivateData = async (sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string }) => {
     setDbLoading(true);
     try {
       await ensureAuthenticated();
@@ -85,6 +85,39 @@ export default function App() {
       setProjects(loadedProjects);
 
       let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+
+      // --- SELF-HEALING SECURE HASH UPGRADE FOR C, A1, A2 ---
+      let upgradedAnyPassword = false;
+      const targetIds = ['C', 'A1', 'A2'];
+      for (const id of targetIds) {
+        const uIdx = loadedUsers.findIndex(u => u.id === id);
+        if (uIdx !== -1) {
+          const userObj = loadedUsers[uIdx];
+          if (userObj.password && !isSha256(userObj.password)) {
+            const hashed = await hashPassword(userObj.password);
+            userObj.password = hashed;
+            await setDocumentData(COLLECTIONS.USERS, id, userObj);
+            upgradedAnyPassword = true;
+            console.log(`[Self-Healing] Upgraded password for ${id} to strong hash key.`);
+          }
+        }
+      }
+      if (upgradedAnyPassword) {
+        loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
+      }
+
+      // --- SESSION INVALIDATION SECURITY GATES ---
+      if (sessionParsed.agentId && ['C', 'A1', 'A2'].includes(sessionParsed.agentId)) {
+        const liveUser = loadedUsers.find(u => u.id === sessionParsed.agentId);
+        if (liveUser) {
+          if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
+            console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated due to password change.`);
+            handleLogout();
+            setDbLoading(false);
+            return;
+          }
+        }
+      }
 
       // --- SELF-HEALING LOCAL-TO-CLOUD SYNC ---
       const storedUsersStr = localStorage.getItem('SBR_USERS');
@@ -363,7 +396,7 @@ export default function App() {
   }, [dbLoading, session, users, projects, sales, payouts, config, notifications, userLogs]);
 
   // Secure credential verification callback called asynchronously by LoginScreen
-  const handleVerifyCredentials = async (identifier: string, pass: string): Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string }> => {
+  const handleVerifyCredentials = async (identifier: string, pass: string): Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string; passwordHash?: string }> => {
     try {
       await ensureAuthenticated();
       const inputId = identifier.trim();
@@ -430,7 +463,7 @@ export default function App() {
 
             const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
             const role = isAdminNode ? 'ADMIN' : 'AGENT';
-            return { success: true, role, agentId: foundAgent.id, name: foundAgent.name };
+            return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password };
           } else {
             return { success: false, errorMsg: 'Access Blocked: This account has been marked INACTIVE by Admin.' };
           }
@@ -485,7 +518,7 @@ export default function App() {
             if (foundAgent.status === 'ACTIVE') {
               const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
               const role = isAdminNode ? 'ADMIN' : 'AGENT';
-              return { success: true, role, agentId: foundAgent.id, name: foundAgent.name };
+              return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password };
             } else {
               return { success: false, errorMsg: 'Access Blocked: This account has been marked INACTIVE by Admin.' };
             }
@@ -501,7 +534,7 @@ export default function App() {
     }
   };
 
-  const handleLogin = async (role: UserRole, agentId?: string) => {
+  const handleLogin = async (role: UserRole, agentId?: string, passwordHash?: string) => {
     let name = '';
     let resolvedAgentId = agentId || 'C';
     if (role === 'ADMIN' && !agentId) {
@@ -521,7 +554,7 @@ export default function App() {
       name = 'SBR Administrator';
     }
 
-    const newSession = { role, agentId: resolvedAgentId, name };
+    const newSession = { role, agentId: resolvedAgentId, name, passwordHash };
     localStorage.setItem('SBR_SESSION', JSON.stringify(newSession));
     await loadPrivateData(newSession);
   };
@@ -1006,6 +1039,13 @@ export default function App() {
       // Update locally
       const updatedUsers = users.map(u => u.id === userId ? updatedUser : u);
       setUsers(updatedUsers);
+
+      // Keep own session active if changing own password, but other devices will be forced to log out
+      if (session && session.agentId === userId) {
+        const updatedSession = { ...session, passwordHash: hashedPass };
+        localStorage.setItem('SBR_SESSION', JSON.stringify(updatedSession));
+        setSession(updatedSession);
+      }
       
       setPasswordSuccess("Password updated successfully! This change is now secure in SBR Cloud Core.");
       setTimeout(() => {
@@ -1037,6 +1077,13 @@ export default function App() {
       const updatedUser = { ...userToUpdate, ...updatedFields };
       await setDocumentData(COLLECTIONS.USERS, userId, updatedUser);
       setUsers(prevUsers => prevUsers.map(u => u.id === userId ? updatedUser : u));
+
+      // Keep own session active if changing own password through admin settings
+      if (session && session.agentId === userId && updatedFields.password) {
+        const updatedSession = { ...session, passwordHash: updatedFields.password };
+        localStorage.setItem('SBR_SESSION', JSON.stringify(updatedSession));
+        setSession(updatedSession);
+      }
     } catch (e: any) {
       console.error(e);
       throw new Error(e.message || "Failed to update broker credentials.");
