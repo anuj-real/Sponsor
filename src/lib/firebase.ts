@@ -157,15 +157,17 @@ export async function seedDatabase(initialData: {
     console.log('Seeding completed successfully!');
     return initialData;
   } else {
-    // Database is already populated, fetch and return actual database state
-    console.log('Database already initialized. Fetching documents...');
-    const users = await getCollectionData<any>(COLLECTIONS.USERS);
-    const projects = await getCollectionData<any>(COLLECTIONS.PROJECTS);
-    const sales = await getCollectionData<any>(COLLECTIONS.SALES);
-    const payouts = await getCollectionData<any>(COLLECTIONS.PAYOUTS);
-    const notifs = await getCollectionData<any>(COLLECTIONS.NOTIFICATIONS);
+    // Database is already populated, fetch and return actual database state in parallel
+    console.log('Database already initialized. Fetching documents in parallel...');
+    const [users, projects, sales, payouts, notifs, configSnapshot] = await Promise.all([
+      getCollectionData<any>(COLLECTIONS.USERS),
+      getCollectionData<any>(COLLECTIONS.PROJECTS),
+      getCollectionData<any>(COLLECTIONS.SALES),
+      getCollectionData<any>(COLLECTIONS.PAYOUTS),
+      getCollectionData<any>(COLLECTIONS.NOTIFICATIONS),
+      getDocs(collection(db, COLLECTIONS.CONFIG))
+    ]);
     
-    const configSnapshot = await getDocs(collection(db, COLLECTIONS.CONFIG));
     let config = initialData.config;
     if (!configSnapshot.empty) {
       config = configSnapshot.docs[0].data();

@@ -95,12 +95,15 @@ export default function App() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
-  const loadPrivateData = async (sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string }) => {
+  const loadPrivateData = async (
+    sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string },
+    preloadedData?: any
+  ) => {
     setDbLoading(true);
     try {
       await ensureAuthenticated();
       
-      const data = await seedDatabase({
+      const data = preloadedData || await seedDatabase({
         users: INITIAL_USERS,
         projects: INITIAL_PROJECTS,
         sales: INITIAL_SALES,
@@ -143,7 +146,9 @@ export default function App() {
         }
 
         // Verify password hash matches perfectly
-        if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
+        const sessionPasswordHash = sessionParsed.passwordHash || '';
+        const livePasswordHash = liveUser.password || 'DEFAULT';
+        if (sessionPasswordHash !== livePasswordHash) {
           console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Password changed/mismatched).`);
           handleLogout();
           setDbLoading(false);
@@ -176,10 +181,10 @@ export default function App() {
               localU => localU && localU.id && !loadedUsers.some(cloudU => cloudU.id === localU.id)
             );
             if (missingUsersInFirestore.length > 0) {
-              for (const localUser of missingUsersInFirestore) {
+              await Promise.all(missingUsersInFirestore.map(async (localUser) => {
                 await setDocumentData(COLLECTIONS.USERS, localUser.id, localUser);
                 loadedUsers.push(localUser);
-              }
+              }));
               loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
             }
           }
@@ -198,10 +203,10 @@ export default function App() {
               localS => localS && localS.id && !loadedSales.some(cloudS => cloudS.id === localS.id)
             );
             if (missingSalesInFirestore.length > 0) {
-              for (const localSale of missingSalesInFirestore) {
+              await Promise.all(missingSalesInFirestore.map(async (localSale) => {
                 await setDocumentData(COLLECTIONS.SALES, localSale.id, localSale);
                 loadedSales.push(localSale);
-              }
+              }));
             }
           }
         } catch (err) {
@@ -219,9 +224,9 @@ export default function App() {
               localN => localN && localN.id && !currentCloudNotifs.some(cloudN => cloudN.id === localN.id)
             );
             if (missingNotifsInFirestore.length > 0) {
-              for (const localNotif of missingNotifsInFirestore) {
+              await Promise.all(missingNotifsInFirestore.map(async (localNotif) => {
                 await setDocumentData(COLLECTIONS.NOTIFICATIONS, localNotif.id, localNotif);
-              }
+              }));
             }
           }
         } catch (err) {
@@ -406,12 +411,24 @@ export default function App() {
         if (storedSession) {
           try {
             const parsed = JSON.parse(storedSession);
-            await loadPrivateData(parsed);
+            await loadPrivateData(parsed, data);
           } catch (e) {
             console.error('Error loading stored session', e);
             setDbLoading(false);
           }
         } else {
+          // If no stored session, populate initial public states from fetched data
+          const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
+          setSales(loadedSales);
+          setNotifications(data.notifications || INITIAL_NOTIFICATIONS);
+          
+          let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+          loadedUsers = loadedUsers.map(user => ({
+            ...user,
+            password: getUpgradedPassword(user.id, user.password)
+          }));
+          setUsers(loadedUsers);
+
           setDbLoading(false);
         }
       } catch (error) {
@@ -487,8 +504,16 @@ export default function App() {
           // No fallbacks, no plaintext defaults for the 7 secure nodes. Must match database hash.
           isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password);
         } else {
-          const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
-          isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+          // For non-secure/channel-partner users, we allow:
+          // 1. Stored custom password hash (if defined)
+          // 2. DOB-based passcode (e.g. SBR001222071989) case-insensitively
+          // 3. General fallback passcode 'password' case-insensitively
+          // 4. The Username itself case-insensitively
+          isPasscodeCorrect = 
+            (!!foundAgent.password && enteredPasswordHash === foundAgent.password) ||
+            (pass.toUpperCase() === defaultPasscode.toUpperCase()) ||
+            (pass.toUpperCase() === 'PASSWORD') ||
+            (pass.toUpperCase() === inputIdUpper);
         }
 
         if (isPasscodeCorrect) {
@@ -497,7 +522,7 @@ export default function App() {
 
             const isAdminNode = foundAgent.role === 'ADMIN' && ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(foundAgent.id.toUpperCase());
             const role = isAdminNode ? 'ADMIN' : 'AGENT';
-            return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password };
+            return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password || 'DEFAULT' };
           } else {
             return { success: false, errorMsg: 'Access Blocked: This account has been marked INACTIVE by Admin.' };
           }
@@ -549,15 +574,23 @@ export default function App() {
             // No fallbacks, no plaintext defaults for the 7 secure nodes. Must match database hash.
             isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password);
           } else {
-            const expectedPlaintextPasscode = foundAgent.password || fallbackPasscodes[foundAgent.id.toUpperCase()] || defaultPasscode;
-            isPasscodeCorrect = (pass === expectedPlaintextPasscode) || (enteredPasswordHash === foundAgent.password);
+            // For non-secure/channel-partner users, we allow:
+            // 1. Stored custom password hash (if defined)
+            // 2. DOB-based passcode (e.g. SBR001222071989) case-insensitively
+            // 3. General fallback passcode 'password' case-insensitively
+            // 4. The Username itself case-insensitively
+            isPasscodeCorrect = 
+              (!!foundAgent.password && enteredPasswordHash === foundAgent.password) ||
+              (pass.toUpperCase() === defaultPasscode.toUpperCase()) ||
+              (pass.toUpperCase() === 'PASSWORD') ||
+              (pass.toUpperCase() === inputIdUpper);
           }
 
           if (isPasscodeCorrect) {
             if (foundAgent.status === 'ACTIVE') {
               const isAdminNode = foundAgent.role === 'ADMIN' && ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(foundAgent.id.toUpperCase());
               const role = isAdminNode ? 'ADMIN' : 'AGENT';
-              return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password };
+              return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password || 'DEFAULT' };
             } else {
               return { success: false, errorMsg: 'Access Blocked: This account has been marked INACTIVE by Admin.' };
             }
