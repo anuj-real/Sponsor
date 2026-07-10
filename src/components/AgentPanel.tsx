@@ -15,7 +15,6 @@ interface AgentPanelProps {
   config: MLMConfig;
   projects?: RealEstateProject[];
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
-  onLogout?: () => void;
 }
 
 export default function AgentPanel({
@@ -28,8 +27,7 @@ export default function AgentPanel({
   onClearNotification,
   config,
   projects = [],
-  onUpdateUserProfile,
-  onLogout
+  onUpdateUserProfile
 }: AgentPanelProps) {
   const [copied, setCopied] = useState(false);
   const [activePanelTab, setActivePanelTab] = useState<'LEDGER' | 'INVENTORY'>('LEDGER');
@@ -138,8 +136,8 @@ export default function AgentPanel({
     return (rankMap[statusA] || 3) - (rankMap[statusB] || 3);
   });
 
-  // Active broker profile - STRICT CHECK WITHOUT FALLBACKS
-  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase());
+  // Active broker profile
+  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase()) || users[0];
 
   // Sync profile form states
   useEffect(() => {
@@ -156,39 +154,6 @@ export default function AgentPanel({
       setIsProfileExpanded(false);
     }
   }, [agent, isProfileOpen]);
-
-  if (activeAgentId && !agent) {
-    return (
-      <div className="max-w-md mx-auto my-12 bg-white border border-rose-200 rounded-2xl p-6 sm:p-8 text-center shadow-lg space-y-6">
-        <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center mx-auto text-rose-600 border border-rose-100">
-          <ShieldAlert className="w-8 h-8 animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-bold text-stone-900 font-serif">Security Gateway Error</h3>
-          <p className="text-stone-600 text-xs leading-relaxed">
-            Your User ID <strong className="text-rose-800 font-mono">{activeAgentId}</strong> was not found in the live SBR organization directory.
-          </p>
-          <p className="text-stone-500 text-[11px] leading-relaxed">
-            Strict security guidelines prohibit automatic fallback or default account access. Please authenticate with a valid SBR partner profile or contact technical support.
-          </p>
-        </div>
-        <div className="border-t border-stone-100 pt-5 flex flex-col gap-2.5">
-          <div className="text-[10.5px] text-stone-500 font-mono">
-            Support Desk: helpdesk@propspire.in
-          </div>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="w-full py-2.5 bg-stone-900 hover:bg-stone-950 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Exit Gateway & Log In</span>
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();

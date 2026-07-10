@@ -337,32 +337,6 @@ export default function App() {
       let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
       let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
 
-      // --- ZERO-TRUST SESSION INVALIDATION SECURITY GATES FOR LOCAL FALLBACK ---
-      if (sessionParsed.agentId) {
-        const upperAgentId = sessionParsed.agentId.toUpperCase();
-        const liveUser = localUsers.find(u => u.id.toUpperCase() === upperAgentId);
-        if (!liveUser) {
-          console.log(`[Session Invalidation - Local Fallback] Active session for ${sessionParsed.agentId} has been invalidated (User does not exist locally).`);
-          handleLogout();
-          setDbLoading(false);
-          return;
-        }
-
-        if (liveUser.status !== 'ACTIVE') {
-          console.log(`[Session Invalidation - Local Fallback] Active session for ${sessionParsed.agentId} has been invalidated (Account INACTIVE locally).`);
-          handleLogout();
-          setDbLoading(false);
-          return;
-        }
-
-        if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
-          console.log(`[Session Invalidation - Local Fallback] Active session for ${sessionParsed.agentId} has been invalidated (Password changed/mismatched locally).`);
-          handleLogout();
-          setDbLoading(false);
-          return;
-        }
-      }
-
       const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
       const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
 
@@ -591,7 +565,7 @@ export default function App() {
             return { success: false, errorMsg: 'Invalid passcode. Please try again.' };
           }
         }
-        return { success: false, errorMsg: 'User ID not found or contact support. Falling back to default accounts is strictly prohibited.' };
+        return { success: false, errorMsg: 'Account ID not recognized.' };
       }
     } catch (e: any) {
       console.error(e);
@@ -1366,7 +1340,6 @@ export default function App() {
               config={config}
               projects={projects}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
-              onLogout={handleLogout}
             />
           </div>
         )}
