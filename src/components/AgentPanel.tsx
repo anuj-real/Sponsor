@@ -15,6 +15,7 @@ interface AgentPanelProps {
   config: MLMConfig;
   projects?: RealEstateProject[];
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
+  onLogout?: () => void;
 }
 
 export default function AgentPanel({
@@ -27,7 +28,8 @@ export default function AgentPanel({
   onClearNotification,
   config,
   projects = [],
-  onUpdateUserProfile
+  onUpdateUserProfile,
+  onLogout
 }: AgentPanelProps) {
   const [copied, setCopied] = useState(false);
   const [activePanelTab, setActivePanelTab] = useState<'LEDGER' | 'INVENTORY'>('LEDGER');
@@ -136,8 +138,8 @@ export default function AgentPanel({
     return (rankMap[statusA] || 3) - (rankMap[statusB] || 3);
   });
 
-  // Active broker profile
-  const agent = users.find(u => u.id === activeAgentId) || users[0];
+  // Active broker profile - STRICT CHECK WITHOUT FALLBACKS
+  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase());
 
   // Sync profile form states
   useEffect(() => {
@@ -154,6 +156,39 @@ export default function AgentPanel({
       setIsProfileExpanded(false);
     }
   }, [agent, isProfileOpen]);
+
+  if (activeAgentId && !agent) {
+    return (
+      <div className="max-w-md mx-auto my-12 bg-white border border-rose-200 rounded-2xl p-6 sm:p-8 text-center shadow-lg space-y-6">
+        <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center mx-auto text-rose-600 border border-rose-100">
+          <ShieldAlert className="w-8 h-8 animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-bold text-stone-900 font-serif">Security Gateway Error</h3>
+          <p className="text-stone-600 text-xs leading-relaxed">
+            Your User ID <strong className="text-rose-800 font-mono">{activeAgentId}</strong> was not found in the live SBR organization directory.
+          </p>
+          <p className="text-stone-500 text-[11px] leading-relaxed">
+            Strict security guidelines prohibit automatic fallback or default account access. Please authenticate with a valid SBR partner profile or contact technical support.
+          </p>
+        </div>
+        <div className="border-t border-stone-100 pt-5 flex flex-col gap-2.5">
+          <div className="text-[10.5px] text-stone-500 font-mono">
+            Support Desk: helpdesk@propspire.in
+          </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-full py-2.5 bg-stone-900 hover:bg-stone-950 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Exit Gateway & Log In</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +236,7 @@ export default function AgentPanel({
 
   // Get recursive downline partners list
   const getDownlineList = (userId: string, level: number = 1): { user: User; relativeLevel: number }[] => {
-    const directRecruits = users.filter(u => u.sponsorId === userId);
+    const directRecruits = users.filter(u => u.sponsorId?.toUpperCase() === userId?.toUpperCase());
     let list = directRecruits.map(u => ({ user: u, relativeLevel: level }));
     
     directRecruits.forEach(u => {
@@ -785,7 +820,7 @@ export default function AgentPanel({
               ) : (config.leadershipConfigs || []).length === 0 ? (
                 <p className="text-xs text-stone-400 italic">No team designation tracks set up.</p>
               ) : (() => {
-                const directRecruitsCount = users.filter(u => u.sponsorId === agent.id).length;
+                const directRecruitsCount = users.filter(u => u.sponsorId?.toUpperCase() === agent.id?.toUpperCase()).length;
                 const teamMembersCount = downlineNetwork.length;
                 const designationRanks = ['Associate', 'Manager', 'Sr. Manager', 'AGM', 'GM', 'Sr. GM'] as const;
                 const currentRankIdx = designationRanks.indexOf((agent.designation as any) || 'Associate');
@@ -1173,7 +1208,7 @@ export default function AgentPanel({
                         <div>
                           <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Upstream Sponsor</label>
                           <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
-                            <span>{users.find(u => u.id === agent.sponsorId)?.name ? `${users.find(u => u.id === agent.sponsorId)?.name} (${agent.sponsorId})` : (agent.sponsorId || 'SBR Root Core')}</span>
+                            <span>{users.find(u => u.id?.toUpperCase() === agent.sponsorId?.toUpperCase())?.name ? `${users.find(u => u.id?.toUpperCase() === agent.sponsorId?.toUpperCase())?.name} (${agent.sponsorId})` : (agent.sponsorId || 'SBR Root Core')}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
                         </div>

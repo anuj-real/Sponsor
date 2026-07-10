@@ -60,18 +60,18 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
   }, [isFullscreen]);
 
   // Find root users (users who do not have an active sponsor in the system)
-  const rootUsers = users.filter(u => !u.sponsorId || !users.some(parent => parent.id === u.sponsorId));
+  const rootUsers = users.filter(u => !u.sponsorId || !users.some(parent => parent.id?.toUpperCase() === u.sponsorId?.toUpperCase()));
 
   // Get dynamic downline counts
   const getDownlineCount = (userId: string): number => {
-    const directChildren = users.filter(u => u.sponsorId === userId);
+    const directChildren = users.filter(u => u.sponsorId?.toUpperCase() === userId?.toUpperCase());
     return directChildren.length + directChildren.reduce((acc, child) => acc + getDownlineCount(child.id), 0);
   };
 
   // Get total network sales value
   const getNetworkVolume = (userId: string): number => {
-    const directSales = users.find(u => u.id === userId)?.totalDirectSales || 0;
-    const directChildren = users.filter(u => u.sponsorId === userId);
+    const directSales = users.find(u => u.id?.toUpperCase() === userId?.toUpperCase())?.totalDirectSales || 0;
+    const directChildren = users.filter(u => u.sponsorId?.toUpperCase() === userId?.toUpperCase());
     const subVolume = directChildren.reduce((acc, child) => acc + getNetworkVolume(child.id), 0);
     return directSales + subVolume;
   };
@@ -79,13 +79,13 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
   // Helper to highlight lineage path for the selected node
   const isLineHighlighted = (parentUserId: string) => {
     if (!selectedUserId) return false;
-    if (selectedUserId === parentUserId) return true;
+    if (selectedUserId?.toUpperCase() === parentUserId?.toUpperCase()) return true;
     
     // Check if selectedUser is a descendant of parentUserId
-    let current = users.find(u => u.id === selectedUserId);
+    let current = users.find(u => u.id?.toUpperCase() === selectedUserId?.toUpperCase());
     while (current) {
-      if (current.sponsorId === parentUserId) return true;
-      current = users.find(u => u.id === current.sponsorId);
+      if (current.sponsorId?.toUpperCase() === parentUserId?.toUpperCase()) return true;
+      current = users.find(u => u.id?.toUpperCase() === current.sponsorId?.toUpperCase());
     }
     return false;
   };
@@ -205,7 +205,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
             let current = user;
             while (current && current.sponsorId) {
               next[current.sponsorId] = true;
-              current = users.find(u => u.id === current.sponsorId)!;
+              current = users.find(u => u.id?.toUpperCase() === current.sponsorId?.toUpperCase())!;
             }
           });
           return next;
@@ -218,10 +218,10 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
     if (selectedUserId) {
       setExpandedNodes(prev => {
         const next = { ...prev };
-        let current = users.find(u => u.id === selectedUserId);
+        let current = users.find(u => u.id?.toUpperCase() === selectedUserId?.toUpperCase());
         while (current && current.sponsorId) {
           next[current.sponsorId] = true;
-          current = users.find(u => u.id === current.sponsorId)!;
+          current = users.find(u => u.id?.toUpperCase() === current.sponsorId?.toUpperCase())!;
         }
         return next;
       });
@@ -334,7 +334,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
   // Recursive Directory Tree (LIST View)
   const renderTreeNodeList = (user: User, level: number = 0) => {
-    const directChildren = users.filter(u => u.sponsorId === user.id);
+    const directChildren = users.filter(u => u.sponsorId?.toUpperCase() === user.id?.toUpperCase());
     const hasChildren = directChildren.length > 0;
     const isExpanded = !!expandedNodes[user.id];
     const isSelected = selectedUserId === user.id;
@@ -445,7 +445,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
 
     // Recursive MLM Orthogonal Tree Node
     const renderMLMNode = (user: User) => {
-      const directChildren = users.filter(u => u.sponsorId === user.id);
+      const directChildren = users.filter(u => u.sponsorId?.toUpperCase() === user.id?.toUpperCase());
       const hasChildren = directChildren.length > 0;
       const isExpanded = !!expandedNodes[user.id];
       const isSelected = selectedUserId === user.id;
@@ -549,7 +549,7 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
       );
     };
 
-  const selectedUser = users.find(u => u.id === selectedUserId);
+  const selectedUser = users.find(u => u.id?.toUpperCase() === selectedUserId?.toUpperCase());
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -760,10 +760,10 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
                   <dt className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Upline Sponsor</dt>
                   <dd className="mt-1 flex items-center gap-2">
                     <Landmark className="w-3.5 h-3.5 text-stone-400" />
-                    {selectedUser.sponsorId && users.some(u => u.id === selectedUser.sponsorId) ? (
+                    {selectedUser.sponsorId && users.some(u => u.id?.toUpperCase() === selectedUser.sponsorId?.toUpperCase()) ? (
                       <div className="text-xs font-medium text-stone-800 bg-white px-2 py-1.5 rounded border border-stone-150 inline-flex items-center gap-1">
                         <span className="font-bold text-emerald-800">{selectedUser.sponsorId}</span>
-                        <span>({users.find(u => u.id === selectedUser.sponsorId)?.name || 'Direct Associate'})</span>
+                        <span>({users.find(u => u.id?.toUpperCase() === selectedUser.sponsorId?.toUpperCase())?.name || 'Direct Associate'})</span>
                       </div>
                     ) : (
                       <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded font-medium border border-amber-200 select-none">
@@ -777,8 +777,8 @@ export default function TreeVisualizer({ users, onSelectUser, selectedUserId, hi
               <div>
                 <dt className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Immediate Recruits</dt>
                 <dd className="mt-1 flex gap-1.5 flex-wrap">
-                  {users.filter(u => u.sponsorId === selectedUser.id).length > 0 ? (
-                    users.filter(u => u.sponsorId === selectedUser.id).map(u => (
+                  {users.filter(u => u.sponsorId?.toUpperCase() === selectedUser.id?.toUpperCase()).length > 0 ? (
+                    users.filter(u => u.sponsorId?.toUpperCase() === selectedUser.id?.toUpperCase()).map(u => (
                       <span key={u.id} className="text-[10.5px] bg-white border border-stone-200 px-2 py-1 rounded text-stone-700 font-medium font-mono">
                         {u.name} ({u.id})
                       </span>

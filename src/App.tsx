@@ -337,6 +337,32 @@ export default function App() {
       let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
       let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
 
+      // --- ZERO-TRUST SESSION INVALIDATION SECURITY GATES FOR LOCAL FALLBACK ---
+      if (sessionParsed.agentId) {
+        const upperAgentId = sessionParsed.agentId.toUpperCase();
+        const liveUser = localUsers.find(u => u.id.toUpperCase() === upperAgentId);
+        if (!liveUser) {
+          console.log(`[Session Invalidation - Local Fallback] Active session for ${sessionParsed.agentId} has been invalidated (User does not exist locally).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
+        }
+
+        if (liveUser.status !== 'ACTIVE') {
+          console.log(`[Session Invalidation - Local Fallback] Active session for ${sessionParsed.agentId} has been invalidated (Account INACTIVE locally).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
+        }
+
+        if (!sessionParsed.passwordHash || sessionParsed.passwordHash !== liveUser.password) {
+          console.log(`[Session Invalidation - Local Fallback] Active session for ${sessionParsed.agentId} has been invalidated (Password changed/mismatched locally).`);
+          handleLogout();
+          setDbLoading(false);
+          return;
+        }
+      }
+
       const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
       const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
 
@@ -565,7 +591,7 @@ export default function App() {
             return { success: false, errorMsg: 'Invalid passcode. Please try again.' };
           }
         }
-        return { success: false, errorMsg: 'Account ID not recognized.' };
+        return { success: false, errorMsg: 'User ID not found or contact support. Falling back to default accounts is strictly prohibited.' };
       }
     } catch (e: any) {
       console.error(e);
@@ -594,13 +620,53 @@ export default function App() {
     }
 
     const newSession = { role, agentId: resolvedAgentId, name, passwordHash };
+    
+    // Clear old cached data keys before establishing the new session
+    const keysToRemove = [
+      'SBR_USERS',
+      'SBR_PROJECTS',
+      'SBR_SALES',
+      'SBR_PAYOUTS',
+      'SBR_CONFIG',
+      'SBR_NOTIFICATIONS',
+      'SBR_USER_LOGS'
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
     localStorage.setItem('SBR_SESSION', JSON.stringify(newSession));
+    
+    // Immediately align UI state to new session role and agent ID
+    setActiveRole(role);
+    if (resolvedAgentId) {
+      setActiveAgentId(resolvedAgentId);
+      setSelectedTreeUserId(resolvedAgentId);
+    }
+    
     await loadPrivateData(newSession);
   };
 
   const handleLogout = () => {
     setSession(null);
-    localStorage.removeItem('SBR_SESSION');
+    setActiveRole('AGENT');
+    setActiveAgentId('');
+    setSelectedTreeUserId(null);
+    setUsers([]);
+    setSales([]);
+    setPayouts([]);
+    setNotifications([]);
+    
+    // Clear all LocalStorage keys related to SBR
+    const keysToRemove = [
+      'SBR_SESSION',
+      'SBR_USERS',
+      'SBR_PROJECTS',
+      'SBR_SALES',
+      'SBR_PAYOUTS',
+      'SBR_CONFIG',
+      'SBR_NOTIFICATIONS',
+      'SBR_USER_LOGS'
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
   };
 
   // State Change triggers
@@ -1300,6 +1366,7 @@ export default function App() {
               config={config}
               projects={projects}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
+              onLogout={handleLogout}
             />
           </div>
         )}

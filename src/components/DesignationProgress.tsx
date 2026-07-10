@@ -16,9 +16,9 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
   const [confetti, setConfetti] = useState<{ id: number; x: number; y: number; color: string; size: number; delay: number; duration: number; rotate: number }[]>([]);
 
   // Count direct recruits
-  const directRecruitsCount = users.filter(u => u.sponsorId === agent.id).length;
+  const directRecruitsCount = users.filter(u => u.sponsorId?.toUpperCase() === agent.id?.toUpperCase()).length;
   // Get active KYC/Status of direct recruits
-  const activeDirectRecruitsCount = users.filter(u => u.sponsorId === agent.id && u.status === 'ACTIVE').length;
+  const activeDirectRecruitsCount = users.filter(u => u.sponsorId?.toUpperCase() === agent.id?.toUpperCase() && u.status === 'ACTIVE').length;
   // Count total downline network
   const teamMembersCount = downlineNetwork.length;
 
