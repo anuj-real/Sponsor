@@ -136,11 +136,8 @@ export default function AgentPanel({
     return (rankMap[statusA] || 3) - (rankMap[statusB] || 3);
   });
 
-  // Active broker profile with secure non-admin fallback
-  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase())
-    || users.find(u => u.id?.toUpperCase() === 'SBR0012')
-    || users.find(u => !['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'DK', 'VIKAS'].includes(u.id?.toUpperCase()))
-    || users[0];
+  // Active broker profile - strictly match activeAgentId and do not fall back
+  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase());
 
   // Sync profile form states
   useEffect(() => {
@@ -187,10 +184,25 @@ export default function AgentPanel({
     }
   };
 
+  if (users.length === 0) {
+    return (
+      <div className="p-12 text-center text-stone-500 flex flex-col items-center justify-center space-y-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div>
+        <p className="text-sm font-medium">Loading broker profile...</p>
+      </div>
+    );
+  }
+
   if (!agent) {
     return (
-      <div className="p-8 text-center text-stone-500">
-        Please register or designate an active SBR broker to simulate Agent dashboards.
+      <div className="p-8 max-w-md mx-auto my-12 bg-white rounded-xl shadow-md border border-stone-200 text-center space-y-4">
+        <div className="text-stone-500 flex justify-center">
+          <ShieldAlert className="h-12 w-12 text-amber-500" />
+        </div>
+        <h3 className="text-lg font-bold text-stone-900">Access Restricted</h3>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          Your broker profile could not be found in SBR records. Please contact the administrator for the access details.
+        </p>
       </div>
     );
   }
