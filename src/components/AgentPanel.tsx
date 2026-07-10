@@ -136,8 +136,11 @@ export default function AgentPanel({
     return (rankMap[statusA] || 3) - (rankMap[statusB] || 3);
   });
 
-  // Active broker profile
-  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase()) || users[0];
+  // Active broker profile with secure non-admin fallback
+  const agent = users.find(u => u.id?.toUpperCase() === activeAgentId?.toUpperCase())
+    || users.find(u => u.id?.toUpperCase() === 'SBR0012')
+    || users.find(u => !['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'DK', 'VIKAS'].includes(u.id?.toUpperCase()))
+    || users[0];
 
   // Sync profile form states
   useEffect(() => {

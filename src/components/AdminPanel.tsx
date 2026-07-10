@@ -74,7 +74,7 @@ export default function AdminPanel({
 
   const isAdminId = (id?: string) => {
     if (!id) return false;
-    return ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'DK', 'VIKAS', 'SBR', 'ADMIN1', 'ADMIN2'].includes(id.toUpperCase());
+    return ['C', 'A1', 'A2', 'MANORANJAN', 'RAM', 'DK', 'VIKAS'].includes(id.toUpperCase());
   };
 
   const isRestrictedForCurrentUser = (targetId: string) => {

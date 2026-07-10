@@ -31,7 +31,7 @@ export function parseConditionString(condition: string) {
  */
 export function calculateUserDesignation(user: User, allUsers: User[], config?: MLMConfig): User['designation'] {
   // Administrative nodes are grandfathered and designation logic is disabled for them.
-  const adminIds = ['C', 'A1', 'A2', 'SBR', 'ADMIN1', 'ADMIN2'];
+  const adminIds = ['C', 'A1', 'A2'];
   if (adminIds.includes(user.id)) {
     return 'Exempt';
   }
@@ -218,7 +218,7 @@ export function rebuildPayoutsFromSales(
       // 1. Cannot make direct sales (level === 1), as "no direct sale will be made by these profiles".
       // 2. Are eligible only for downline sales (level > 1) via the defined multi-level commission tiers (overrides).
       // 3. Downlines for these profiles must start from the 4 family IDs (MANORANJAN, RAM, DK, VIKAS).
-      const adminIds = ['C', 'A1', 'A2', 'SBR', 'ADMIN1', 'ADMIN2'];
+      const adminIds = ['C', 'A1', 'A2'];
       const isCorporate = adminIds.includes(currentAgent.id);
       
       const isEligible = isCorporate

@@ -151,7 +151,7 @@ export default function App() {
         }
 
         // Verify session role matches the user's designated role
-        const isCoreAdmin = ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(upperAgentId);
+        const isCoreAdmin = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(upperAgentId);
         const expectedRole = (liveUser.role === 'ADMIN' && isCoreAdmin) ? 'ADMIN' : 'AGENT';
         if (sessionParsed.role !== expectedRole) {
           console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Role mismatch).`);
@@ -495,7 +495,7 @@ export default function App() {
           if (foundAgent.status === 'ACTIVE') {
             // Automatic passcode self-healing write-back is disabled to keep original passcodes unchanged.
 
-            const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
+            const isAdminNode = foundAgent.role === 'ADMIN' && ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(foundAgent.id.toUpperCase());
             const role = isAdminNode ? 'ADMIN' : 'AGENT';
             return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password };
           } else {
@@ -555,7 +555,7 @@ export default function App() {
 
           if (isPasscodeCorrect) {
             if (foundAgent.status === 'ACTIVE') {
-              const isAdminNode = foundAgent.role === 'ADMIN' && ['SBR', 'ADMIN1', 'ADMIN2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK', 'C', 'A1', 'A2'].includes(foundAgent.id.toUpperCase());
+              const isAdminNode = foundAgent.role === 'ADMIN' && ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'VIKAS', 'DK'].includes(foundAgent.id.toUpperCase());
               const role = isAdminNode ? 'ADMIN' : 'AGENT';
               return { success: true, role, agentId: foundAgent.id, name: foundAgent.name, passwordHash: foundAgent.password };
             } else {
