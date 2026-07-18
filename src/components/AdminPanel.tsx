@@ -12,7 +12,7 @@ import {
 
 interface AdminPanelProps {
   users: User[];
-  onAddUser: (user: Omit<User, 'totalDirectSales' | 'totalDownlineSales'>) => void;
+  onAddUser: (user: Omit<User, 'totalDirectSales' | 'totalDownlineSales'>) => Promise<void>;
   config: MLMConfig;
   onUpdateConfig: (config: MLMConfig) => void;
   sales: Sale[];
@@ -213,6 +213,7 @@ export default function AdminPanel({
 
   const [createUserSuccess, setCreateUserSuccess] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
   const [agentFilter, setAgentFilter] = useState('');
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
@@ -568,8 +569,9 @@ export default function AdminPanel({
     );
   };
 
-  const handleOnboardAgent = (e: React.FormEvent) => {
+  const handleOnboardAgent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingUser) return;
     if (!newName || !newPhone) {
       setErrorMsg('Full Name and Mobile Number are required.');
       return;
@@ -601,6 +603,10 @@ export default function AdminPanel({
       return;
     }
 
+    setIsSubmittingUser(true);
+    setErrorMsg('');
+    setCreateUserSuccess('');
+
     const assignedId = getNextSequentialId();
 
     const newlyCreatedAgent: User = {
@@ -628,25 +634,32 @@ export default function AdminPanel({
       nomineeRelation: newNomineeRelation || undefined
     };
 
-    onAddUser(newlyCreatedAgent);
+    try {
+      await onAddUser(newlyCreatedAgent);
 
-    setCreateUserSuccess(`Successfully onboarded ${newName} as SBR Certified Partner. ID: ${assignedId}`);
-    setErrorMsg('');
-    setNewName('');
-    setNewEmail('');
-    setNewPhone('');
-    setNewSponsor('');
-    setNewDob('');
-    setNewAadhar('');
-    setNewPan('');
-    setNewAddress('');
-    setNewFatherOrHusbandName('');
-    setNewBankAccountNumber('');
-    setNewIfscCode('');
-    setNewBranchName('');
-    setNewNominee('');
-    setNewNomineeRelation('');
-    setTimeout(() => setCreateUserSuccess(''), 6000);
+      setCreateUserSuccess(`Successfully onboarded ${newName} as SBR Certified Partner. ID: ${assignedId}`);
+      setErrorMsg('');
+      setNewName('');
+      setNewEmail('');
+      setNewPhone('');
+      setNewSponsor('');
+      setNewDob('');
+      setNewAadhar('');
+      setNewPan('');
+      setNewAddress('');
+      setNewFatherOrHusbandName('');
+      setNewBankAccountNumber('');
+      setNewIfscCode('');
+      setNewBranchName('');
+      setNewNominee('');
+      setNewNomineeRelation('');
+      setTimeout(() => setCreateUserSuccess(''), 6000);
+    } catch (err: any) {
+      console.error("Onboarding failed:", err);
+      setErrorMsg(err.message || 'Onboarding failed due to cloud synchronization issues.');
+    } finally {
+      setIsSubmittingUser(false);
+    }
 
     // Auto-trigger the secure credentials SMS Portal for the newly added user! (Removed/Disabled for now until DLT registration)
     /*
@@ -2016,9 +2029,17 @@ export default function AdminPanel({
               <div className="md:col-span-3 pt-2">
                 <button
                   type="submit"
-                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer shadow-xs uppercase tracking-wider font-sans"
+                  disabled={isSubmittingUser}
+                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer shadow-xs uppercase tracking-wider font-sans disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Confirm Sourcing Credential Allocation
+                  {isSubmittingUser ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving to Cloud Database...</span>
+                    </>
+                  ) : (
+                    <span>Confirm Sourcing Credential Allocation</span>
+                  )}
                 </button>
               </div>
             </form>

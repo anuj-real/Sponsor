@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
   INITIAL_MLM_CONFIG, 
@@ -83,6 +83,8 @@ export default function App() {
   const [config, setConfig] = useState<MLMConfig>(INITIAL_MLM_CONFIG);
   const [dbLoading, setDbLoading] = useState(true);
   const [userLogs, setUserLogs] = useState<UserLog[]>([]);
+  const isSyncingRef = useRef(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
 
   // Selected User in the Tree diagram
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('C');
@@ -97,9 +99,12 @@ export default function App() {
 
   const loadPrivateData = async (
     sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string },
-    preloadedData?: any
+    preloadedData?: any,
+    isBackground = false
   ) => {
-    setDbLoading(true);
+    if (!isBackground) {
+      setDbLoading(true);
+    }
     try {
       await ensureAuthenticated();
       
@@ -134,14 +139,14 @@ export default function App() {
         if (!liveUser) {
           console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (User does not exist).`);
           handleLogout();
-          setDbLoading(false);
+          if (!isBackground) setDbLoading(false);
           return;
         }
 
         if (liveUser.status !== 'ACTIVE') {
           console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Account INACTIVE).`);
           handleLogout();
-          setDbLoading(false);
+          if (!isBackground) setDbLoading(false);
           return;
         }
 
@@ -151,7 +156,7 @@ export default function App() {
         if (sessionPasswordHash !== livePasswordHash) {
           console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Password changed/mismatched).`);
           handleLogout();
-          setDbLoading(false);
+          if (!isBackground) setDbLoading(false);
           return;
         }
 
@@ -161,13 +166,13 @@ export default function App() {
         if (sessionParsed.role !== expectedRole) {
           console.log(`[Session Invalidation] Active session for ${sessionParsed.agentId} has been invalidated (Role mismatch).`);
           handleLogout();
-          setDbLoading(false);
+          if (!isBackground) setDbLoading(false);
           return;
         }
       } else {
         console.log(`[Session Invalidation] Invalid session structure.`);
         handleLogout();
-        setDbLoading(false);
+        if (!isBackground) setDbLoading(false);
         return;
       }
 
@@ -380,7 +385,9 @@ export default function App() {
         setSelectedTreeUserId(sessionParsed.agentId);
       }
     } finally {
-      setDbLoading(false);
+      if (!isBackground) {
+        setDbLoading(false);
+      }
     }
   };
 
@@ -439,6 +446,57 @@ export default function App() {
 
     initFirestore();
   }, []);
+
+  const handleManualSync = async () => {
+    if (isManualSyncing) return;
+    setIsManualSyncing(true);
+    try {
+      await ensureAuthenticated();
+      const data = await seedDatabase({
+        users: INITIAL_USERS,
+        projects: INITIAL_PROJECTS,
+        sales: INITIAL_SALES,
+        payouts: INITIAL_PAYOUTS,
+        config: INITIAL_MLM_CONFIG,
+        notifications: INITIAL_NOTIFICATIONS
+      });
+      if (session) {
+        await loadPrivateData(session, data, true);
+      }
+    } catch (e) {
+      console.error("Manual sync failed:", e);
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
+
+  // Background polling for multi-session data consistency every 10 seconds
+  useEffect(() => {
+    if (!session) return;
+
+    const interval = setInterval(async () => {
+      if (isSyncingRef.current || isManualSyncing) return;
+      isSyncingRef.current = true;
+      try {
+        await ensureAuthenticated();
+        const data = await seedDatabase({
+          users: INITIAL_USERS,
+          projects: INITIAL_PROJECTS,
+          sales: INITIAL_SALES,
+          payouts: INITIAL_PAYOUTS,
+          config: INITIAL_MLM_CONFIG,
+          notifications: INITIAL_NOTIFICATIONS
+        });
+        await loadPrivateData(session, data, true);
+      } catch (error) {
+        console.warn("Background auto-sync failed:", error);
+      } finally {
+        isSyncingRef.current = false;
+      }
+    }, 10000); // Poll every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [session, isManualSyncing]);
 
   // Synchronize state changes to LocalStorage as a local fallback backup
   useEffect(() => {
@@ -1289,6 +1347,17 @@ export default function App() {
               )}
 
 
+
+              {/* Manual Cloud Sync Button */}
+              <button
+                onClick={handleManualSync}
+                disabled={isManualSyncing}
+                className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-850 border border-emerald-200/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50"
+                title="Sync database immediately"
+              >
+                <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-800 ${isManualSyncing ? 'animate-spin' : ''}`} />
+                <span>{isManualSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
+              </button>
 
               {/* Security Credentials Button */}
               {session.agentId && (
