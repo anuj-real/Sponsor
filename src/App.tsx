@@ -47,16 +47,7 @@ export const SECURE_PASSWORD_HASHES: Record<string, string> = {
   'VIKAS': '8d1cdaf06bbee7926c3e6399a59702d5d6afe6f4e96f0ea8b971340d34aeb817'
 };
 
-const OLD_SECURE_PASSWORD_HASHES: Record<string, string[]> = {
-  'RAM': ['e94d1854d8fdd73e95a9a12aa3e34c451e59ec5b396b9b7ee9493fe01c4ab5fa', 'Ram@SBR'],
-  'MANORANJAN': ['d4de64ea3eb5befe19202c7a707a6eed1db10a170bf1958f750e4abf792a5d9c', 'Manoranjan@SBR'],
-  'VIKAS': ['0bfa71711539c14eedf9fb0707b941ce78712e21bc3ce80aacc416063895913b', 'Vikas@SBR'],
-  'DK': ['e67f046e786c86fd99fdec1b46120b8762883859a253c5fcb94bdf0fec53d8cf', 'Dk@SBR'],
-  'C': ['025e6ca2d1707998c2afd8aa0e72bf6a2052e5968a6a442d0c4ccd8ea3ad2e34', 'SBR@2026', 'password'],
-  'A1': ['d99006a443b32205d9e527a0180c70d7b163438e7f4b7bbf0ba8a6bdf303fdaa', 'Admin1@SBR', 'password'],
-  'A2': ['66548ad67f5ee1245027cbbb334c744bd304f8b8dc6ee709040a6b009b1d8d8c', 'Admin2@SBR', 'password']
-};
-
+// Strict password upgrade mechanism for the 7 secure nodes in memory.
 export function getUpgradedPassword(userId: string, currentPasswordValue: string): string {
   const upperId = userId.toUpperCase();
   const targetNewHash = SECURE_PASSWORD_HASHES[upperId];
