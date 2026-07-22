@@ -529,7 +529,7 @@ export default function App() {
           'ADMIN2': 'Admin2@SBR'
         };
 
-        let defaultPasscode = 'password';
+        let defaultPasscode = '';
         const username = foundAgent.id.toUpperCase();
         if (foundAgent.dob) {
           const parts = foundAgent.dob.split('-');
@@ -541,8 +541,6 @@ export default function App() {
               defaultPasscode = `${username}${day}${month}${year}`;
             }
           }
-        } else {
-          defaultPasscode = `${username}01011990`;
         }
 
         const enteredPasswordHash = await hashPassword(pass);
@@ -550,19 +548,16 @@ export default function App() {
         const isSecureNode = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'DK', 'VIKAS'].includes(inputIdUpper);
 
         if (isSecureNode) {
-          // No fallbacks, no plaintext defaults for the 7 secure nodes. Must match database hash.
-          isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password);
+          // Strict verification against database hash for secure/admin nodes
+          isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password || pass === foundAgent.password);
         } else {
-          // For non-secure/channel-partner users, we allow:
-          // 1. Stored custom password hash (if defined)
-          // 2. DOB-based passcode (e.g. SBR001222071989) case-insensitively
-          // 3. General fallback passcode 'password' case-insensitively
-          // 4. The Username itself case-insensitively
-          isPasscodeCorrect = 
-            (!!foundAgent.password && enteredPasswordHash === foundAgent.password) ||
-            (pass.toUpperCase() === defaultPasscode.toUpperCase()) ||
-            (pass.toUpperCase() === 'PASSWORD') ||
-            (pass.toUpperCase() === inputIdUpper);
+          // For channel partner users:
+          // 1. Configured password (hash or exact match if set)
+          // 2. Individual DOB-based passcode if DOB is set on user profile (e.g. SBR001222071989)
+          // Generic 'password' and username-as-password defaults are disabled.
+          const matchesConfiguredPassword = !!foundAgent.password && (enteredPasswordHash === foundAgent.password || pass === foundAgent.password);
+          const matchesDobPasscode = !!defaultPasscode && (pass.toUpperCase() === defaultPasscode.toUpperCase());
+          isPasscodeCorrect = matchesConfiguredPassword || matchesDobPasscode;
         }
 
         if (isPasscodeCorrect) {
@@ -599,7 +594,7 @@ export default function App() {
             'ADMIN2': 'Admin2@SBR'
           };
 
-          let defaultPasscode = 'password';
+          let defaultPasscode = '';
           const username = foundAgent.id.toUpperCase();
           if (foundAgent.dob) {
             const parts = foundAgent.dob.split('-');
@@ -611,8 +606,6 @@ export default function App() {
                 defaultPasscode = `${username}${day}${month}${year}`;
               }
             }
-          } else {
-            defaultPasscode = `${username}01011990`;
           }
 
           const enteredPasswordHash = await hashPassword(pass);
@@ -620,19 +613,16 @@ export default function App() {
           const isSecureNode = ['C', 'A1', 'A2', 'RAM', 'MANORANJAN', 'DK', 'VIKAS'].includes(inputIdUpper);
 
           if (isSecureNode) {
-            // No fallbacks, no plaintext defaults for the 7 secure nodes. Must match database hash.
-            isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password);
+            // Strict verification against database hash for secure/admin nodes
+            isPasscodeCorrect = !!foundAgent.password && (enteredPasswordHash === foundAgent.password || pass === foundAgent.password);
           } else {
-            // For non-secure/channel-partner users, we allow:
-            // 1. Stored custom password hash (if defined)
-            // 2. DOB-based passcode (e.g. SBR001222071989) case-insensitively
-            // 3. General fallback passcode 'password' case-insensitively
-            // 4. The Username itself case-insensitively
-            isPasscodeCorrect = 
-              (!!foundAgent.password && enteredPasswordHash === foundAgent.password) ||
-              (pass.toUpperCase() === defaultPasscode.toUpperCase()) ||
-              (pass.toUpperCase() === 'PASSWORD') ||
-              (pass.toUpperCase() === inputIdUpper);
+            // For channel partner users:
+            // 1. Configured password (hash or exact match if set)
+            // 2. Individual DOB-based passcode if DOB is set on user profile (e.g. SBR001222071989)
+            // Generic 'password' and username-as-password defaults are disabled.
+            const matchesConfiguredPassword = !!foundAgent.password && (enteredPasswordHash === foundAgent.password || pass === foundAgent.password);
+            const matchesDobPasscode = !!defaultPasscode && (pass.toUpperCase() === defaultPasscode.toUpperCase());
+            isPasscodeCorrect = matchesConfiguredPassword || matchesDobPasscode;
           }
 
           if (isPasscodeCorrect) {

@@ -270,7 +270,7 @@ export default function AdminPanel({
     setSmsErrorMessage('');
     
     const username = agent.id.toUpperCase();
-    let calculatedDefaultPass = 'password';
+    let calculatedDefaultPass = '';
     if (agent.dob) {
       const parts = agent.dob.split('-');
       if (parts.length === 3) {
@@ -281,8 +281,6 @@ export default function AdminPanel({
           calculatedDefaultPass = `${username}${day}${month}${year}`;
         }
       }
-    } else {
-      calculatedDefaultPass = `${username}01011990`;
     }
     const finalPasscode = getDisplayPasscode(agent.id, agent.password || '', calculatedDefaultPass);
     
@@ -2135,7 +2133,7 @@ export default function AdminPanel({
                                   setEditNominee(agent.nominee || '');
                                   setEditNomineeRelation(agent.nomineeRelation || '');
                                   const username = agent.id.toUpperCase();
-                                  let calculatedDefaultPass = 'password';
+                                  let calculatedDefaultPass = '';
                                   if (agent.dob) {
                                     const parts = agent.dob.split('-');
                                     if (parts.length === 3) {
@@ -2146,8 +2144,6 @@ export default function AdminPanel({
                                         calculatedDefaultPass = `${username}${day}${month}${year}`;
                                       }
                                     }
-                                  } else {
-                                    calculatedDefaultPass = `${username}01011990`;
                                   }
                                   setTempPassword(getDisplayPasscode(agent.id, agent.password || '', calculatedDefaultPass));
                                   setPasswordStatusMsg('');
@@ -2174,7 +2170,7 @@ export default function AdminPanel({
                               <button
                                 onClick={() => {
                                   const username = agent.id.toUpperCase();
-                                  let calculatedDefaultPass = 'password';
+                                  let calculatedDefaultPass = '';
                                   if (agent.dob) {
                                     const parts = agent.dob.split('-');
                                     if (parts.length === 3) {
@@ -2185,8 +2181,6 @@ export default function AdminPanel({
                                         calculatedDefaultPass = `${username}${day}${month}${year}`;
                                       }
                                     }
-                                  } else {
-                                    calculatedDefaultPass = `${username}01011990`;
                                   }
                                   const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
                                     `Hello *${agent.name}*,\n` +
