@@ -205,6 +205,32 @@ for two routes isn't warranted. Mechanics in [src/App.tsx](src/App.tsx):
   — honoured only when `session.role === 'ADMIN'`, everyone else silently gets their own record.
   The admin agents directory has a per-row "Profile" button that sets the hash directly.
 
+## 7. Mobile responsiveness pass
+
+**Pattern: card lists for wide tables.** Every data table keeps its full table on `sm+` and renders
+a stacked card list below `sm` (`sm:hidden` cards + `hidden sm:block`/`sm:table` table). Converted:
+
+- AdminPanel **agents directory** (7 cols) — identity + status chip, ID/designation/sponsor chips,
+  stats grid, then full-width tap-target action buttons in a 2-col grid.
+- AdminPanel **payouts** (8 cols) — gross → TDS → admin → net breakdown, full-width sanction/dispatch button.
+- AdminPanel **sales ledger** (9 cols) — same live controls as the row: payment progress, Manage
+  Payments, milestone `<select>` and token-amount input.
+- AdminPanel **lifecycle logs** (7 cols) — compact entries.
+- AgentPanel **direct ledger** and **downline network** tables. (The override receipts list was
+  already cards.)
+
+Cards and rows share behaviour through extracted handlers — `openCredentialsEditor`,
+`copyInviteMessage`, `confirmDeleteAgent`, `openPaymentsLedger`, `getDobPasscode` — which also
+de-duplicated ~90 lines of inline closures from the desktop rows. **Edit those helpers, not the
+markup, when changing row behaviour** — both layouts consume them.
+
+**Form grids:** eight `grid-cols-2` input grids (booking form selects, rate/token, project legal
+metadata, leadership/offer editors) became `grid-cols-1 sm:grid-cols-2` so inputs are full-width on
+phones. Display-only 2-col grids (stat pairs, date chips) were left alone deliberately.
+
+**Admin sub-tab bar** (earlier pass): scrollable pill strip with short labels + auto-centred active
+pill + context line on mobile; unchanged wrap layout on `sm+` (see `ADMIN_TABS` in AdminPanel).
+
 ## Known gaps
 
 - Nav items **highlight and scroll only**. There is no router; `App` switches views via

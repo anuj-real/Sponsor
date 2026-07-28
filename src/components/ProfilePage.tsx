@@ -275,6 +275,24 @@ export default function ProfilePage({
             <span className="text-[10.5px] text-stone-500">Joined {user.joinedDate}</span>
           </div>
 
+          {/* Contact line */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+            {user.phone && (
+              <a
+                href={`tel:${user.phone}`}
+                className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded hover:bg-emerald-100 transition-colors"
+              >
+                <Phone className="w-3 h-3 shrink-0" /> {user.phone}
+              </a>
+            )}
+            {user.email && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-stone-600 min-w-0">
+                <Mail className="w-3 h-3 text-stone-400 shrink-0" />
+                <span className="truncate">{user.email}</span>
+              </span>
+            )}
+          </div>
+
           <p className="text-[11px] text-stone-500 mt-2 leading-relaxed">
             {sponsor ? (
               <>

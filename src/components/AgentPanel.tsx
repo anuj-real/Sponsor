@@ -434,7 +434,37 @@ export default function AgentPanel({
             {activePanelTab === 'LEDGER' ? (
               <div className="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar">
                 {directDeals.length > 0 ? (
-                  <table className="w-full text-left border-collapse">
+                  <>
+                  {/* Mobile: stacked deal cards */}
+                  <div className="sm:hidden divide-y divide-stone-200">
+                    {directDeals.map((deal) => (
+                      <div key={deal.id} className="p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-stone-900 text-xs truncate">{deal.project}</p>
+                            <p className="text-[10px] text-stone-500 mt-0.5">Unit: {deal.unitNumber} • {deal.buyerName}</p>
+                          </div>
+                          <span className="font-mono font-bold text-xs text-emerald-800 shrink-0">{formatPoints(deal.saleValue)}</span>
+                        </div>
+                        <p className="text-[10px] text-stone-500 font-mono">{deal.id} · {deal.saleDate}</p>
+                        {!deal.bookingStatus || deal.bookingStatus === 'TOKEN_RECEIVED' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                            Token received (₹{(deal.tokenAmount !== undefined ? deal.tokenAmount : 75000).toLocaleString('en-IN')})
+                          </span>
+                        ) : deal.bookingStatus === 'BOOKING_DONE' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-900 border border-blue-200">
+                            Booking Done (30% paid)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
+                            Registry Done (100% paid)
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <table className="w-full text-left border-collapse hidden sm:table">
                     <thead>
                       <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
                         <th className="px-5 py-3">Agreement Reference</th>
@@ -478,6 +508,7 @@ export default function AgentPanel({
                       ))}
                     </tbody>
                   </table>
+                  </>
                 ) : (
                   <div className="p-8 text-center text-stone-500">
                     You have not registered any direct deals. Work with administration to book inventory!
@@ -923,7 +954,33 @@ export default function AgentPanel({
 
           <div className="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar font-medium">
             {downlineNetwork.length > 0 ? (
-              <table className="w-full text-left border-collapse">
+              <>
+              {/* Mobile: stacked team-member cards */}
+              <div className="sm:hidden divide-y divide-stone-200">
+                {downlineNetwork.map(({ user, relativeLevel }) => (
+                  <div key={user.id} className="p-4 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-stone-900 text-xs truncate">{user.name}</p>
+                        <p className="font-mono font-bold text-[10px] text-stone-500 mt-0.5">{user.id}</p>
+                      </div>
+                      <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        relativeLevel === 1
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          : 'bg-stone-100 text-stone-700 border border-stone-200'
+                      }`}>
+                        L{relativeLevel} {relativeLevel === 1 ? '(Direct)' : '(Indirect)'}
+                      </span>
+                    </div>
+                    <p className="font-mono text-[10.5px] text-stone-800">
+                      <span className="font-bold">{formatPoints(user.totalDirectSales)}</span>
+                      <span className="text-stone-400 font-sans"> · team {formatPoints(user.totalDownlineSales)}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <table className="w-full text-left border-collapse hidden sm:table">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
                     <th className="px-5 py-3">Sourcing Tier Depth</th>
@@ -956,6 +1013,7 @@ export default function AgentPanel({
                   ))}
                 </tbody>
               </table>
+              </>
             ) : (
               <div className="p-10 text-center text-stone-400 flex flex-col items-center justify-center min-h-[200px]">
                 <Users className="w-10 h-10 text-stone-300 stroke-1 mx-auto mb-2" />
