@@ -8,20 +8,34 @@ import {
   INITIAL_PAYOUTS, 
   INITIAL_NOTIFICATIONS 
 } from './data/seedData';
-import { 
-  Building2, 
-  Users, 
-  TrendingUp, 
-  IndianRupee, 
-  Briefcase, 
-  ShieldCheck, 
-  Award, 
-  BookOpen, 
-  Lock, 
+import {
+  Building2,
+  Users,
+  TrendingUp,
+  IndianRupee,
+  Briefcase,
+  ShieldCheck,
+  Award,
+  BookOpen,
+  Lock,
   HelpCircle,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  Home,
+  Menu,
+  Moon,
+  Network,
+  Sun,
+  Wallet,
+  X
 } from 'lucide-react';
+
+const NAV_ITEMS = [
+  { key: 'HOME', label: 'Home', icon: Home },
+  { key: 'TREE', label: 'My Tree', icon: Network },
+  { key: 'TEAM', label: 'Team', icon: Users },
+  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet },
+];
 import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
@@ -79,6 +93,18 @@ export default function App() {
 
   // Selected User in the Tree diagram
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('C');
+
+  // Header shell: light/dark preference + primary navigation
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem('SBR_THEME');
+    return stored === 'dark' ? 'dark' : 'light';
+  });
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState('HOME');
+
+  useEffect(() => {
+    localStorage.setItem('SBR_THEME', theme);
+  }, [theme]);
 
   // Security Modal States
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
@@ -1263,7 +1289,7 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-hidden">
+    <div className={`min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-hidden dark:bg-slate-950 dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
       {/* Soft Elegant Warm Ambient Light Gradients - highly subtle */}
       <div className="absolute top-0 left-0 w-full h-[500px] overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-25%] left-[-10%] w-[60%] h-[110%] rounded-full bg-amber-500/5 blur-[120px]" />
@@ -1271,17 +1297,59 @@ export default function App() {
       </div>
 
       {/* Top Banner */}
-      <header className="border-b border-stone-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="z-10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold text-lg select-none shadow-sm">
-                P
+      <header className="border-b border-stone-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs dark:border-white/10 dark:bg-slate-900/85">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+
+          {/* Brand row: menu button, then logo, then inline nav on large screens */}
+          <div className="flex items-center justify-between gap-2 z-10 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Mobile / tablet nav trigger */}
+              <button
+                onClick={() => setIsNavOpen(open => !open)}
+                aria-label={isNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={isNavOpen}
+                className="lg:hidden p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                {isNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold select-none shadow-sm shrink-0">
+                  P
+                </div>
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-stone-900 font-serif truncate dark:text-slate-50">
+                  SBR <span className="text-emerald-850 font-normal dark:text-emerald-400">Sponsors</span>
+                </h1>
               </div>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight text-stone-900 font-serif">SBR <span className="text-emerald-850 font-normal">Sponsors</span></h1>
-              </div>
+
+              {/* Inline primary navigation */}
+              <nav className="hidden lg:flex items-center gap-0.5 ml-3">
+                {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => { setActiveNav(key); setIsNavOpen(false); }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      activeNav === key
+                        ? 'bg-emerald-800 text-white shadow-xs'
+                        : 'text-stone-500 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </nav>
             </div>
+
+            {/* Theme switch — stays pinned top-right on mobile */}
+            <button
+              onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              className="md:hidden p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Interactive Role Selector / User Identity Block */}
@@ -1361,9 +1429,39 @@ export default function App() {
                 <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span className="hidden sm:inline">Disconnect</span>
               </button>
+
+              {/* Theme switch — desktop position, at the far right of the header */}
+              <button
+                onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+                className="hidden md:flex p-1.5 rounded-lg border border-stone-300/80 bg-stone-200/60 hover:bg-stone-200 text-stone-700 transition-all cursor-pointer shadow-xs dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
             </div>
           ) : null}
         </div>
+
+        {/* Collapsible navigation for mobile / tablet */}
+        {isNavOpen && (
+          <nav className="lg:hidden border-t border-stone-200/80 bg-white/95 px-4 md:px-6 py-2 flex flex-col gap-0.5 dark:border-white/10 dark:bg-slate-900/95">
+            {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => { setActiveNav(key); setIsNavOpen(false); }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                  activeNav === key
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        )}
       </header>
 
       {/* Primary Dashboard Content Area */}
@@ -1429,8 +1527,8 @@ export default function App() {
       </main>
 
       {/* Bottom Professional Whitelabel Footer */}
-      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
+      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center dark:bg-slate-900 dark:border-white/10">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4 dark:text-slate-400">
           <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
           <div className="flex gap-4 justify-center text-stone-400">
             <span>Support: helpdesk@propspire.in</span>
