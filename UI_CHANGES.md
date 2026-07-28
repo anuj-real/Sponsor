@@ -8,25 +8,70 @@ Companion to [../CLAUDE.md](../CLAUDE.md) (architecture) — this file covers on
 
 ---
 
-## 1. Theme (light + dark)
+## 1. Theme (light + dark) — **all colour lives in `src/theme.css`**
 
-- **Mechanism:** class-based dark mode, not a config file. [src/index.css](src/index.css) declares:
-  ```css
-  @custom-variant dark (&:where(.dark, .dark *));
-  ```
-  `App` puts `.dark` on the layout root, so any descendant — including `TreeVisualizer`
-  nested deep inside `AdminPanel`/`AgentPanel` — responds to plain `dark:` classes.
-  This avoids both a context file and prop-drilling through the panels.
-- **State:** `theme` in [src/App.tsx](src/App.tsx), persisted to `localStorage` under `SBR_THEME`.
-  That key is deliberately **not** in the list App clears on login/logout, so the preference survives sessions.
-- **Toggle:** a single button in the header's right column (it was briefly duplicated for
-  responsive placement; the centred-logo layout made that unnecessary). Icon shows the mode you
-  switch *to* — Sun while dark, Moon while light.
-- **Scope limitation:** dark styling covers the **shell + tree only** — root background, header,
-  footer, `TreeVisualizer`. `AdminPanel` (~4.4k lines) and `AgentPanel` are thousands of hardcoded
-  `stone-*`/`white` classes, and [src/index.css](src/index.css) has `!important` rules forcing light
-  text inside `.glass-panel`. In dark mode you get a dark shell with the existing light cards.
-  Converting those panels is a separate, much larger job.
+**App-wide.** Every view is themed: login screen, header, drawer, `AdminPanel`, `AgentPanel`,
+`DesignationProgress`, `TreeVisualizer`, footer, modals and form controls.
+
+### Where to edit colour
+
+[src/theme.css](src/theme.css) — nowhere else. Components keep their existing light-mode Tailwind
+classes (`bg-white`, `text-stone-900`, `border-stone-200`); dark mode is produced by re-pointing
+those same utilities under a `.dark` ancestor. **Components carry no `dark:` classes** — those were
+removed once the central layer landed, so there is exactly one place colour is decided.
+
+### Why utility overrides, not variable inversion
+
+Tailwind v4 emits `background-color: var(--color-stone-900)`, so inverting `--color-*` under `.dark`
+looks like a one-line win. It breaks, because the same colour does two opposite jobs:
+
+```
+bg-stone-900 + text-white   →  solid dark button
+text-stone-900              →  primary body text
+```
+
+Inverting the variable turns the button background light while its label stays white. Overriding
+*utilities* keeps the two independent — `text-stone-900` can be lightened without touching
+`bg-stone-900`. The same reasoning drives the accent split: only shades 50–200 are re-pointed for
+backgrounds and only 600–950 for text, which is what keeps `bg-emerald-800 text-white` buttons intact.
+
+### Structure of `theme.css`
+
+Tokens (§1) → base/body (§2) → neutral surfaces (§3) → neutral text (§4) → borders (§5) →
+accent tints (§6) → accent text (§7) → solid actions (§8) → hover states (§9) → form controls (§10)
+→ legacy `.glass-panel` unwind (§11) → chrome (§12). Semantic tokens (`--sbr-surface`, `--sbr-text`,
+`--sbr-border`, …) mean a palette change is a handful of edits at the top.
+
+### Gotchas worth knowing
+
+- **`.dark` is on `<html>`**, not the layout root — `body` has a `background-color: … !important`
+  rule in index.css that can only be reached from an ancestor of `body`, and the login screen
+  renders outside the app shell.
+- **Hover variants need their own rules.** `hover:bg-stone-100` is a *different class* from
+  `bg-stone-100`, so `.dark .bg-stone-100` does not touch it. §9 handles them explicitly.
+- **Opacity variants likewise** — `bg-emerald-50/40` is its own class, listed separately in §6.
+- **`slate-*` is left alone on purpose** — it is the dark ramp itself.
+- **`.glass-panel` fights back.** index.css forces light text/background inside it with
+  `!important` (a legacy hack to neutralise AI-Studio dark classes). §11 unwinds that at equal
+  specificity, so those `!important`s are required, not sloppiness.
+- **Re-auditing coverage:** extract colour utilities from the built CSS and diff against theme.css.
+  28 utilities are uncovered *by design* — see the header comment in theme.css for why.
+
+### State and toggle
+
+`theme` lives in [src/App.tsx](src/App.tsx), persisted to `localStorage` under `SBR_THEME`. That key
+is deliberately **not** in the list App clears on login/logout, so the preference survives sessions.
+Toggles: header right column when signed in, top-right of the login screen before sign-in. The icon
+shows the mode you switch *to* — Sun while dark, Moon while light.
+
+### Palette repair (done as part of this)
+
+254 occurrences of **invalid Tailwind shades** (`text-stone-550`, `border-stone-150`,
+`text-emerald-850`, `text-stone-90`, … 47 distinct) were normalised to real steps. Tailwind
+generates nothing for a non-existent shade, so those elements had **no colour at all** — borders
+fell back to `currentColor` and text silently inherited. They were broken in light mode too; the
+theme work simply made it visible. Do not reintroduce off-scale shades: the valid steps are
+50/100/200/300/400/500/600/700/800/900/950.
 
 ## 2. Header layout
 
@@ -61,6 +106,7 @@ id it scrolls to:
 | `TEAM` | Team | `sbr-team-section` |
 | `INVENTORY` | Plot Inventory | `sbr-inventory-section` |
 | `PAYOUTS` | Payouts | `sbr-payouts-section` |
+| `SPONSOR_CODE` | Sponsor Reference Code | `sbr-sponsor-code` |
 | `USER_DETAIL` | User Detail | `sbr-user-detail` |
 | `EDIT_DETAIL` | Edit Detail | `sbr-edit-detail` |
 
@@ -89,7 +135,7 @@ Drawer sections, in order: **identity card** → **Navigate** (the table above) 
 
 `activeNav` is passed to both panels as `navFocus`; each maps it to the view that owns the section:
 
-- **`AdminPanel`** — `TREE` / `TEAM` / `USER_DETAIL` / `EDIT_DETAIL` → `AGENTS` sub-tab;
+- **`AdminPanel`** — `TREE` / `TEAM` / `USER_DETAIL` / `EDIT_DETAIL` / `SPONSOR_CODE` → `AGENTS` sub-tab;
   `PAYOUTS` → `PAYOUTS` sub-tab; `INVENTORY` → `BOOKINGS` sub-tab (which holds the live inventory
   table). Without this the anchors would not exist in the DOM, since sub-tab content is
   conditionally rendered.
@@ -135,6 +181,29 @@ Previously KYC and bank details lived in a modal gated behind the "SBR Profile �
 - `isProfileOpen` state, the modal header/footer, and the `ArrowLeft` import were deleted with it.
 
 ---
+
+## 6. `/profile` route (hash router)
+
+[src/components/ProfilePage.tsx](src/components/ProfilePage.tsx) — the full partner record:
+identity banner (photo or initial, status, designation, sponsor line), performance stats
+(direct/downline volume, paid/pending payouts), read-only personal details (name, phone, email,
+DOB, PAN, Aadhaar, address), plus the same "KYC Compliance (Locked)" and editable
+"Profile Info & Bank Details" sections the dashboard shows. Saves go through
+`handleAdminUpdateUserProfile`, same as the inline form.
+
+**Routing is hash-based, hand-rolled — no react-router.** The production build is a static
+GitHub Pages SPA with `base: './'`, so history-based paths would 404 on refresh; a dependency
+for two routes isn't warranted. Mechanics in [src/App.tsx](src/App.tsx):
+
+- `route` state mirrors `window.location.hash` (`parseHashRoute`); a `hashchange` listener keeps
+  it in sync, so browser back/forward work.
+- `NAV_ITEMS` entries now carry either `anchor` (scroll on the dashboard) **or** `route` (swap
+  the main view). "Profile" is a `route` entry. Selecting an *anchored* item while on `/profile`
+  first navigates back to `/`, then the retry-scroll finds the anchor once the dashboard mounts.
+- `navigateTo('/')` uses `pushState` to strip the hash entirely rather than leaving `#/`.
+- **Access rule:** `#/profile` shows the signed-in user; `#/profile/<SBR ID>` shows that partner
+  — honoured only when `session.role === 'ADMIN'`, everyone else silently gets their own record.
+  The admin agents directory has a per-row "Profile" button that sets the hash directly.
 
 ## Known gaps
 

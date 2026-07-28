@@ -1,0 +1,435 @@
+/* ==========================================================================
+   SBR THEME — single source of truth for light/dark colour
+   ==========================================================================
+
+   HOW IT WORKS
+   ------------
+   `App` toggles a `.dark` class on <html>. Light mode is the Tailwind palette
+   the components already use (`bg-white`, `text-stone-900`, `border-stone-200`,
+   …). Dark mode is produced here by re-pointing those same utilities at the
+   dark tokens below — so components need no `dark:` classes at all.
+
+   WHY UTILITY OVERRIDES AND NOT VARIABLE INVERSION
+   ------------------------------------------------
+   Tailwind v4 emits `background-color: var(--color-stone-900)` etc., so it is
+   tempting to just invert `--color-*` under `.dark`. That breaks, because the
+   same colour is used for two opposite jobs:
+
+       bg-stone-900 + text-white   → a solid dark button
+       text-stone-900              → primary body text
+
+   Inverting the variable would turn the button background light while its
+   label stayed white. Overriding *utilities* keeps them independent: we can
+   lighten `text-stone-900` without touching `bg-stone-900`.
+
+   RULES WHEN EDITING
+   ------------------
+   1. Add colour here, not as `dark:` classes in components.
+   2. Neutrals are `stone-*`; the dark ramp is `slate`-like. `slate-*` is left
+      alone deliberately — it *is* the dark palette, so overriding it would
+      fight the few components that use it directly.
+   3. Accents: only light shades (50–200) are re-pointed for backgrounds, and
+      only dark shades (600–950) for text. That split is what keeps solid
+      accent buttons (`bg-emerald-800 text-white`) intact.
+   4. Every override is `.dark <selector>` (specificity 0,2,0) so it reliably
+      beats the base utility.
+
+   DELIBERATELY NOT OVERRIDDEN — do not "fix" these
+   ------------------------------------------------
+   * Saturated 500/600 fills (`bg-amber-500`, `bg-green-500`, `bg-rose-500`,
+     `bg-blue-600`) — status dots and progress bars. They read correctly on
+     dark already, and muting them would lose the signal.
+   * Already-translucent tints (`bg-emerald-500/10`, `bg-amber-500/5`, …) —
+     they composite over whatever surface is behind them, so they adapt free.
+   * Light text shades (`text-stone-100`, `text-amber-400`, `text-blue-500`,
+     `text-emerald-200/80`) — these sit on solid coloured buttons. Darkening
+     them would make the labels unreadable.
+   * `slate-*` in any form — that IS the dark ramp.
+
+   To re-audit coverage after adding components, diff the colour utilities in
+   the built CSS against this file (see UI_CHANGES.md §1).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. TOKENS
+   -------------------------------------------------------------------------- */
+
+.dark {
+  /* Surfaces, lightest-sitting-on-darkest */
+  --sbr-bg: #0b1120;          /* page background            */
+  --sbr-surface: #111a2e;     /* cards / panels (was white) */
+  --sbr-surface-2: #16203a;   /* subtle fills   (stone-50)  */
+  --sbr-surface-3: #1e2a45;   /* chips, tab bars(stone-100) */
+  --sbr-surface-4: #26334f;   /* pressed / strong(stone-200)*/
+  --sbr-surface-5: #334155;   /* solid neutral buttons      */
+
+  /* Hairlines */
+  --sbr-border: rgba(255, 255, 255, 0.09);
+  --sbr-border-strong: rgba(255, 255, 255, 0.17);
+
+  /* Text, strongest first */
+  --sbr-text: #e8edf5;        /* headings / primary  */
+  --sbr-text-2: #b8c4d6;      /* body                */
+  --sbr-text-3: #8d9aae;      /* secondary / labels  */
+  --sbr-text-4: #6b7889;      /* faint / placeholder */
+
+  color-scheme: dark;
+}
+
+/* --------------------------------------------------------------------------
+   2. BASE
+   -------------------------------------------------------------------------- */
+
+.dark body {
+  background-color: var(--sbr-bg) !important;
+  color: var(--sbr-text) !important;
+}
+
+/* Arbitrary hex values hardcoded in components */
+.dark .bg-\[\#fafaf7\] { background-color: var(--sbr-bg); }
+.dark .text-\[\#1c1917\] { color: var(--sbr-text); }
+.dark .bg-\[\#0d1425\],
+.dark .bg-\[\#0c1324\],
+.dark .bg-\[\#0f172a\] { background-color: var(--sbr-surface); }
+
+/* --------------------------------------------------------------------------
+   3. NEUTRAL SURFACES
+   -------------------------------------------------------------------------- */
+
+.dark .bg-white { background-color: var(--sbr-surface); }
+.dark .bg-white\/85 { background-color: color-mix(in srgb, var(--sbr-surface) 85%, transparent); }
+.dark .bg-white\/10 { background-color: rgba(255, 255, 255, 0.06); }
+.dark .bg-white\/2 { background-color: rgba(255, 255, 255, 0.03); }
+
+.dark .bg-stone-50,
+.dark .bg-stone-50\/30,
+.dark .bg-stone-50\/40,
+.dark .bg-stone-50\/50,
+.dark .bg-stone-50\/60,
+.dark .bg-stone-50\/65,
+.dark .bg-stone-50\/70 { background-color: var(--sbr-surface-2); }
+
+.dark .bg-stone-100,
+.dark .bg-stone-100\/80 { background-color: var(--sbr-surface-3); }
+
+.dark .bg-stone-200 { background-color: var(--sbr-surface-4); }
+.dark .bg-stone-300 { background-color: var(--sbr-surface-5); }
+.dark .bg-stone-500\/5 { background-color: rgba(255, 255, 255, 0.04); }
+
+/* Solid neutral buttons keep a filled look (their label stays `text-white`) */
+.dark .bg-stone-700,
+.dark .bg-stone-800,
+.dark .bg-stone-900,
+.dark .bg-stone-950 { background-color: var(--sbr-surface-5); }
+
+/* Modal scrims stay dark — they are already correct, just deepen them */
+.dark .bg-stone-900\/40,
+.dark .bg-stone-900\/45,
+.dark .bg-stone-900\/60 { background-color: rgba(2, 6, 23, 0.72); }
+.dark .bg-stone-950\/80 { background-color: rgba(2, 6, 23, 0.85); }
+
+/* --------------------------------------------------------------------------
+   4. NEUTRAL TEXT
+   -------------------------------------------------------------------------- */
+
+.dark .text-stone-950,
+.dark .text-stone-900,
+.dark .text-stone-800 { color: var(--sbr-text); }
+
+.dark .text-stone-700,
+.dark .text-stone-600 { color: var(--sbr-text-2); }
+
+.dark .text-stone-500 { color: var(--sbr-text-3); }
+
+.dark .text-stone-400,
+.dark .text-stone-300 { color: var(--sbr-text-4); }
+
+.dark .placeholder-stone-400::placeholder { color: var(--sbr-text-4); }
+
+/* --------------------------------------------------------------------------
+   5. BORDERS
+   -------------------------------------------------------------------------- */
+
+.dark .border-stone-100,
+.dark .border-stone-200,
+.dark .border-stone-200\/60,
+.dark .border-stone-200\/65,
+.dark .border-stone-200\/70,
+.dark .border-stone-200\/80,
+.dark .border-stone-200\/85,
+.dark .border-stone-200\/90 { border-color: var(--sbr-border); }
+
+.dark .border-stone-300,
+.dark .border-stone-400,
+.dark .border-stone-700 { border-color: var(--sbr-border-strong); }
+
+.dark .divide-stone-150 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-stone-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--sbr-border); }
+
+/* --------------------------------------------------------------------------
+   6. ACCENT TINTS  (light chip/callout backgrounds → translucent on dark)
+   -------------------------------------------------------------------------- */
+
+.dark .bg-emerald-50  { background-color: rgba(16, 185, 129, 0.12); }
+.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.18); }
+.dark .bg-amber-50    { background-color: rgba(245, 158, 11, 0.12); }
+.dark .bg-amber-100   { background-color: rgba(245, 158, 11, 0.18); }
+.dark .bg-rose-50     { background-color: rgba(244, 63, 94, 0.12); }
+.dark .bg-rose-100    { background-color: rgba(244, 63, 94, 0.18); }
+.dark .bg-blue-50     { background-color: rgba(59, 130, 246, 0.12); }
+.dark .bg-blue-100    { background-color: rgba(59, 130, 246, 0.18); }
+.dark .bg-teal-50     { background-color: rgba(20, 184, 166, 0.12); }
+.dark .bg-green-50    { background-color: rgba(34, 197, 94, 0.12); }
+.dark .bg-indigo-50   { background-color: rgba(99, 102, 241, 0.12); }
+.dark .bg-sky-50      { background-color: rgba(14, 165, 233, 0.12); }
+.dark .bg-cyan-50     { background-color: rgba(6, 182, 212, 0.12); }
+.dark .bg-violet-50   { background-color: rgba(139, 92, 246, 0.12); }
+
+/* Opacity variants of the same tints (bg-emerald-50/40, bg-amber-50/30, …).
+   Tailwind emits each as its own class, so each needs its own rule. */
+.dark .bg-emerald-50\/10,
+.dark .bg-emerald-50\/20,
+.dark .bg-emerald-50\/40,
+.dark .bg-emerald-50\/45,
+.dark .bg-emerald-50\/50,
+.dark .bg-emerald-50\/70 { background-color: rgba(16, 185, 129, 0.10); }
+
+.dark .bg-amber-50\/30,
+.dark .bg-amber-50\/40,
+.dark .bg-amber-50\/50 { background-color: rgba(245, 158, 11, 0.10); }
+.dark .bg-amber-100\/80 { background-color: rgba(245, 158, 11, 0.18); }
+
+.dark .bg-blue-50\/20 { background-color: rgba(59, 130, 246, 0.10); }
+
+.dark .border-emerald-100,
+.dark .border-emerald-200,
+.dark .border-emerald-200\/30,
+.dark .border-emerald-200\/50,
+.dark .border-emerald-200\/60,
+.dark .border-emerald-200\/80,
+.dark .border-emerald-300 { border-color: rgba(16, 185, 129, 0.28); }
+
+.dark .border-amber-100,
+.dark .border-amber-200,
+.dark .border-amber-200\/50,
+.dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.28); }
+
+.dark .border-rose-100,
+.dark .border-rose-200    { border-color: rgba(244, 63, 94, 0.28); }
+.dark .border-blue-100,
+.dark .border-blue-200,
+.dark .border-blue-300    { border-color: rgba(59, 130, 246, 0.28); }
+.dark .border-teal-200,
+.dark .border-teal-200\/55,
+.dark .border-teal-300    { border-color: rgba(20, 184, 166, 0.28); }
+.dark .border-green-200   { border-color: rgba(34, 197, 94, 0.28); }
+.dark .border-indigo-200  { border-color: rgba(99, 102, 241, 0.28); }
+.dark .border-sky-300     { border-color: rgba(14, 165, 233, 0.28); }
+.dark .border-cyan-300    { border-color: rgba(6, 182, 212, 0.28); }
+.dark .border-violet-300  { border-color: rgba(139, 92, 246, 0.28); }
+
+/* --------------------------------------------------------------------------
+   7. ACCENT TEXT  (dark-on-light shades → legible on dark)
+   -------------------------------------------------------------------------- */
+
+.dark .text-emerald-950,
+.dark .text-emerald-900,
+.dark .text-emerald-800,
+.dark .text-emerald-700,
+.dark .text-emerald-700\/70,
+.dark .text-emerald-600 { color: #6ee7b7; }
+
+.dark .text-amber-950,
+.dark .text-amber-900,
+.dark .text-amber-800,
+.dark .text-amber-700,
+.dark .text-amber-600 { color: #fcd34d; }
+
+.dark .text-rose-950,
+.dark .text-rose-900,
+.dark .text-rose-800,
+.dark .text-rose-700,
+.dark .text-rose-600 { color: #fda4af; }
+
+.dark .text-blue-900,
+.dark .text-blue-800,
+.dark .text-blue-700,
+.dark .text-blue-600 { color: #93c5fd; }
+
+.dark .text-teal-700,
+.dark .text-teal-500 { color: #5eead4; }
+
+.dark .text-green-800,
+.dark .text-green-700 { color: #86efac; }
+
+.dark .text-indigo-900,
+.dark .text-indigo-800 { color: #a5b4fc; }
+
+.dark .text-sky-700 { color: #7dd3fc; }
+.dark .text-cyan-700 { color: #67e8f9; }
+.dark .text-violet-700 { color: #c4b5fd; }
+
+/* --------------------------------------------------------------------------
+   8. SOLID ACTIONS
+   Brand buttons keep a filled treatment; lift them slightly so they read
+   against the dark surface, and make hover *lighter* rather than darker.
+   -------------------------------------------------------------------------- */
+
+.dark .bg-emerald-800,
+.dark .bg-emerald-900 { background-color: #047857; }
+.dark .bg-emerald-600,
+.dark .bg-emerald-700 { background-color: #059669; }
+.dark .bg-rose-600 { background-color: #e11d48; }
+
+/* --------------------------------------------------------------------------
+   9. HOVER STATES
+   -------------------------------------------------------------------------- */
+
+.dark .hover\:bg-white\/5:hover { background-color: rgba(255, 255, 255, 0.05); }
+
+.dark .hover\:bg-stone-50:hover,
+.dark .hover\:bg-stone-50\/30:hover,
+.dark .hover\:bg-stone-50\/50:hover { background-color: var(--sbr-surface-2); }
+
+.dark .hover\:bg-stone-100:hover,
+.dark .hover\:bg-stone-100\/80:hover { background-color: var(--sbr-surface-3); }
+
+.dark .hover\:bg-stone-200:hover,
+.dark .hover\:bg-stone-200\/80:hover { background-color: var(--sbr-surface-4); }
+
+.dark .hover\:bg-stone-300:hover,
+.dark .hover\:bg-stone-700:hover,
+.dark .hover\:bg-stone-800:hover { background-color: #475569; }
+
+.dark .hover\:bg-emerald-50:hover { background-color: rgba(16, 185, 129, 0.16); }
+.dark .hover\:bg-emerald-100:hover,
+.dark .hover\:bg-emerald-100\/50:hover { background-color: rgba(16, 185, 129, 0.24); }
+.dark .hover\:bg-emerald-800:hover,
+.dark .hover\:bg-emerald-900:hover { background-color: #059669; }
+
+.dark .hover\:bg-amber-100:hover { background-color: rgba(245, 158, 11, 0.24); }
+.dark .hover\:bg-rose-50:hover { background-color: rgba(244, 63, 94, 0.16); }
+.dark .hover\:bg-rose-100:hover { background-color: rgba(244, 63, 94, 0.24); }
+.dark .hover\:bg-rose-700:hover { background-color: #be123c; }
+.dark .hover\:bg-rose-950:hover { background-color: rgba(244, 63, 94, 0.18); }
+
+.dark .hover\:text-stone-900:hover,
+.dark .hover\:text-stone-800:hover { color: var(--sbr-text); }
+.dark .hover\:text-stone-700:hover { color: var(--sbr-text-2); }
+.dark .hover\:text-stone-200:hover { color: var(--sbr-text); }
+.dark .hover\:text-emerald-950:hover,
+.dark .hover\:text-emerald-700:hover { color: #6ee7b7; }
+.dark .hover\:text-rose-900:hover,
+.dark .hover\:text-rose-600:hover { color: #fda4af; }
+.dark .hover\:text-blue-900:hover { color: #93c5fd; }
+
+.dark .hover\:border-emerald-100:hover { border-color: rgba(16, 185, 129, 0.34); }
+.dark .hover\:border-rose-100:hover { border-color: rgba(244, 63, 94, 0.34); }
+
+/* --------------------------------------------------------------------------
+   10. FORM CONTROLS
+   Browser-native widgets need explicit colour or they render light-on-light.
+   -------------------------------------------------------------------------- */
+
+.dark input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.dark select,
+.dark textarea {
+  background-color: var(--sbr-surface-2);
+  border-color: var(--sbr-border);
+  color: var(--sbr-text);
+}
+
+/* Let checkbox/radio keep the native control, just theme-aware */
+.dark input[type='checkbox'],
+.dark input[type='radio'] { accent-color: #059669; }
+
+.dark input::placeholder,
+.dark textarea::placeholder { color: var(--sbr-text-4); }
+
+/* Date/number spinners and the picker icon are black by default */
+.dark input[type='date']::-webkit-calendar-picker-indicator { filter: invert(0.8); }
+
+.dark select option {
+  background-color: var(--sbr-surface-2);
+  color: var(--sbr-text);
+}
+
+.dark .glass-input {
+  background-color: var(--sbr-surface-2);
+  border-color: var(--sbr-border);
+  color: var(--sbr-text);
+}
+
+/* --------------------------------------------------------------------------
+   11. LEGACY `.glass-panel` OVERRIDES
+   index.css forces light text/background inside .glass-panel with !important
+   to bypass the old AI-Studio dark classes. Those rules must be undone in dark
+   mode at equal specificity, hence the !important here too.
+   -------------------------------------------------------------------------- */
+
+.dark .glass-panel {
+  background-color: var(--sbr-surface);
+  border-color: var(--sbr-border);
+  color: var(--sbr-text);
+}
+
+.dark .glass-panel .text-white,
+.dark .glass-panel .text-slate-100,
+.dark .glass-panel .text-slate-200,
+.dark .glass-panel .text-zinc-100,
+.dark .glass-panel .text-orange-100,
+.dark .glass-panel .text-zinc-900,
+.dark .glass-panel .text-slate-900,
+.dark .glass-panel .text-stone-900 { color: var(--sbr-text) !important; }
+
+.dark .glass-panel .text-slate-300,
+.dark .glass-panel .text-zinc-300,
+.dark .glass-panel .text-stone-300,
+.dark .glass-panel .text-slate-400,
+.dark .glass-panel .text-zinc-400,
+.dark .glass-panel .text-stone-400 { color: var(--sbr-text-2) !important; }
+
+.dark .glass-panel .text-slate-500,
+.dark .glass-panel .text-zinc-500 { color: var(--sbr-text-3) !important; }
+
+.dark .glass-panel .text-cyan-400,
+.dark .glass-panel .text-teal-400,
+.dark .glass-panel .text-emerald-400 { color: #6ee7b7 !important; }
+
+.dark .glass-panel .border-white\/5,
+.dark .glass-panel .border-white\/10,
+.dark .glass-panel .border-stone-800 { border-color: var(--sbr-border) !important; }
+
+.dark .glass-panel .bg-slate-900,
+.dark .glass-panel .bg-\[\#0d1425\],
+.dark .glass-panel .bg-\[\#0c1324\],
+.dark .glass-panel .bg-\[\#0f172a\] {
+  background-color: var(--sbr-surface-2) !important;
+  border-color: var(--sbr-border) !important;
+}
+
+.dark .glass-panel .bg-slate-950,
+.dark .glass-panel .bg-slate-950\/20,
+.dark .glass-panel .bg-slate-950\/40 {
+  background-color: var(--sbr-surface-3) !important;
+  border-color: var(--sbr-border) !important;
+}
+
+.dark .glass-panel-hover:hover {
+  background-color: var(--sbr-surface-2);
+  border-color: var(--sbr-border-strong);
+}
+
+/* --------------------------------------------------------------------------
+   12. CHROME
+   -------------------------------------------------------------------------- */
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); }
+
+.dark .shadow-xs,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl { --tw-shadow-color: rgba(0, 0, 0, 0.5); }

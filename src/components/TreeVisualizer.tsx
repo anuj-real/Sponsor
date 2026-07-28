@@ -62,17 +62,18 @@ interface TeamNode {
  * };
  */
 
+/* Colour is theme-agnostic here: theme.css re-points these utilities in dark mode. */
 const ACCENT: Record<string, string> = {
-  'Exempt': 'text-amber-700 bg-amber-50 border-amber-300 dark:text-amber-300 dark:bg-amber-400/10 dark:border-amber-400/25',
-  'Sr. GM': 'text-violet-700 bg-violet-50 border-violet-300 dark:text-violet-300 dark:bg-violet-400/10 dark:border-violet-400/25',
-  'GM': 'text-sky-700 bg-sky-50 border-sky-300 dark:text-sky-300 dark:bg-sky-400/10 dark:border-sky-400/25',
-  'AGM': 'text-cyan-700 bg-cyan-50 border-cyan-300 dark:text-cyan-300 dark:bg-cyan-400/10 dark:border-cyan-400/25',
-  'Sr. Manager': 'text-teal-700 bg-teal-50 border-teal-300 dark:text-teal-300 dark:bg-teal-400/10 dark:border-teal-400/25',
-  'Manager': 'text-emerald-700 bg-emerald-50 border-emerald-300 dark:text-emerald-300 dark:bg-emerald-400/10 dark:border-emerald-400/25',
-  'Associate': 'text-stone-600 bg-stone-100 border-stone-300 dark:text-slate-300 dark:bg-slate-400/10 dark:border-slate-400/25',
+  'Exempt': 'text-amber-700 bg-amber-50 border-amber-300',
+  'Sr. GM': 'text-violet-700 bg-violet-50 border-violet-300',
+  'GM': 'text-sky-700 bg-sky-50 border-sky-300',
+  'AGM': 'text-cyan-700 bg-cyan-50 border-cyan-300',
+  'Sr. Manager': 'text-teal-700 bg-teal-50 border-teal-300',
+  'Manager': 'text-emerald-700 bg-emerald-50 border-emerald-300',
+  'Associate': 'text-stone-600 bg-stone-100 border-stone-300',
 };
 
-const LINE = 'bg-stone-300 dark:bg-white/12';
+const LINE = 'bg-stone-300';
 
 /**
  * Converts the flat user list into nested TeamNodes.
@@ -129,26 +130,26 @@ function MemberCard({ node, isRoot = false }: { node: TeamNode; isRoot?: boolean
     <div
       className={`rounded-lg border px-2 py-1.5 text-center ${
         isRoot
-          ? 'w-36 border-amber-400 bg-amber-50 ring-1 ring-amber-300 dark:border-amber-400/30 dark:bg-slate-800/80 dark:ring-amber-400/20'
-          : 'w-32 border-stone-200 bg-white dark:border-white/10 dark:bg-slate-800/50'
+          ? 'w-36 border-amber-400 bg-amber-50 ring-1 ring-amber-300'
+          : 'w-32 border-stone-200 bg-white'
       }`}
     >
-      <UserIcon className="mx-auto h-3.5 w-3.5 text-stone-400 dark:text-slate-400" strokeWidth={1.75} />
+      <UserIcon className="mx-auto h-3.5 w-3.5 text-stone-400" strokeWidth={1.75} />
 
-      <h4 className="mt-1 truncate text-[11px] font-semibold leading-tight text-stone-900 dark:text-slate-50" title={node.name}>
+      <h4 className="mt-1 truncate text-[11px] font-semibold leading-tight text-stone-900" title={node.name}>
         {node.name}
       </h4>
 
-      <p className="font-mono text-[9px] leading-tight text-stone-500 dark:text-slate-500">{node.id}</p>
+      <p className="font-mono text-[9px] leading-tight text-stone-500">{node.id}</p>
 
       <span className={`mt-1 inline-block rounded border px-1.5 text-[8.5px] font-semibold leading-[14px] ${accent}`}>
         {node.designation}
       </span>
 
-      <div className="mt-1 flex justify-center gap-2 border-t border-stone-200 pt-1 font-mono text-[9px] leading-tight text-stone-600 dark:border-white/10 dark:text-slate-400">
-        <span><span className="text-stone-400 dark:text-slate-600">D</span> {node.directPts.toLocaleString()}</span>
-        <span><span className="text-stone-400 dark:text-slate-600">N</span> {node.networkPts.toLocaleString()}</span>
-        <span><span className="text-stone-400 dark:text-slate-600">T</span> {node.teamSize}</span>
+      <div className="mt-1 flex justify-center gap-2 border-t border-stone-200 pt-1 font-mono text-[9px] leading-tight text-stone-600">
+        <span><span className="text-stone-400">D</span> {node.directPts.toLocaleString()}</span>
+        <span><span className="text-stone-400">N</span> {node.networkPts.toLocaleString()}</span>
+        <span><span className="text-stone-400">T</span> {node.teamSize}</span>
       </div>
     </div>
   );
@@ -209,17 +210,17 @@ export default function TreeVisualizer({ users = [] }: TreeVisualizerProps) {
   }, [roots]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-white/10 dark:bg-slate-950">
-      <div className="border-b border-stone-200 px-3 py-2 text-center dark:border-white/10">
-        <h3 className="text-xs font-semibold tracking-tight text-stone-900 dark:text-slate-100">SBR Team Structure</h3>
-        <p className="text-[10px] text-stone-500 dark:text-slate-500">
+    <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+      <div className="border-b border-stone-200 px-3 py-2 text-center">
+        <h3 className="text-xs font-semibold tracking-tight text-stone-900">SBR Team Structure</h3>
+        <p className="text-[10px] text-stone-500">
           D direct · N network · T team
         </p>
       </div>
 
-      <div ref={scrollRef} className="max-h-[70vh] overflow-auto p-4 bg-stone-50/60 dark:bg-slate-950">
+      <div ref={scrollRef} className="max-h-[70vh] overflow-auto p-4 bg-stone-50/60">
         {roots.length === 0 ? (
-          <p className="py-8 text-center text-[11px] text-stone-400 dark:text-slate-500">
+          <p className="py-8 text-center text-[11px] text-stone-400">
             No sponsor records available yet.
           </p>
         ) : (

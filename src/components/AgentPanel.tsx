@@ -84,7 +84,7 @@ export default function AgentPanel({
       return { 
         status: 'ACTIVE',
         text: 'Active', 
-        color: 'text-emerald-700 bg-emerald-50 border border-emerald-150 font-bold' 
+        color: 'text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold' 
       };
     }
     try {
@@ -94,7 +94,7 @@ export default function AgentPanel({
           return { 
             status: 'UPCOMING',
             text: 'Upcoming', 
-            color: 'text-blue-700 bg-blue-50 border border-blue-150 font-semibold' 
+            color: 'text-blue-700 bg-blue-50 border border-blue-200 font-semibold' 
           };
         }
       }
@@ -113,38 +113,38 @@ export default function AgentPanel({
           return { 
             status: 'ACTIVE',
             text: 'Expires Today!', 
-            color: 'text-rose-605 bg-rose-50 border border-rose-100 animate-pulse font-extrabold' 
+            color: 'text-rose-600 bg-rose-50 border border-rose-100 animate-pulse font-extrabold' 
           };
         } else if (diffDays === 1) {
           return { 
             status: 'ACTIVE',
             text: 'Expires Tomorrow', 
-            color: 'text-amber-700 bg-amber-50 border border-amber-150 font-bold' 
+            color: 'text-amber-700 bg-amber-50 border border-amber-200 font-bold' 
           };
         } else if (diffDays <= 7) {
           return { 
             status: 'ACTIVE',
             text: `Only ${diffDays} days left`, 
-            color: 'text-amber-600 bg-amber-50 border border-amber-150 font-semibold' 
+            color: 'text-amber-600 bg-amber-50 border border-amber-200 font-semibold' 
           };
         } else {
           return { 
             status: 'ACTIVE',
             text: `${diffDays} days left`, 
-            color: 'text-emerald-700 bg-emerald-50 border border-emerald-150 font-medium' 
+            color: 'text-emerald-700 bg-emerald-50 border border-emerald-200 font-medium' 
           };
         }
       }
       return { 
         status: 'ACTIVE',
         text: 'Active', 
-        color: 'text-emerald-750 bg-emerald-50 border border-emerald-150 font-bold' 
+        color: 'text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold' 
       };
     } catch {
       return { 
         status: 'ACTIVE',
         text: 'Active', 
-        color: 'text-emerald-750 bg-emerald-50 border border-emerald-150 font-bold' 
+        color: 'text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold' 
       };
     }
   };
@@ -265,10 +265,10 @@ export default function AgentPanel({
                 className="flex items-center gap-2 cursor-pointer group"
                 title="Jump to SBR profile details"
               >
-                <h2 className="text-lg sm:text-xl font-bold text-stone-900 group-hover:text-emerald-850 transition-colors">
+                <h2 className="text-lg sm:text-xl font-bold text-stone-900 group-hover:text-emerald-800 transition-colors">
                   {agent.name}
                 </h2>
-                <span className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-150 flex items-center gap-1 transition-all">
+                <span className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 transition-all">
                   <span>SBR Profile 👤</span>
                 </span>
               </div>
@@ -276,14 +276,14 @@ export default function AgentPanel({
                 {agent.designation || 'Associate'}
               </span>
             </div>
-            <p className="text-xs text-stone-550 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="text-xs text-stone-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>Associate Sponsor ID:</span>
               <span className="font-mono font-bold text-stone-900 bg-stone-50 px-2 py-0.5 rounded border border-stone-200">{agent.id}</span>
               <span>• Joined {agent.joinedDate}</span>
               {agent.bankAccountNumber && (
                 <>
                   <span>•</span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-850 bg-emerald-50/70 px-1.5 py-0.5 rounded border border-emerald-150/30">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-800 bg-emerald-50/70 px-1.5 py-0.5 rounded border border-emerald-200/30">
                     <CreditCard className="w-3 h-3 shrink-0 text-emerald-700" />
                     <span>A/C: *{agent.bankAccountNumber.slice(-4)} ({agent.ifscCode})</span>
                   </span>
@@ -294,7 +294,7 @@ export default function AgentPanel({
         </div>
 
         {/* Active Team Member Count */}
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-150 rounded-xl px-4 py-2 shrink-0 md:self-center">
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 shrink-0 md:self-center">
           <Users className="w-5 h-5 text-emerald-800" />
           <div>
             <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block font-sans">Active Team Members</span>
@@ -313,14 +313,14 @@ export default function AgentPanel({
           </div>
           <div>
             <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider font-sans">Real-time Sizing Conversion Rule</h4>
-            <p className="text-[11px] text-stone-650 mt-0.5 leading-normal">
-              Plot points are derived from plot size (e.g. up to 80 Sq Yd = <span className="font-bold text-emerald-850">1.0 Point</span>, 81-130 = <span className="font-bold text-emerald-850">2.0 Points</span>, 131-180 = <span className="font-bold text-emerald-850">3.0 Points</span>, and up to 10.0 Points for 481-530 Sq Yd). Commission and levels are derived purely in points.
+            <p className="text-[11px] text-stone-600 mt-0.5 leading-normal">
+              Plot points are derived from plot size (e.g. up to 80 Sq Yd = <span className="font-bold text-emerald-800">1.0 Point</span>, 81-130 = <span className="font-bold text-emerald-800">2.0 Points</span>, 131-180 = <span className="font-bold text-emerald-800">3.0 Points</span>, and up to 10.0 Points for 481-530 Sq Yd). Commission and levels are derived purely in points.
             </p>
           </div>
         </div>
         <div className="hidden sm:block text-right px-4 py-2 bg-white rounded-xl border border-stone-200 shrink-0">
           <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-sans">Platform Standard</span>
-          <span className="font-mono font-extrabold text-xs text-emerald-850">Tiered Points System</span>
+          <span className="font-mono font-extrabold text-xs text-emerald-800">Tiered Points System</span>
         </div>
       </div>
 
@@ -368,7 +368,7 @@ export default function AgentPanel({
               <h3 className="font-mono font-bold text-xl sm:text-lg text-indigo-900 mt-2">
                 {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length} / {downlineNetwork.length}
               </h3>
-              <p className="text-[10.5px] text-stone-550 mt-1.5">
+              <p className="text-[10.5px] text-stone-500 mt-1.5">
                 Active sub-brokers in your downline
               </p>
             </div>
@@ -394,7 +394,7 @@ export default function AgentPanel({
 
           {/* Sourced property listings & Inventory sub-panel switcher */}
           <div id="sbr-inventory-section" className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden scroll-mt-24">
-            <div className="p-5 border-b border-stone-150 bg-stone-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="p-5 border-b border-stone-200 bg-stone-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h3 className="font-bold text-stone-900 text-base">
                   {activePanelTab === 'LEDGER' ? 'Your Direct Booking Ledger' : 'Live Real Estate Inventory'}
@@ -412,7 +412,7 @@ export default function AgentPanel({
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial ${
                     activePanelTab === 'LEDGER'
                       ? 'bg-white text-stone-900 shadow-xs'
-                      : 'text-stone-550 hover:text-stone-900'
+                      : 'text-stone-500 hover:text-stone-900'
                   }`}
                 >
                   <Clipboard className="w-3.5 h-3.5" /> Direct Ledger
@@ -423,7 +423,7 @@ export default function AgentPanel({
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial ${
                     activePanelTab === 'INVENTORY'
                       ? 'bg-white text-emerald-900 shadow-xs'
-                      : 'text-stone-550 hover:text-stone-900'
+                      : 'text-stone-500 hover:text-stone-900'
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5 text-emerald-700 font-bold" /> Live Inventory
@@ -444,7 +444,7 @@ export default function AgentPanel({
                         <th className="px-5 py-3">Booking Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-stone-150 text-xs text-stone-850">
+                    <tbody className="divide-y divide-stone-200 text-xs text-stone-800">
                       {directDeals.map((deal) => (
                         <tr key={deal.id} className="hover:bg-stone-50/50 transition-colors">
                           <td className="px-5 py-3 font-mono text-stone-800 font-bold">{deal.id}</td>
@@ -455,7 +455,7 @@ export default function AgentPanel({
                             </div>
                           </td>
                           <td className="px-5 py-3 font-mono font-bold text-emerald-800">{formatPoints(deal.saleValue)}</td>
-                          <td className="px-5 py-3 font-mono text-stone-550">{deal.saleDate}</td>
+                          <td className="px-5 py-3 font-mono text-stone-500">{deal.saleDate}</td>
                           <td className="px-5 py-3">
                             {!deal.bookingStatus || deal.bookingStatus === 'TOKEN_RECEIVED' ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
@@ -560,7 +560,7 @@ export default function AgentPanel({
                             </div>
 
                             {/* Project Map and Legal details */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3 rounded-xl border border-stone-150 shadow-2xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3 rounded-xl border border-stone-200 shadow-2xs">
                               {/* Left: Interactive Layout Map with click-to-zoom */}
                               <div className="relative group cursor-zoom-in overflow-hidden rounded-lg border border-stone-200 h-28 bg-stone-50">
                                 <img 
@@ -605,7 +605,7 @@ export default function AgentPanel({
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-stone-50/70 rounded-lg p-1.5 border border-stone-150 text-[10px] space-y-0.5">
+                                  <div className="bg-stone-50/70 rounded-lg p-1.5 border border-stone-200 text-[10px] space-y-0.5">
                                     <div className="flex justify-between items-center border-b border-stone-100 pb-0.5">
                                       <span className="font-bold text-stone-500 uppercase text-[7px] tracking-wider">Registry</span>
                                       <span className={`px-1 rounded-sm text-[8px] font-bold ${
@@ -613,7 +613,7 @@ export default function AgentPanel({
                                           ? 'bg-emerald-100 text-emerald-800'
                                           : proj.registryStatus === 'In Progress'
                                           ? 'bg-amber-100 text-amber-800'
-                                          : 'bg-stone-150 text-stone-600'
+                                          : 'bg-stone-200 text-stone-600'
                                       }`}>
                                         {proj.registryStatus || 'Not Started'}
                                       </span>
@@ -628,7 +628,7 @@ export default function AgentPanel({
                                     )}
                                   </div>
 
-                                  <div className="bg-stone-50/70 rounded-lg p-1.5 border border-stone-150 text-[10px] space-y-0.5">
+                                  <div className="bg-stone-50/70 rounded-lg p-1.5 border border-stone-200 text-[10px] space-y-0.5">
                                     <div className="flex justify-between items-center border-b border-stone-100 pb-0.5">
                                       <span className="font-bold text-stone-500 uppercase text-[7px] tracking-wider">Mutation</span>
                                       <span className={`px-1 rounded-sm text-[8px] font-bold ${
@@ -636,7 +636,7 @@ export default function AgentPanel({
                                           ? 'bg-emerald-100 text-emerald-800'
                                           : proj.mutationStatus === 'Applied'
                                           ? 'bg-amber-100 text-amber-800'
-                                          : 'bg-stone-150 text-stone-600'
+                                          : 'bg-stone-200 text-stone-600'
                                       }`}>
                                         {proj.mutationStatus || 'Pending'}
                                       </span>
@@ -659,7 +659,7 @@ export default function AgentPanel({
                             ) : (
                               filteredInventory.map((inv, idx) => (
                                 <div key={idx} className="space-y-2">
-                                  <span className="text-[10px] font-extrabold text-stone-550 uppercase tracking-wide flex items-center gap-1.5 font-mono">
+                                  <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wide flex items-center gap-1.5 font-mono">
                                     <Layers className="w-3.5 h-3.5 text-emerald-700 shrink-0 animate-pulse" /> Sizing Slab: {inv.size}
                                   </span>
                                   <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -670,8 +670,8 @@ export default function AgentPanel({
                                           u.status === 'BOOKED'
                                             ? 'bg-rose-50 border-rose-200 text-rose-800'
                                             : u.status === 'HOLD'
-                                            ? 'bg-amber-50 border-amber-200 text-amber-850 animate-pulse'
-                                            : 'bg-emerald-50 border-emerald-250 text-emerald-805 hover:bg-emerald-100/50 cursor-help'
+                                            ? 'bg-amber-50 border-amber-200 text-amber-800 animate-pulse'
+                                            : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/50 cursor-help'
                                         }`}
                                         title={`Allotment state: ${u.status}`}
                                       >
@@ -698,9 +698,9 @@ export default function AgentPanel({
         {/* Right Widget: Sponsor sharing & alerts stream */}
         <div className="space-y-6">
           {/* Quick Share Sponsor ID */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
+          <div id="sbr-sponsor-code" className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs scroll-mt-24">
             <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block font-sans">Sponsor Reference Code</span>
-            <p className="text-xs text-stone-550 mt-1.5 leading-relaxed font-sans">
+            <p className="text-xs text-stone-500 mt-1.5 leading-relaxed font-sans">
               Copy and share your unique ID to register associates. When they register sales, you obtain team overrides up to 10 tier levels!
             </p>
             
@@ -730,7 +730,7 @@ export default function AgentPanel({
             <h3 className="font-bold text-stone-900 text-base">✨ SBR Partner Incentives & Motivational Locker</h3>
             <p className="text-xs text-stone-500 mt-1">Unlock milestones, complete monthly offers and trace clear-cut leadership commission designations.</p>
           </div>
-          <span className="inline-block px-3 py-1.5 bg-emerald-50 text-emerald-800 text-[10.5px] font-bold tracking-wider rounded-xl border border-emerald-150 uppercase">
+          <span className="inline-block px-3 py-1.5 bg-emerald-50 text-emerald-800 text-[10.5px] font-bold tracking-wider rounded-xl border border-emerald-200 uppercase">
             Active Campaign Phase
           </span>
         </div>
@@ -752,7 +752,7 @@ export default function AgentPanel({
                       expiry.status === 'EXPIRED' 
                         ? 'bg-stone-50/50 border-stone-200/65 opacity-70' 
                         : expiry.status === 'UPCOMING'
-                          ? 'bg-blue-50/20 border-blue-150'
+                          ? 'bg-blue-50/20 border-blue-200'
                           : 'bg-stone-50 border-stone-200'
                     }`}>
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center border shrink-0 mt-0.5 ${
@@ -777,8 +777,8 @@ export default function AgentPanel({
                             {expiry.text}
                           </span>
                         </div>
-                        <p className="text-[11.5px] text-stone-850 font-bold leading-normal">Settle {o.volumeSqYds} Square Yards</p>
-                        <p className="text-[10px] text-stone-550 mt-0.5">Requires Down Payment: <strong className="text-stone-800 font-mono">{o.paymentPercentage}%</strong></p>
+                        <p className="text-[11.5px] text-stone-800 font-bold leading-normal">Settle {o.volumeSqYds} Square Yards</p>
+                        <p className="text-[10px] text-stone-500 mt-0.5">Requires Down Payment: <strong className="text-stone-800 font-mono">{o.paymentPercentage}%</strong></p>
                         {o.startDate && o.endDate && (
                           <p className="text-[9.5px] text-stone-600 font-medium mt-1">
                             Available: <span className="font-mono text-stone-800">{o.startDate}</span> to <span className="font-mono text-stone-800">{o.endDate}</span>
@@ -788,7 +788,7 @@ export default function AgentPanel({
                           expiry.status === 'EXPIRED'
                             ? 'bg-stone-100 text-stone-500 border-stone-200'
                             : expiry.status === 'UPCOMING'
-                              ? 'bg-blue-50 text-blue-900 border-blue-150'
+                              ? 'bg-blue-50 text-blue-900 border-blue-200'
                               : 'bg-amber-50 text-amber-900 border-amber-100'
                         }`}>
                           Reward: {o.perkName}
@@ -872,15 +872,15 @@ export default function AgentPanel({
                         : isUnlocked 
                           ? 'bg-stone-50/70 border-stone-200/80 opacity-90' 
                           : isEligible 
-                            ? 'bg-amber-50/30 border-amber-250 animate-pulse' 
-                            : 'bg-stone-50/30 border-stone-150'
+                            ? 'bg-amber-50/30 border-amber-200 animate-pulse' 
+                            : 'bg-stone-50/30 border-stone-200'
                     }`}>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h5 className="font-sans font-extrabold text-stone-900 uppercase text-[11px] tracking-wide">{cfg.designation}</h5>
                           {statusBadge}
                         </div>
-                        <span className="text-[9.5px] text-stone-550 block mt-1">Condition: <strong className="text-stone-805">{cfg.condition}</strong></span>
+                        <span className="text-[9.5px] text-stone-500 block mt-1">Condition: <strong className="text-stone-800">{cfg.condition}</strong></span>
                         <p className="text-[9px] text-stone-500 leading-normal italic mt-0.5">Lineage: {cfg.rules}</p>
                       </div>
                       <span className="text-[10px] bg-emerald-50 text-emerald-800 font-mono font-bold px-2 py-1 rounded shrink-0 ml-3">
@@ -932,13 +932,13 @@ export default function AgentPanel({
                     <th className="px-5 py-3">Sourced Property Volume</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-150 text-xs text-stone-800 font-medium">
+                <tbody className="divide-y divide-stone-200 text-xs text-stone-800 font-medium">
                   {downlineNetwork.map(({ user, relativeLevel }) => (
                     <tr key={user.id} className="hover:bg-stone-50/50 transition-colors">
                       <td className="px-5 py-3.5">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           relativeLevel === 1 
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-150' 
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
                             : 'bg-stone-100 text-stone-700 border border-stone-200'
                         }`}>
                           Level {relativeLevel} {relativeLevel === 1 ? '(Direct)' : '(Indirect)'}
@@ -977,7 +977,7 @@ export default function AgentPanel({
             </p>
           </div>
 
-          <div className="overflow-y-auto max-h-[350px] divide-y divide-stone-150 custom-scrollbar">
+          <div className="overflow-y-auto max-h-[350px] divide-y divide-stone-200 custom-scrollbar">
             {myPayouts.length > 0 ? (
               myPayouts.map((payout) => (
                 <div key={payout.id} className="p-4 hover:bg-stone-50/50 flex items-start justify-between gap-3 font-medium transition-colors">
@@ -987,8 +987,8 @@ export default function AgentPanel({
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
                         payout.level === 1 
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-150' 
-                          : 'bg-amber-50 text-amber-800 border-amber-150'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
                       }`}>
                         {payout.level === 1 ? 'Direct L1 Sourcing' : `Indirect Level ${payout.level} Overrides`}
                       </span>
@@ -1003,10 +1003,10 @@ export default function AgentPanel({
                     <p className="text-[9.5px] text-stone-500 font-sans">Gross: {formatPoints(payout.grossCommission)}</p>
                     <span className={`inline-block text-[9px] font-bold py-0.5 px-2 rounded-full border ${
                       payout.status === 'DISBURSED' 
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-150' 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                         : payout.status === 'APPROVED'
-                          ? 'bg-emerald-50/50 text-emerald-700 border-emerald-150'
-                          : 'bg-amber-50 text-amber-800 border-amber-150'
+                          ? 'bg-emerald-50/50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
                     }`}>
                       {payout.status}
                     </span>
@@ -1028,17 +1028,17 @@ export default function AgentPanel({
         <div className="fixed inset-0 bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
           <div className="bg-stone-900 text-stone-100 rounded-2xl max-w-4xl w-full border border-stone-800 shadow-2xl overflow-hidden flex flex-col h-[85vh]">
             {/* Header */}
-            <div className="bg-stone-950 p-4 border-b border-stone-850 flex items-center justify-between">
+            <div className="bg-stone-950 p-4 border-b border-stone-800 flex items-center justify-between">
               <div>
                 <h4 className="font-extrabold text-xs text-white uppercase tracking-wider">Project Layout Map Zoom</h4>
                 <p className="text-[10px] text-stone-400 mt-0.5">{zoomedMap.title}</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="bg-stone-850 px-2.5 py-1 rounded-lg flex items-center gap-2 border border-stone-750">
+                <div className="bg-stone-800 px-2.5 py-1 rounded-lg flex items-center gap-2 border border-stone-700">
                   <button 
                     type="button"
                     onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
-                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    className="p-1 hover:bg-stone-700 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
                     title="Zoom Out"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
@@ -1049,7 +1049,7 @@ export default function AgentPanel({
                   <button 
                     type="button"
                     onClick={() => setZoomScale(prev => Math.min(4, prev + 0.25))}
-                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    className="p-1 hover:bg-stone-700 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
                     title="Zoom In"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
@@ -1057,7 +1057,7 @@ export default function AgentPanel({
                   <button 
                     type="button"
                     onClick={() => setZoomScale(1)}
-                    className="px-1.5 py-0.5 bg-stone-750 hover:bg-stone-700 rounded text-[9px] font-bold text-stone-300 cursor-pointer"
+                    className="px-1.5 py-0.5 bg-stone-700 hover:bg-stone-700 rounded text-[9px] font-bold text-stone-300 cursor-pointer"
                   >
                     Reset
                   </button>
@@ -1068,7 +1068,7 @@ export default function AgentPanel({
                     setZoomedMap(null);
                     setZoomScale(1);
                   }}
-                  className="p-1.5 bg-stone-850 hover:bg-rose-950 hover:text-rose-400 border border-stone-750 rounded-lg text-stone-300 transition-all cursor-pointer text-xs"
+                  className="p-1.5 bg-stone-800 hover:bg-rose-950 hover:text-rose-400 border border-stone-700 rounded-lg text-stone-300 transition-all cursor-pointer text-xs"
                 >
                   ✕ Close
                 </button>
@@ -1091,7 +1091,7 @@ export default function AgentPanel({
             </div>
 
             {/* Instruction Footer */}
-            <div className="bg-stone-950 p-2 text-center text-[9px] text-stone-550 border-t border-stone-850">
+            <div className="bg-stone-950 p-2 text-center text-[9px] text-stone-500 border-t border-stone-800">
               Use the + and - buttons to adjust map scale. Drag or scroll to navigate large project layouts.
             </div>
           </div>
@@ -1145,14 +1145,14 @@ export default function AgentPanel({
 
                 {/* Profile alerts / banners */}
                 {profileSuccess && (
-                  <div className="bg-emerald-50 border border-emerald-250 p-3 rounded-xl text-emerald-850 text-xs font-semibold flex items-center gap-2">
+                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-emerald-800 text-xs font-semibold flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
                     <span>{profileSuccess}</span>
                   </div>
                 )}
 
                 {profileError && (
-                  <div className="bg-rose-50 border border-rose-250 p-3 rounded-xl text-rose-850 text-xs font-semibold flex items-center gap-2">
+                  <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-rose-700 shrink-0" />
                     <span>{profileError}</span>
                   </div>
@@ -1169,7 +1169,7 @@ export default function AgentPanel({
                       <Lock className="w-4 h-4 text-stone-500 shrink-0" />
                       <div>
                         <h5 className="text-[11px] font-bold text-stone-700 uppercase tracking-wider">KYC Compliance (Locked)</h5>
-                        <p className="text-[9.5px] text-stone-450 font-sans mt-0.5">Verified identity & sponsor records</p>
+                        <p className="text-[9.5px] text-stone-400 font-sans mt-0.5">Verified identity & sponsor records</p>
                       </div>
                     </div>
                     <ChevronDown className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${isKycExpanded ? 'rotate-180' : ''}`} />
@@ -1180,8 +1180,8 @@ export default function AgentPanel({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Full Name */}
                         <div>
-                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Full Name</label>
-                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Full Name</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
                             <span>{agent.name}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
@@ -1189,8 +1189,8 @@ export default function AgentPanel({
 
                         {/* Mobile */}
                         <div>
-                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Mobile Sourcing Phone</label>
-                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Mobile Sourcing Phone</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
                             <span>{agent.phone}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
@@ -1198,8 +1198,8 @@ export default function AgentPanel({
 
                         {/* Sponsor */}
                         <div>
-                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Upstream Sponsor</label>
-                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Upstream Sponsor</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-500 font-medium cursor-not-allowed flex justify-between items-center">
                             <span>{users.find(u => u.id?.toUpperCase() === agent.sponsorId?.toUpperCase())?.name ? `${users.find(u => u.id?.toUpperCase() === agent.sponsorId?.toUpperCase())?.name} (${agent.sponsorId})` : (agent.sponsorId || 'SBR Root Core')}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
@@ -1207,8 +1207,8 @@ export default function AgentPanel({
 
                         {/* DOB */}
                         <div>
-                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Date of Birth (DOB)</label>
-                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Date of Birth (DOB)</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
                             <span>{agent.dob || 'Not Provided'}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
@@ -1216,8 +1216,8 @@ export default function AgentPanel({
 
                         {/* Aadhar */}
                         <div>
-                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Aadhar Card Number</label>
-                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Aadhar Card Number</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
                             <span>{agent.aadhar || 'Not Provided'}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
@@ -1225,15 +1225,15 @@ export default function AgentPanel({
 
                         {/* PAN */}
                         <div>
-                          <label className="text-[10px] font-bold text-stone-450 uppercase block mb-1">Permanent Account Number (PAN)</label>
-                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-150 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Permanent Account Number (PAN)</label>
+                          <div className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-500 font-mono cursor-not-allowed flex justify-between items-center">
                             <span>{agent.pan || 'Not Provided'}</span>
                             <Lock className="w-3 h-3 text-stone-300" />
                           </div>
                         </div>
                       </div>
 
-                      <p className="text-[9.5px] text-stone-450 italic font-sans">
+                      <p className="text-[9.5px] text-stone-400 italic font-sans">
                         * Locked fields can only be modified with administrative verification of legal identity documents.
                       </p>
                     </div>
@@ -1248,9 +1248,9 @@ export default function AgentPanel({
                     className="w-full flex items-center justify-between p-4 bg-stone-50 hover:bg-stone-100/80 transition-colors text-left"
                   >
                     <div className="flex items-center gap-2.5">
-                      <CreditCard className="w-4 h-4 text-emerald-850 shrink-0" />
+                      <CreditCard className="w-4 h-4 text-emerald-800 shrink-0" />
                       <div>
-                        <h5 className="text-[11px] font-bold text-emerald-850 uppercase tracking-wider">Profile Info & Bank Details</h5>
+                        <h5 className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Profile Info & Bank Details</h5>
                         <p className="text-[9.5px] text-emerald-700/70 font-sans mt-0.5">Edit nominee, father/husband & bank accounts</p>
                       </div>
                     </div>
@@ -1351,7 +1351,7 @@ export default function AgentPanel({
         </div>
 
         {/* Save action */}
-        <div className="bg-stone-50 border-t border-stone-150 p-4 sm:p-5 flex justify-end">
+        <div className="bg-stone-50 border-t border-stone-200 p-4 sm:p-5 flex justify-end">
           <button
             type="submit"
             disabled={isSavingProfile}

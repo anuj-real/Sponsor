@@ -30,26 +30,41 @@ import {
   X,
   IdCard,
   UserCog,
-  Layers
+  Layers,
+  Share2
 } from 'lucide-react';
 
 /**
- * Primary navigation. `anchor` is the DOM id each entry scrolls to; the panels
- * render those ids (see AdminPanel / AgentPanel) and switch sub-tabs via navFocus.
+ * Primary navigation. Entries either scroll to an `anchor` (a DOM id the panels
+ * render — they switch sub-tabs via navFocus) or navigate to a hash `route`.
+ *
+ * Routing is hash-based (`#/profile`) on purpose: the production build is a
+ * static GitHub Pages SPA with `base: './'`, so history-based paths would 404
+ * on refresh. Anchored entries keep the dashboard a single scrollable page;
+ * `route` entries swap the whole main view.
  */
 const NAV_ITEMS = [
   { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
+  { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
   { key: 'TREE', label: 'My Tree', icon: Network, anchor: 'sbr-tree-section' },
   { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
   { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, anchor: 'sbr-payouts-section' },
-  { key: 'USER_DETAIL', label: 'User Detail', icon: IdCard, anchor: 'sbr-user-detail' },
+  { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
+  { key: 'USER_DETAIL', label: 'User Detail', icon: UserCog, anchor: 'sbr-user-detail' },
   { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, anchor: 'sbr-edit-detail' },
 ];
+
+/** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
+function parseHashRoute(): string {
+  const hash = window.location.hash.replace(/^#/, '');
+  return hash.startsWith('/') ? hash : '/';
+}
 import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
+import ProfilePage from './components/ProfilePage';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -112,8 +127,36 @@ export default function App() {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('HOME');
 
+  // Hash route (`#/profile`, `#/profile/<id>`). Kept in state so back/forward
+  // buttons re-render; the hash itself is the source of truth.
+  const [route, setRoute] = useState<string>(parseHashRoute);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const next = parseHashRoute();
+      setRoute(next);
+      setActiveNav(next.startsWith('/profile') ? 'PROFILE' : 'HOME');
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const navigateTo = (path: string) => {
+    if (path === '/') {
+      // Clear the route without leaving a dangling '#/' in the URL bar.
+      history.pushState(null, '', window.location.pathname + window.location.search);
+      setRoute('/');
+      setActiveNav('HOME');
+    } else {
+      window.location.hash = path; // fires hashchange → state sync above
+    }
+  };
+
+  // The `.dark` class lives on <html> (not the layout root) so it also covers
+  // <body> and the pre-login screen. All colour rules hang off it — see theme.css.
   useEffect(() => {
     localStorage.setItem('SBR_THEME', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   // Freeze the page behind the nav drawer so only the drawer scrolls.
@@ -132,19 +175,33 @@ export default function App() {
    * to navFocus), so poll briefly instead of assuming it is already mounted.
    */
   const handleNavSelect = (key: string) => {
-    setActiveNav(key);
     setIsNavOpen(false);
 
     const target = NAV_ITEMS.find(item => item.key === key);
     if (!target) return;
 
+    // Route entries swap the main view instead of scrolling.
+    if ('route' in target && target.route) {
+      navigateTo(target.route);
+      setActiveNav(key);
+      return;
+    }
+
+    // Anchored entries live on the dashboard — leave /profile first if needed.
+    // (navigateTo('/') resets activeNav, so set the highlight after it.)
+    if (route !== '/') {
+      navigateTo('/');
+    }
+    setActiveNav(key);
+
+    const anchor = target.anchor!;
     let attempts = 0;
     const tryScroll = () => {
-      if (target.anchor === 'sbr-top') {
+      if (anchor === 'sbr-top') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      const el = document.getElementById(target.anchor);
+      const el = document.getElementById(anchor);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (attempts++ < 10) {
@@ -386,10 +443,16 @@ export default function App() {
       setNotifications(loadedNotifs);
 
       setSession(sessionParsed);
-      setActiveRole(sessionParsed.role);
-      if (sessionParsed.agentId) {
-        setActiveAgentId(sessionParsed.agentId);
-        setSelectedTreeUserId(sessionParsed.agentId);
+      // Only align UI to the session on foreground loads. The 10s background
+      // poll also runs through here — resetting these would silently kick an
+      // admin out of the Channel Partner Panel (and clobber the agent they are
+      // inspecting) on every tick.
+      if (!isBackground) {
+        setActiveRole(sessionParsed.role);
+        if (sessionParsed.agentId) {
+          setActiveAgentId(sessionParsed.agentId);
+          setSelectedTreeUserId(sessionParsed.agentId);
+        }
       }
     } catch (error) {
       console.error("Failed to load private data from Firestore:", error);
@@ -444,10 +507,14 @@ export default function App() {
       setNotifications(localNotifs);
 
       setSession(sessionParsed);
-      setActiveRole(sessionParsed.role);
-      if (sessionParsed.agentId) {
-        setActiveAgentId(sessionParsed.agentId);
-        setSelectedTreeUserId(sessionParsed.agentId);
+      // Same guard as the Firestore path: background polls must not reset the
+      // admin's workspace toggle or selected agent.
+      if (!isBackground) {
+        setActiveRole(sessionParsed.role);
+        if (sessionParsed.agentId) {
+          setActiveAgentId(sessionParsed.agentId);
+          setSelectedTreeUserId(sessionParsed.agentId);
+        }
       }
     } finally {
       if (!isBackground) {
@@ -1332,7 +1399,14 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginScreen onLogin={handleLogin} onVerifyCredentials={handleVerifyCredentials} />;
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        onVerifyCredentials={handleVerifyCredentials}
+        theme={theme}
+        onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+      />
+    );
   }
 
 
@@ -1342,7 +1416,7 @@ export default function App() {
       `auto`, which makes this div a scroll container and stops the sticky header
       from pinning to the viewport. `clip` still clips horizontally without that.
     */
-    <div className={`min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-clip dark:bg-slate-950 dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className="min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-clip">
       {/* Soft Elegant Warm Ambient Light Gradients - highly subtle */}
       <div className="absolute top-0 left-0 w-full h-[500px] overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-25%] left-[-10%] w-[60%] h-[110%] rounded-full bg-amber-500/5 blur-[120px]" />
@@ -1350,7 +1424,7 @@ export default function App() {
       </div>
 
       {/* Top Banner */}
-      <header className="border-b border-stone-200/80 bg-white/85 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs dark:border-white/10 dark:bg-slate-900/90">
+      <header className="border-b border-stone-200/80 bg-white/85 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs">
         {/*
           Three columns so the brand sits dead-centre regardless of how wide the
           side controls are. Everything else (session badge, role selector, sync,
@@ -1364,7 +1438,7 @@ export default function App() {
               onClick={() => setIsNavOpen(open => !open)}
               aria-label={isNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={isNavOpen}
-              className="p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0"
             >
               {isNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
@@ -1375,8 +1449,8 @@ export default function App() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold select-none shadow-sm shrink-0">
               P
             </div>
-            <h1 className="text-base sm:text-xl font-bold tracking-tight text-stone-900 font-serif whitespace-nowrap dark:text-slate-50">
-              SBR <span className="text-emerald-850 font-normal dark:text-emerald-400">Sponsors</span>
+            <h1 className="text-base sm:text-xl font-bold tracking-tight text-stone-900 font-serif whitespace-nowrap">
+              SBR <span className="text-emerald-800 font-normal">Sponsors</span>
             </h1>
           </div>
 
@@ -1386,7 +1460,7 @@ export default function App() {
               onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-              className="p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -1405,20 +1479,20 @@ export default function App() {
             className="fixed inset-0 z-40 bg-stone-900/40 backdrop-blur-xs"
             aria-hidden="true"
           />
-          <nav className="fixed top-0 left-0 z-50 h-full w-68 max-w-[82vw] bg-white border-r border-stone-200 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200 dark:bg-slate-900 dark:border-white/10">
+          <nav className="fixed top-0 left-0 z-50 h-full w-68 max-w-[82vw] bg-white border-r border-stone-200 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
 
             {/* Drawer header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 shrink-0 dark:border-white/10">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold text-sm select-none">
                   P
                 </div>
-                <span className="font-serif font-bold text-sm text-stone-900 dark:text-slate-50">Menu</span>
+                <span className="font-serif font-bold text-sm text-stone-900">Menu</span>
               </div>
               <button
                 onClick={() => setIsNavOpen(false)}
                 aria-label="Close navigation menu"
-                className="p-1.5 rounded-lg text-stone-500 hover:bg-stone-100 transition-all cursor-pointer dark:text-slate-400 dark:hover:bg-slate-800"
+                className="p-1.5 rounded-lg text-stone-500 hover:bg-stone-100 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1428,17 +1502,17 @@ export default function App() {
 
               {/* Signed-in identity */}
               {session && (
-                <div className="m-3 p-3 rounded-xl bg-stone-50 border border-stone-200 dark:bg-slate-800/60 dark:border-white/10">
+                <div className="m-3 p-3 rounded-xl bg-stone-50 border border-stone-200">
                   <div className="flex items-center gap-2">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                    <span className="font-semibold text-xs text-stone-900 truncate dark:text-slate-100">{session.name}</span>
+                    <span className="font-semibold text-xs text-stone-900 truncate">{session.name}</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-[8.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono dark:bg-slate-700 dark:text-slate-200">
+                    <span className="text-[8.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono">
                       {session.role === 'ADMIN' ? 'ADMIN' : 'ASSOCIATE'}
                     </span>
                     {session.agentId && (
-                      <span className="text-[9.5px] font-mono text-stone-500 truncate dark:text-slate-400">{session.agentId}</span>
+                      <span className="text-[9.5px] font-mono text-stone-500 truncate">{session.agentId}</span>
                     )}
                   </div>
                 </div>
@@ -1446,7 +1520,7 @@ export default function App() {
 
               {/* Primary navigation */}
               <div className="px-2 pb-1 flex flex-col gap-0.5">
-                <span className="px-3 pt-1 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-slate-500">Navigate</span>
+                <span className="px-3 pt-1 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400">Navigate</span>
                 {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
@@ -1454,7 +1528,7 @@ export default function App() {
                     className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
                       activeNav === key
                         ? 'bg-emerald-800 text-white shadow-xs'
-                        : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
@@ -1467,14 +1541,14 @@ export default function App() {
                 <>
                   {/* Workspace switch — administrators only */}
                   {session.role === 'ADMIN' && (
-                    <div className="px-2 pt-2 flex flex-col gap-0.5 border-t border-stone-150 mt-2 dark:border-white/10">
-                      <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-slate-500">Workspace</span>
+                    <div className="px-2 pt-2 flex flex-col gap-0.5 border-t border-stone-200 mt-2">
+                      <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400">Workspace</span>
                       <button
                         onClick={() => { setActiveRole('ADMIN'); setIsNavOpen(false); }}
                         className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
                           activeRole === 'ADMIN'
                             ? 'bg-emerald-800 text-white shadow-xs'
-                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                         }`}
                       >
                         <span className="w-4 text-center shrink-0">👑</span> Owner / Admin
@@ -1484,7 +1558,7 @@ export default function App() {
                         className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
                           activeRole === 'AGENT'
                             ? 'bg-emerald-800 text-white shadow-xs'
-                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
                         }`}
                       >
                         <span className="w-4 text-center shrink-0">💼</span> Channel Partner Panel
@@ -1493,22 +1567,22 @@ export default function App() {
                   )}
 
                   {/* Account actions */}
-                  <div className="px-2 pt-2 pb-3 flex flex-col gap-0.5 border-t border-stone-150 mt-2 dark:border-white/10">
-                    <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-slate-500">Account</span>
+                  <div className="px-2 pt-2 pb-3 flex flex-col gap-0.5 border-t border-stone-200 mt-2">
+                    <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400">Account</span>
 
                     <button
                       onClick={handleManualSync}
                       disabled={isManualSyncing}
-                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer disabled:opacity-50"
                     >
-                      <RefreshCw className={`w-4 h-4 shrink-0 text-emerald-800 dark:text-emerald-400 ${isManualSyncing ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`w-4 h-4 shrink-0 text-emerald-800 ${isManualSyncing ? 'animate-spin' : ''}`} />
                       {isManualSyncing ? 'Syncing...' : 'Sync Cloud'}
                     </button>
 
                     {session.agentId && (
                       <button
                         onClick={() => { setIsSecurityModalOpen(true); setIsNavOpen(false); }}
-                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer"
                       >
                         <Lock className="w-4 h-4 shrink-0" />
                         Passcode Settings
@@ -1517,7 +1591,7 @@ export default function App() {
 
                     <button
                       onClick={() => { setIsNavOpen(false); handleLogout(); }}
-                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-rose-700 hover:bg-rose-50 transition-all cursor-pointer dark:text-rose-400 dark:hover:bg-rose-950/40"
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-rose-700 hover:bg-rose-50 transition-all cursor-pointer"
                     >
                       <LogOut className="w-4 h-4 shrink-0" />
                       Disconnect
@@ -1532,6 +1606,20 @@ export default function App() {
 
       {/* Primary Dashboard Content Area */}
       <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        {route.startsWith('/profile') ? (
+          /* /profile or /profile/<SBR ID> — full partner record */
+          <ProfilePage
+            users={users}
+            sales={sales}
+            payouts={payouts}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onBack={() => navigateTo('/')}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
+        ) : (
+          <>
         {activeRole === 'ADMIN' && (
           <div className="space-y-6">
             <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
@@ -1570,12 +1658,12 @@ export default function App() {
 
         {activeRole === 'AGENT' && (
           <div className="space-y-6">
-            <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
+            {/* <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
               <h2 className="text-lg font-bold text-stone-900 font-serif">SBR Channel Partner Deck</h2>
               <p className="text-xs text-stone-500 mt-1 leading-relaxed">
                 Track direct sales volumes, strategic team downlines, and check your commission bank slip alerts.
               </p>
-            </div>
+            </div> */}
 
             <AgentPanel 
               users={users}
@@ -1592,14 +1680,16 @@ export default function App() {
             />
           </div>
         )}
+          </>
+        )}
       </main>
 
       {/* Bottom Professional Whitelabel Footer */}
-      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center dark:bg-slate-900 dark:border-white/10">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4 dark:text-slate-400">
+      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
           <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
           <div className="flex gap-4 justify-center text-stone-400">
-            <span>Support: helpdesk@propspire.in</span>
+            <span>Support: malav.nitin199@gmail.com</span>
             <span>|</span>
             <span>Policy: Standard Compliance Manual</span>
           </div>
@@ -1653,7 +1743,7 @@ export default function App() {
             >
               <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl space-y-1 text-xs">
                 <div className="text-stone-500">Updating credentials for:</div>
-                <div className="font-bold text-stone-850 flex items-center gap-1.5">
+                <div className="font-bold text-stone-800 flex items-center gap-1.5">
                   <span className="font-mono bg-stone-200 px-1.5 py-0.5 rounded text-stone-800">{session.agentId}</span>
                   <span>({session.name})</span>
                 </div>
@@ -1713,7 +1803,7 @@ export default function App() {
                     setPasswordError('');
                     setPasswordSuccess('');
                   }}
-                  className="flex-1 px-4 py-2.5 text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 border border-stone-250 rounded-xl transition-all cursor-pointer text-center"
+                  className="flex-1 px-4 py-2.5 text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-xl transition-all cursor-pointer text-center"
                 >
                   Cancel
                 </button>
