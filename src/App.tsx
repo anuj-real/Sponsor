@@ -443,10 +443,16 @@ export default function App() {
       setNotifications(loadedNotifs);
 
       setSession(sessionParsed);
-      setActiveRole(sessionParsed.role);
-      if (sessionParsed.agentId) {
-        setActiveAgentId(sessionParsed.agentId);
-        setSelectedTreeUserId(sessionParsed.agentId);
+      // Only align UI to the session on foreground loads. The 10s background
+      // poll also runs through here — resetting these would silently kick an
+      // admin out of the Channel Partner Panel (and clobber the agent they are
+      // inspecting) on every tick.
+      if (!isBackground) {
+        setActiveRole(sessionParsed.role);
+        if (sessionParsed.agentId) {
+          setActiveAgentId(sessionParsed.agentId);
+          setSelectedTreeUserId(sessionParsed.agentId);
+        }
       }
     } catch (error) {
       console.error("Failed to load private data from Firestore:", error);
@@ -501,10 +507,14 @@ export default function App() {
       setNotifications(localNotifs);
 
       setSession(sessionParsed);
-      setActiveRole(sessionParsed.role);
-      if (sessionParsed.agentId) {
-        setActiveAgentId(sessionParsed.agentId);
-        setSelectedTreeUserId(sessionParsed.agentId);
+      // Same guard as the Firestore path: background polls must not reset the
+      // admin's workspace toggle or selected agent.
+      if (!isBackground) {
+        setActiveRole(sessionParsed.role);
+        if (sessionParsed.agentId) {
+          setActiveAgentId(sessionParsed.agentId);
+          setSelectedTreeUserId(sessionParsed.agentId);
+        }
       }
     } finally {
       if (!isBackground) {
