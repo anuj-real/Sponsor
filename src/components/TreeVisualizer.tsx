@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { User as UserIcon } from 'lucide-react';
 import { User } from '../types';
 
 /**
- * Props are accepted only so existing call sites keep type-checking.
- * This component is intentionally static and renders from DUMMY_TREE below.
- * Light/dark follows the `.dark` class that App puts on the layout root.
+ * Static horizontal org chart of the sponsor hierarchy.
+ *
+ * Renders from the live `users` prop (App -> AdminPanel/AgentPanel).
+ * No interactivity: no expand/collapse, pan/zoom, search or buttons.
+ * Light/dark follows the `.dark` class App puts on the layout root.
  */
 interface TreeVisualizerProps {
   users?: User[];
@@ -24,140 +26,41 @@ interface TeamNode {
   children?: TeamNode[];
 }
 
-// 4-level dummy org structure. Root → leaders → managers → associates.
-const DUMMY_TREE: TeamNode = {
-  id: 'C',
-  name: 'Rajesh Malhotra',
-  designation: 'Exempt',
-  directPts: 0,
-  networkPts: 18420,
-  teamSize: 25,
-  children: [
-    {
-      id: 'MANORANJAN',
-      name: 'Manoranjan Sahu',
-      designation: 'Sr. GM',
-      directPts: 320,
-      networkPts: 6240,
-      teamSize: 8,
-      children: [
-        {
-          id: 'SBR0004',
-          name: 'Anita Sharma',
-          designation: 'Manager',
-          directPts: 145,
-          networkPts: 1980,
-          teamSize: 2,
-          children: [
-            { id: 'SBR0013', name: 'Rohit Verma', designation: 'Associate', directPts: 62, networkPts: 62, teamSize: 0 },
-            { id: 'SBR0014', name: 'Sneha Pillai', designation: 'Associate', directPts: 48, networkPts: 48, teamSize: 0 },
-          ],
-        },
-        {
-          id: 'SBR0005',
-          name: 'Suresh Rana',
-          designation: 'Manager',
-          directPts: 118,
-          networkPts: 1240,
-          teamSize: 1,
-          children: [
-            { id: 'SBR0015', name: 'Mohit Gupta', designation: 'Associate', directPts: 54, networkPts: 54, teamSize: 0 },
-          ],
-        },
-        { id: 'SBR0006', name: 'Pooja Nair', designation: 'Associate', directPts: 76, networkPts: 76, teamSize: 0 },
-      ],
-    },
-    {
-      id: 'RAM',
-      name: 'Ram Prakash',
-      designation: 'GM',
-      directPts: 280,
-      networkPts: 4860,
-      teamSize: 6,
-      children: [
-        {
-          id: 'SBR0007',
-          name: 'Imran Qureshi',
-          designation: 'Sr. Manager',
-          directPts: 162,
-          networkPts: 2140,
-          teamSize: 2,
-          children: [
-            { id: 'SBR0016', name: 'Deepak Rawat', designation: 'Associate', directPts: 71, networkPts: 71, teamSize: 0 },
-            { id: 'SBR0017', name: 'Ritu Chawla', designation: 'Associate', directPts: 39, networkPts: 39, teamSize: 0 },
-          ],
-        },
-        {
-          id: 'SBR0008',
-          name: 'Kavita Joshi',
-          designation: 'Manager',
-          directPts: 104,
-          networkPts: 890,
-          teamSize: 1,
-          children: [
-            { id: 'SBR0018', name: 'Sanjay Dubey', designation: 'Associate', directPts: 45, networkPts: 45, teamSize: 0 },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'DK',
-      name: 'Dinesh Kumar',
-      designation: 'AGM',
-      directPts: 245,
-      networkPts: 3910,
-      teamSize: 5,
-      children: [
-        {
-          id: 'SBR0009',
-          name: 'Harpreet Singh',
-          designation: 'Manager',
-          directPts: 132,
-          networkPts: 1620,
-          teamSize: 2,
-          children: [
-            { id: 'SBR0019', name: 'Aisha Khan', designation: 'Associate', directPts: 58, networkPts: 58, teamSize: 0 },
-            { id: 'SBR0020', name: 'Gaurav Sethi', designation: 'Associate', directPts: 41, networkPts: 41, teamSize: 0 },
-          ],
-        },
-        { id: 'SBR0010', name: 'Neha Bansal', designation: 'Associate', directPts: 67, networkPts: 67, teamSize: 0 },
-      ],
-    },
-    {
-      id: 'VIKAS',
-      name: 'Vikas Yadav',
-      designation: 'Sr. Manager',
-      directPts: 198,
-      networkPts: 3410,
-      teamSize: 5,
-      children: [
-        {
-          id: 'SBR0011',
-          name: 'Arjun Mehta',
-          designation: 'Manager',
-          directPts: 121,
-          networkPts: 1480,
-          teamSize: 2,
-          children: [
-            { id: 'SBR0021', name: 'Meena Iyer', designation: 'Associate', directPts: 63, networkPts: 63, teamSize: 0 },
-            { id: 'SBR0022', name: 'Tarun Bose', designation: 'Associate', directPts: 52, networkPts: 52, teamSize: 0 },
-          ],
-        },
-        {
-          id: 'SBR0012',
-          name: 'Farhan Ali',
-          designation: 'Associate',
-          directPts: 88,
-          networkPts: 430,
-          teamSize: 1,
-          children: [
-            { id: 'SBR0023', name: 'Zoya Sheikh', designation: 'Associate', directPts: 34, networkPts: 34, teamSize: 0 },
-          ],
-        },
-      ],
-    },
-  ],
-};
+/*
+ * ---------------------------------------------------------------------------
+ * DUMMY DATA (retained for reference / offline design work only).
+ * The component now renders the real sponsor tree from the `users` prop.
+ * ---------------------------------------------------------------------------
+ *
+ * const DUMMY_TREE: TeamNode = {
+ *   id: 'C',
+ *   name: 'Rajesh Malhotra',
+ *   designation: 'Exempt',
+ *   directPts: 0,
+ *   networkPts: 18420,
+ *   teamSize: 25,
+ *   children: [
+ *     {
+ *       id: 'MANORANJAN', name: 'Manoranjan Sahu', designation: 'Sr. GM',
+ *       directPts: 320, networkPts: 6240, teamSize: 8,
+ *       children: [
+ *         {
+ *           id: 'SBR0004', name: 'Anita Sharma', designation: 'Manager',
+ *           directPts: 145, networkPts: 1980, teamSize: 2,
+ *           children: [
+ *             { id: 'SBR0013', name: 'Rohit Verma', designation: 'Associate', directPts: 62, networkPts: 62, teamSize: 0 },
+ *             { id: 'SBR0014', name: 'Sneha Pillai', designation: 'Associate', directPts: 48, networkPts: 48, teamSize: 0 },
+ *           ],
+ *         },
+ *         { id: 'SBR0006', name: 'Pooja Nair', designation: 'Associate', directPts: 76, networkPts: 76, teamSize: 0 },
+ *       ],
+ *     },
+ *     { id: 'RAM', name: 'Ram Prakash', designation: 'GM', directPts: 280, networkPts: 4860, teamSize: 6 },
+ *     { id: 'DK', name: 'Dinesh Kumar', designation: 'AGM', directPts: 245, networkPts: 3910, teamSize: 5 },
+ *     { id: 'VIKAS', name: 'Vikas Yadav', designation: 'Sr. Manager', directPts: 198, networkPts: 3410, teamSize: 5 },
+ *   ],
+ * };
+ */
 
 const ACCENT: Record<string, string> = {
   'Exempt': 'text-amber-700 bg-amber-50 border-amber-300 dark:text-amber-300 dark:bg-amber-400/10 dark:border-amber-400/25',
@@ -170,6 +73,54 @@ const ACCENT: Record<string, string> = {
 };
 
 const LINE = 'bg-stone-300 dark:bg-white/12';
+
+/**
+ * Converts the flat user list into nested TeamNodes.
+ * `visited` guards against a malformed sponsorId cycle causing infinite recursion.
+ */
+function buildTree(users: User[]): TeamNode[] {
+  const childrenBySponsor = new Map<string, User[]>();
+  const known = new Set(users.map(u => u.id?.toUpperCase()));
+
+  users.forEach(u => {
+    const parent = u.sponsorId?.toUpperCase() || '';
+    if (!parent || !known.has(parent)) return;
+    const list = childrenBySponsor.get(parent) || [];
+    list.push(u);
+    childrenBySponsor.set(parent, list);
+  });
+
+  const toNode = (user: User, visited: Set<string>): TeamNode => {
+    const key = user.id?.toUpperCase();
+    const nextVisited = new Set(visited).add(key);
+
+    const kids = (childrenBySponsor.get(key) || [])
+      .filter(child => !nextVisited.has(child.id?.toUpperCase()))
+      .map(child => toNode(child, nextVisited));
+
+    const direct = Math.round(user.totalDirectSales || 0);
+    const network = direct + kids.reduce((sum, k) => sum + k.networkPts, 0);
+    const teamSize = kids.reduce((sum, k) => sum + 1 + k.teamSize, 0);
+
+    return {
+      id: user.id,
+      name: user.name,
+      designation: user.designation || 'Associate',
+      directPts: direct,
+      networkPts: network,
+      teamSize,
+      children: kids,
+    };
+  };
+
+  // Roots are users whose sponsor is absent from this list (top of the visible tree).
+  return users
+    .filter(u => {
+      const parent = u.sponsorId?.toUpperCase();
+      return !parent || !known.has(parent);
+    })
+    .map(root => toNode(root, new Set()));
+}
 
 function MemberCard({ node, isRoot = false }: { node: TeamNode; isRoot?: boolean }) {
   const accent = ACCENT[node.designation] || ACCENT['Associate'];
@@ -184,7 +135,7 @@ function MemberCard({ node, isRoot = false }: { node: TeamNode; isRoot?: boolean
     >
       <UserIcon className="mx-auto h-3.5 w-3.5 text-stone-400 dark:text-slate-400" strokeWidth={1.75} />
 
-      <h4 className="mt-1 truncate text-[11px] font-semibold leading-tight text-stone-900 dark:text-slate-50">
+      <h4 className="mt-1 truncate text-[11px] font-semibold leading-tight text-stone-900 dark:text-slate-50" title={node.name}>
         {node.name}
       </h4>
 
@@ -245,8 +196,9 @@ function TreeBranch({ node, isRoot = false }: { node: TeamNode; isRoot?: boolean
   );
 }
 
-export default function TreeVisualizer(_props: TreeVisualizerProps) {
+export default function TreeVisualizer({ users = [] }: TreeVisualizerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const roots = useMemo(() => buildTree(users), [users]);
 
   // Park the root card in the middle of the viewport on first paint.
   useEffect(() => {
@@ -254,21 +206,29 @@ export default function TreeVisualizer(_props: TreeVisualizerProps) {
     if (el) {
       el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
     }
-  }, []);
+  }, [roots]);
 
   return (
     <div className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-white/10 dark:bg-slate-950">
       <div className="border-b border-stone-200 px-3 py-2 text-center dark:border-white/10">
         <h3 className="text-xs font-semibold tracking-tight text-stone-900 dark:text-slate-100">SBR Team Structure</h3>
         <p className="text-[10px] text-stone-500 dark:text-slate-500">
-          Sample hierarchy · D direct · N network · T team
+          D direct · N network · T team
         </p>
       </div>
 
       <div ref={scrollRef} className="max-h-[70vh] overflow-auto p-4 bg-stone-50/60 dark:bg-slate-950">
-        <div className="flex w-max min-w-full justify-center">
-          <TreeBranch node={DUMMY_TREE} isRoot />
-        </div>
+        {roots.length === 0 ? (
+          <p className="py-8 text-center text-[11px] text-stone-400 dark:text-slate-500">
+            No sponsor records available yet.
+          </p>
+        ) : (
+          <div className="flex w-max min-w-full justify-center gap-6">
+            {roots.map(root => (
+              <TreeBranch key={root.id} node={root} isRoot />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

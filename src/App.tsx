@@ -27,14 +27,24 @@ import {
   Network,
   Sun,
   Wallet,
-  X
+  X,
+  IdCard,
+  UserCog,
+  Layers
 } from 'lucide-react';
 
+/**
+ * Primary navigation. `anchor` is the DOM id each entry scrolls to; the panels
+ * render those ids (see AdminPanel / AgentPanel) and switch sub-tabs via navFocus.
+ */
 const NAV_ITEMS = [
-  { key: 'HOME', label: 'Home', icon: Home },
-  { key: 'TREE', label: 'My Tree', icon: Network },
-  { key: 'TEAM', label: 'Team', icon: Users },
-  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet },
+  { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
+  { key: 'TREE', label: 'My Tree', icon: Network, anchor: 'sbr-tree-section' },
+  { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
+  { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
+  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, anchor: 'sbr-payouts-section' },
+  { key: 'USER_DETAIL', label: 'User Detail', icon: IdCard, anchor: 'sbr-user-detail' },
+  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, anchor: 'sbr-edit-detail' },
 ];
 import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
@@ -105,6 +115,44 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('SBR_THEME', theme);
   }, [theme]);
+
+  // Freeze the page behind the nav drawer so only the drawer scrolls.
+  useEffect(() => {
+    if (!isNavOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isNavOpen]);
+
+  /**
+   * Nav selection: highlight the entry, close the drawer, then scroll to its
+   * anchor. The target may not exist yet (the panels switch sub-tab in response
+   * to navFocus), so poll briefly instead of assuming it is already mounted.
+   */
+  const handleNavSelect = (key: string) => {
+    setActiveNav(key);
+    setIsNavOpen(false);
+
+    const target = NAV_ITEMS.find(item => item.key === key);
+    if (!target) return;
+
+    let attempts = 0;
+    const tryScroll = () => {
+      if (target.anchor === 'sbr-top') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      const el = document.getElementById(target.anchor);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (attempts++ < 10) {
+        setTimeout(tryScroll, 80);
+      }
+    };
+    setTimeout(tryScroll, 60);
+  };
 
   // Security Modal States
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
@@ -1289,7 +1337,12 @@ export default function App() {
 
 
   return (
-    <div className={`min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-hidden dark:bg-slate-950 dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
+    /*
+      overflow-x-clip (not -hidden): `overflow-x: hidden` computes overflow-y to
+      `auto`, which makes this div a scroll container and stops the sticky header
+      from pinning to the viewport. `clip` still clips horizontally without that.
+    */
+    <div className={`min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-clip dark:bg-slate-950 dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
       {/* Soft Elegant Warm Ambient Light Gradients - highly subtle */}
       <div className="absolute top-0 left-0 w-full h-[500px] overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-25%] left-[-10%] w-[60%] h-[110%] rounded-full bg-amber-500/5 blur-[120px]" />
@@ -1297,175 +1350,188 @@ export default function App() {
       </div>
 
       {/* Top Banner */}
-      <header className="border-b border-stone-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs dark:border-white/10 dark:bg-slate-900/85">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <header className="border-b border-stone-200/80 bg-white/85 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs dark:border-white/10 dark:bg-slate-900/90">
+        {/*
+          Three columns so the brand sits dead-centre regardless of how wide the
+          side controls are. Everything else (session badge, role selector, sync,
+          passcode, logout) now lives in the slide-over nav.
+        */}
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-2.5 flex items-center gap-3">
 
-          {/* Brand row: menu button, then logo, then inline nav on large screens */}
-          <div className="flex items-center justify-between gap-2 z-10 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              {/* Mobile / tablet nav trigger */}
-              <button
-                onClick={() => setIsNavOpen(open => !open)}
-                aria-label={isNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
-                aria-expanded={isNavOpen}
-                className="lg:hidden p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                {isNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              </button>
+          {/* Left: menu trigger */}
+          <div className="flex-1 flex justify-start">
+            <button
+              onClick={() => setIsNavOpen(open => !open)}
+              aria-label={isNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isNavOpen}
+              className="p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              {isNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+          </div>
 
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold select-none shadow-sm shrink-0">
-                  P
-                </div>
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-stone-900 font-serif truncate dark:text-slate-50">
-                  SBR <span className="text-emerald-850 font-normal dark:text-emerald-400">Sponsors</span>
-                </h1>
-              </div>
-
-              {/* Inline primary navigation */}
-              <nav className="hidden lg:flex items-center gap-0.5 ml-3">
-                {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    onClick={() => { setActiveNav(key); setIsNavOpen(false); }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      activeNav === key
-                        ? 'bg-emerald-800 text-white shadow-xs'
-                        : 'text-stone-500 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {label}
-                  </button>
-                ))}
-              </nav>
+          {/* Center: logo + name */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold select-none shadow-sm shrink-0">
+              P
             </div>
+            <h1 className="text-base sm:text-xl font-bold tracking-tight text-stone-900 font-serif whitespace-nowrap dark:text-slate-50">
+              SBR <span className="text-emerald-850 font-normal dark:text-emerald-400">Sponsors</span>
+            </h1>
+          </div>
 
-            {/* Theme switch — stays pinned top-right on mobile */}
+          {/* Right: theme switch */}
+          <div className="flex-1 flex justify-end">
             <button
               onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-              className="md:hidden p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="p-2 rounded-lg border border-stone-250 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0 dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
-
-          {/* Interactive Role Selector / User Identity Block */}
-          {session ? (
-            <div className="flex flex-row flex-wrap items-center justify-end gap-1.5 sm:gap-2 z-20 self-center md:self-auto w-auto">
-              
-              {/* Authenticated Broker or Admin Badge */}
-              <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-lg px-2 py-1 text-[10.5px] sm:text-xs text-stone-700">
-                <div className={`w-1.5 h-1.5 rounded-full ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                <span className="font-semibold text-stone-900 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{session.name}</span>
-                <span className="text-[8px] uppercase font-bold tracking-wider px-1 py-0.5 rounded bg-stone-200 text-stone-800 font-mono scale-90 origin-right">
-                  {session.role === 'ADMIN' ? 'ADMIN' : 'ASSOCIATE'}
-                </span>
-              </div>
-
-              {/* Interactive Role selector ONLY FOR ADMINISTRATOR SESSIONS */}
-              {session.role === 'ADMIN' ? (
-                <div className="flex p-0.5 bg-stone-100 border border-stone-250 rounded-lg shadow-xs">
-                  <button
-                    onClick={() => setActiveRole('ADMIN')}
-                    className={`px-2 py-1 rounded text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                      activeRole === 'ADMIN' 
-                        ? 'bg-emerald-800 text-white shadow-xs' 
-                        : 'text-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    👑 <span className="hidden xs:inline">Owner/Admin</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveRole('AGENT')}
-                    className={`px-1.5 py-1 rounded text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                      activeRole === 'AGENT' 
-                        ? 'bg-emerald-800 text-white shadow-xs' 
-                        : 'text-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    💼 <span className="hidden xs:inline">Channel Partner Panel</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="hidden sm:flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 text-[10.5px] sm:text-xs text-emerald-800 font-medium">
-                  🔑 Session Verified
-                </div>
-              )}
-
-
-
-              {/* Manual Cloud Sync Button */}
-              <button
-                onClick={handleManualSync}
-                disabled={isManualSyncing}
-                className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-850 border border-emerald-200/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50"
-                title="Sync database immediately"
-              >
-                <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-800 ${isManualSyncing ? 'animate-spin' : ''}`} />
-                <span>{isManualSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
-              </button>
-
-              {/* Security Credentials Button */}
-              {session.agentId && (
-                <button
-                  onClick={() => setIsSecurityModalOpen(true)}
-                  className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                  title="Change your secure login passcode"
-                >
-                  <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-stone-600" />
-                  <span className="hidden sm:inline">Passcode Settings</span>
-                </button>
-              )}
-
-              {/* Log Out Button */}
-              <button
-                onClick={handleLogout}
-                className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-stone-200/60 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-stone-300/80 text-stone-700 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                title="Disconnect from session"
-              >
-                <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                <span className="hidden sm:inline">Disconnect</span>
-              </button>
-
-              {/* Theme switch — desktop position, at the far right of the header */}
-              <button
-                onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
-                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-                className="hidden md:flex p-1.5 rounded-lg border border-stone-300/80 bg-stone-200/60 hover:bg-stone-200 text-stone-700 transition-all cursor-pointer shadow-xs dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          ) : null}
         </div>
-
-        {/* Collapsible navigation for mobile / tablet */}
-        {isNavOpen && (
-          <nav className="lg:hidden border-t border-stone-200/80 bg-white/95 px-4 md:px-6 py-2 flex flex-col gap-0.5 dark:border-white/10 dark:bg-slate-900/95">
-            {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                onClick={() => { setActiveNav(key); setIsNavOpen(false); }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
-                  activeNav === key
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
-          </nav>
-        )}
       </header>
 
+      {/*
+        Left slide-over navigation. Fixed + overlaid so opening it never reflows
+        the page content underneath (no layout shift).
+      */}
+      {isNavOpen && (
+        <>
+          <div
+            onClick={() => setIsNavOpen(false)}
+            className="fixed inset-0 z-40 bg-stone-900/40 backdrop-blur-xs"
+            aria-hidden="true"
+          />
+          <nav className="fixed top-0 left-0 z-50 h-full w-68 max-w-[82vw] bg-white border-r border-stone-200 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200 dark:bg-slate-900 dark:border-white/10">
+
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 shrink-0 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold text-sm select-none">
+                  P
+                </div>
+                <span className="font-serif font-bold text-sm text-stone-900 dark:text-slate-50">Menu</span>
+              </div>
+              <button
+                onClick={() => setIsNavOpen(false)}
+                aria-label="Close navigation menu"
+                className="p-1.5 rounded-lg text-stone-500 hover:bg-stone-100 transition-all cursor-pointer dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+
+              {/* Signed-in identity */}
+              {session && (
+                <div className="m-3 p-3 rounded-xl bg-stone-50 border border-stone-200 dark:bg-slate-800/60 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
+                    <span className="font-semibold text-xs text-stone-900 truncate dark:text-slate-100">{session.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span className="text-[8.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono dark:bg-slate-700 dark:text-slate-200">
+                      {session.role === 'ADMIN' ? 'ADMIN' : 'ASSOCIATE'}
+                    </span>
+                    {session.agentId && (
+                      <span className="text-[9.5px] font-mono text-stone-500 truncate dark:text-slate-400">{session.agentId}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Primary navigation */}
+              <div className="px-2 pb-1 flex flex-col gap-0.5">
+                <span className="px-3 pt-1 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-slate-500">Navigate</span>
+                {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => handleNavSelect(key)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                      activeNav === key
+                        ? 'bg-emerald-800 text-white shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {session && (
+                <>
+                  {/* Workspace switch — administrators only */}
+                  {session.role === 'ADMIN' && (
+                    <div className="px-2 pt-2 flex flex-col gap-0.5 border-t border-stone-150 mt-2 dark:border-white/10">
+                      <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-slate-500">Workspace</span>
+                      <button
+                        onClick={() => { setActiveRole('ADMIN'); setIsNavOpen(false); }}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                          activeRole === 'ADMIN'
+                            ? 'bg-emerald-800 text-white shadow-xs'
+                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="w-4 text-center shrink-0">👑</span> Owner / Admin
+                      </button>
+                      <button
+                        onClick={() => { setActiveRole('AGENT'); setIsNavOpen(false); }}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                          activeRole === 'AGENT'
+                            ? 'bg-emerald-800 text-white shadow-xs'
+                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="w-4 text-center shrink-0">💼</span> Channel Partner Panel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Account actions */}
+                  <div className="px-2 pt-2 pb-3 flex flex-col gap-0.5 border-t border-stone-150 mt-2 dark:border-white/10">
+                    <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-slate-500">Account</span>
+
+                    <button
+                      onClick={handleManualSync}
+                      disabled={isManualSyncing}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <RefreshCw className={`w-4 h-4 shrink-0 text-emerald-800 dark:text-emerald-400 ${isManualSyncing ? 'animate-spin' : ''}`} />
+                      {isManualSyncing ? 'Syncing...' : 'Sync Cloud'}
+                    </button>
+
+                    {session.agentId && (
+                      <button
+                        onClick={() => { setIsSecurityModalOpen(true); setIsNavOpen(false); }}
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <Lock className="w-4 h-4 shrink-0" />
+                        Passcode Settings
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => { setIsNavOpen(false); handleLogout(); }}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-rose-700 hover:bg-rose-50 transition-all cursor-pointer dark:text-rose-400 dark:hover:bg-rose-950/40"
+                    >
+                      <LogOut className="w-4 h-4 shrink-0" />
+                      Disconnect
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </nav>
+        </>
+      )}
+
       {/* Primary Dashboard Content Area */}
-      <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+      <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         {activeRole === 'ADMIN' && (
           <div className="space-y-6">
             <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
@@ -1495,6 +1561,7 @@ export default function App() {
               onUpdateUserProfile={handleAdminUpdateUserProfile}
               currentUserAgentId={session?.agentId}
               userLogs={userLogs}
+              navFocus={activeNav}
             />
           </div>
         )}
@@ -1521,6 +1588,7 @@ export default function App() {
               config={config}
               projects={projects}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
+              navFocus={activeNav}
             />
           </div>
         )}

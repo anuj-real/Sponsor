@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog } from '../types';
+import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog, LeadershipConfig } from '../types';
 import { calculatePointsFromSize } from '../lib/points';
 import TreeVisualizer from './TreeVisualizer';
 import { 
@@ -44,6 +44,8 @@ interface AdminPanelProps {
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
   currentUserAgentId?: string;
   userLogs?: UserLog[];
+  /** Active key from the App header nav; drives which sub-tab is revealed. */
+  navFocus?: string;
 }
 
 export default function AdminPanel({
@@ -65,7 +67,8 @@ export default function AdminPanel({
   onUpdateUserProfile,
   currentUserAgentId,
   onDeleteUser,
-  userLogs = []
+  userLogs = [],
+  navFocus
 }: AdminPanelProps) {
   const isFamilyId = (id?: string) => {
     if (!id) return false;
@@ -88,6 +91,18 @@ export default function AdminPanel({
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, LOGS
   const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'LOGS'>('SETTINGS');
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
+
+  // Reveal the sub-tab that owns the section the header nav is pointing at.
+  React.useEffect(() => {
+    if (!navFocus) return;
+    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'USER_DETAIL' || navFocus === 'EDIT_DETAIL') {
+      setActiveSubTab('AGENTS');
+    } else if (navFocus === 'PAYOUTS') {
+      setActiveSubTab('PAYOUTS');
+    } else if (navFocus === 'INVENTORY') {
+      setActiveSubTab('BOOKINGS');
+    }
+  }, [navFocus]);
 
   const formatPoints = (val: number) => {
     return `${Math.round(val).toLocaleString()} PTS`;
@@ -1169,7 +1184,7 @@ export default function AdminPanel({
                                   const updated = [...leadershipConfigs];
                                   updated[idx] = {
                                     ...updated[idx],
-                                    designation: editLeadDesignation,
+                                    designation: editLeadDesignation as LeadershipConfig['designation'],
                                     condition: editLeadCondition,
                                     directVol: editLeadDirectVol,
                                     incentivePrice: editLeadIncentivePrice,
@@ -1283,7 +1298,7 @@ export default function AdminPanel({
                         const updated = [
                           ...leadershipConfigs,
                           {
-                            designation: rankEl.value,
+                            designation: rankEl.value as LeadershipConfig['designation'],
                             condition: condEl ? condEl.value : '',
                             directVol: Number(volEl.value) || 0,
                             incentivePrice: Number(priceEl.value) || 0,
@@ -1788,7 +1803,7 @@ export default function AdminPanel({
       {/* 2. ONBOARD SPONSORS WITH DETAILED INFO */}
       {activeSubTab === 'AGENTS' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+          <div id="sbr-edit-detail" className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50">
               <h3 className="font-bold text-stone-900 flex items-center gap-2 text-sm uppercase tracking-wide">
                 <PlusCircle className="w-5 h-5 text-emerald-800" /> Register Strategic Sponsoring Partner (SBR Series)
@@ -2043,13 +2058,15 @@ export default function AdminPanel({
             </form>
           </div>
 
-          <TreeVisualizer 
-            users={users}
-            onSelectUser={(id) => setSelectedTreeUserId(id)}
-            selectedUserId={selectedTreeUserId}
-          />
+          <div id="sbr-tree-section" className="scroll-mt-24">
+            <TreeVisualizer
+              users={users}
+              onSelectUser={(id) => setSelectedTreeUserId(id)}
+              selectedUserId={selectedTreeUserId}
+            />
+          </div>
 
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+          <div id="sbr-user-detail" className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24">
             <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex items-center justify-between flex-col md:flex-row gap-4">
               <div>
                 <h4 className="font-bold text-stone-900 text-xs uppercase font-sans">Live Sourcing Team Directory</h4>
@@ -3061,7 +3078,7 @@ export default function AdminPanel({
             </form>
           </div>
 
-          <div className="lg:col-span-6 bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-xs">
+          <div id="sbr-inventory-section" className="lg:col-span-6 bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-xs scroll-mt-24">
             <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wide">Real Estate Inventory Table (Live status)</h3>
             <p className="text-xs text-stone-500">View real-time booking statuses of every SBR project unit categorized by size.</p>
 
@@ -3238,7 +3255,7 @@ export default function AdminPanel({
 
       {/* 6. OPERATIONS & PAYOUTS AUDITING */}
       {activeSubTab === 'PAYOUTS' && (
-        <div className="space-y-6 animate-fade-in">
+        <div id="sbr-payouts-section" className="space-y-6 animate-fade-in scroll-mt-24">
           {/* Summary metrics cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
