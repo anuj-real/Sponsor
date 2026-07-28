@@ -106,6 +106,7 @@ id it scrolls to:
 | `TEAM` | Team | `sbr-team-section` |
 | `INVENTORY` | Plot Inventory | `sbr-inventory-section` |
 | `PAYOUTS` | Payouts | `sbr-payouts-section` |
+| `SPONSOR_CODE` | Sponsor Reference Code | `sbr-sponsor-code` |
 | `USER_DETAIL` | User Detail | `sbr-user-detail` |
 | `EDIT_DETAIL` | Edit Detail | `sbr-edit-detail` |
 
@@ -134,7 +135,7 @@ Drawer sections, in order: **identity card** → **Navigate** (the table above) 
 
 `activeNav` is passed to both panels as `navFocus`; each maps it to the view that owns the section:
 
-- **`AdminPanel`** — `TREE` / `TEAM` / `USER_DETAIL` / `EDIT_DETAIL` → `AGENTS` sub-tab;
+- **`AdminPanel`** — `TREE` / `TEAM` / `USER_DETAIL` / `EDIT_DETAIL` / `SPONSOR_CODE` → `AGENTS` sub-tab;
   `PAYOUTS` → `PAYOUTS` sub-tab; `INVENTORY` → `BOOKINGS` sub-tab (which holds the live inventory
   table). Without this the anchors would not exist in the DOM, since sub-tab content is
   conditionally rendered.
@@ -180,6 +181,29 @@ Previously KYC and bank details lived in a modal gated behind the "SBR Profile �
 - `isProfileOpen` state, the modal header/footer, and the `ArrowLeft` import were deleted with it.
 
 ---
+
+## 6. `/profile` route (hash router)
+
+[src/components/ProfilePage.tsx](src/components/ProfilePage.tsx) — the full partner record:
+identity banner (photo or initial, status, designation, sponsor line), performance stats
+(direct/downline volume, paid/pending payouts), read-only personal details (name, phone, email,
+DOB, PAN, Aadhaar, address), plus the same "KYC Compliance (Locked)" and editable
+"Profile Info & Bank Details" sections the dashboard shows. Saves go through
+`handleAdminUpdateUserProfile`, same as the inline form.
+
+**Routing is hash-based, hand-rolled — no react-router.** The production build is a static
+GitHub Pages SPA with `base: './'`, so history-based paths would 404 on refresh; a dependency
+for two routes isn't warranted. Mechanics in [src/App.tsx](src/App.tsx):
+
+- `route` state mirrors `window.location.hash` (`parseHashRoute`); a `hashchange` listener keeps
+  it in sync, so browser back/forward work.
+- `NAV_ITEMS` entries now carry either `anchor` (scroll on the dashboard) **or** `route` (swap
+  the main view). "Profile" is a `route` entry. Selecting an *anchored* item while on `/profile`
+  first navigates back to `/`, then the retry-scroll finds the anchor once the dashboard mounts.
+- `navigateTo('/')` uses `pushState` to strip the hash entirely rather than leaving `#/`.
+- **Access rule:** `#/profile` shows the signed-in user; `#/profile/<SBR ID>` shows that partner
+  — honoured only when `session.role === 'ADMIN'`, everyone else silently gets their own record.
+  The admin agents directory has a per-row "Profile" button that sets the hash directly.
 
 ## Known gaps
 

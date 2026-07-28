@@ -30,26 +30,41 @@ import {
   X,
   IdCard,
   UserCog,
-  Layers
+  Layers,
+  Share2
 } from 'lucide-react';
 
 /**
- * Primary navigation. `anchor` is the DOM id each entry scrolls to; the panels
- * render those ids (see AdminPanel / AgentPanel) and switch sub-tabs via navFocus.
+ * Primary navigation. Entries either scroll to an `anchor` (a DOM id the panels
+ * render — they switch sub-tabs via navFocus) or navigate to a hash `route`.
+ *
+ * Routing is hash-based (`#/profile`) on purpose: the production build is a
+ * static GitHub Pages SPA with `base: './'`, so history-based paths would 404
+ * on refresh. Anchored entries keep the dashboard a single scrollable page;
+ * `route` entries swap the whole main view.
  */
 const NAV_ITEMS = [
   { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
+  { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
   { key: 'TREE', label: 'My Tree', icon: Network, anchor: 'sbr-tree-section' },
   { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
   { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, anchor: 'sbr-payouts-section' },
-  { key: 'USER_DETAIL', label: 'User Detail', icon: IdCard, anchor: 'sbr-user-detail' },
+  { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
+  { key: 'USER_DETAIL', label: 'User Detail', icon: UserCog, anchor: 'sbr-user-detail' },
   { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, anchor: 'sbr-edit-detail' },
 ];
+
+/** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
+function parseHashRoute(): string {
+  const hash = window.location.hash.replace(/^#/, '');
+  return hash.startsWith('/') ? hash : '/';
+}
 import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
+import ProfilePage from './components/ProfilePage';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -112,6 +127,31 @@ export default function App() {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('HOME');
 
+  // Hash route (`#/profile`, `#/profile/<id>`). Kept in state so back/forward
+  // buttons re-render; the hash itself is the source of truth.
+  const [route, setRoute] = useState<string>(parseHashRoute);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const next = parseHashRoute();
+      setRoute(next);
+      setActiveNav(next.startsWith('/profile') ? 'PROFILE' : 'HOME');
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const navigateTo = (path: string) => {
+    if (path === '/') {
+      // Clear the route without leaving a dangling '#/' in the URL bar.
+      history.pushState(null, '', window.location.pathname + window.location.search);
+      setRoute('/');
+      setActiveNav('HOME');
+    } else {
+      window.location.hash = path; // fires hashchange → state sync above
+    }
+  };
+
   // The `.dark` class lives on <html> (not the layout root) so it also covers
   // <body> and the pre-login screen. All colour rules hang off it — see theme.css.
   useEffect(() => {
@@ -135,19 +175,33 @@ export default function App() {
    * to navFocus), so poll briefly instead of assuming it is already mounted.
    */
   const handleNavSelect = (key: string) => {
-    setActiveNav(key);
     setIsNavOpen(false);
 
     const target = NAV_ITEMS.find(item => item.key === key);
     if (!target) return;
 
+    // Route entries swap the main view instead of scrolling.
+    if ('route' in target && target.route) {
+      navigateTo(target.route);
+      setActiveNav(key);
+      return;
+    }
+
+    // Anchored entries live on the dashboard — leave /profile first if needed.
+    // (navigateTo('/') resets activeNav, so set the highlight after it.)
+    if (route !== '/') {
+      navigateTo('/');
+    }
+    setActiveNav(key);
+
+    const anchor = target.anchor!;
     let attempts = 0;
     const tryScroll = () => {
-      if (target.anchor === 'sbr-top') {
+      if (anchor === 'sbr-top') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      const el = document.getElementById(target.anchor);
+      const el = document.getElementById(anchor);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (attempts++ < 10) {
@@ -1542,6 +1596,20 @@ export default function App() {
 
       {/* Primary Dashboard Content Area */}
       <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        {route.startsWith('/profile') ? (
+          /* /profile or /profile/<SBR ID> — full partner record */
+          <ProfilePage
+            users={users}
+            sales={sales}
+            payouts={payouts}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onBack={() => navigateTo('/')}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
+        ) : (
+          <>
         {activeRole === 'ADMIN' && (
           <div className="space-y-6">
             <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
@@ -1580,12 +1648,12 @@ export default function App() {
 
         {activeRole === 'AGENT' && (
           <div className="space-y-6">
-            <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
+            {/* <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
               <h2 className="text-lg font-bold text-stone-900 font-serif">SBR Channel Partner Deck</h2>
               <p className="text-xs text-stone-500 mt-1 leading-relaxed">
                 Track direct sales volumes, strategic team downlines, and check your commission bank slip alerts.
               </p>
-            </div>
+            </div> */}
 
             <AgentPanel 
               users={users}
@@ -1602,6 +1670,8 @@ export default function App() {
             />
           </div>
         )}
+          </>
+        )}
       </main>
 
       {/* Bottom Professional Whitelabel Footer */}
@@ -1609,7 +1679,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
           <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
           <div className="flex gap-4 justify-center text-stone-400">
-            <span>Support: helpdesk@propspire.in</span>
+            <span>Support: malav.nitin199@gmail.com</span>
             <span>|</span>
             <span>Policy: Standard Compliance Manual</span>
           </div>

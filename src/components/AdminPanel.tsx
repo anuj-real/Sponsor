@@ -95,7 +95,7 @@ export default function AdminPanel({
   // Reveal the sub-tab that owns the section the header nav is pointing at.
   React.useEffect(() => {
     if (!navFocus) return;
-    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'USER_DETAIL' || navFocus === 'EDIT_DETAIL') {
+    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'USER_DETAIL' || navFocus === 'EDIT_DETAIL' || navFocus === 'SPONSOR_CODE') {
       setActiveSubTab('AGENTS');
     } else if (navFocus === 'PAYOUTS') {
       setActiveSubTab('PAYOUTS');
@@ -2058,6 +2058,36 @@ export default function AdminPanel({
             </form>
           </div>
 
+          {/* Sponsor Reference Code — admin's own onboarding ID, mirrors the AgentPanel card */}
+          {currentUserAgentId && (
+            <div id="sbr-sponsor-code" className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs scroll-mt-24">
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block font-sans">Sponsor Reference Code</span>
+              <p className="text-xs text-stone-500 mt-1.5 leading-relaxed font-sans">
+                Share this ID as the recruiting sponsor when onboarding new associates.
+              </p>
+              <div className="flex gap-2 mt-4 max-w-sm">
+                <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 flex-grow font-mono font-bold text-sm text-emerald-800 flex items-center select-all">
+                  {currentUserAgentId}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentUserAgentId);
+                    setCopiedUserId('__SELF_CODE__');
+                    setTimeout(() => setCopiedUserId(null), 2000);
+                  }}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
+                    copiedUserId === '__SELF_CODE__'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-white text-stone-800 border-stone-200 hover:bg-stone-50'
+                  }`}
+                >
+                  {copiedUserId === '__SELF_CODE__' ? 'Copied!' : 'Copy Code'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div id="sbr-tree-section" className="scroll-mt-24">
             <TreeVisualizer
               users={users}
@@ -2170,6 +2200,15 @@ export default function AdminPanel({
                               >
                                 <Key className="w-2.5 h-2.5 text-stone-500" />
                                 <span>Credentials</span>
+                              </button>
+
+                              <button
+                                onClick={() => { window.location.hash = `/profile/${agent.id}`; }}
+                                className="text-[10px] font-bold px-2.5 py-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1"
+                                title="Open full partner profile"
+                              >
+                                <Users className="w-2.5 h-2.5" />
+                                <span>Profile</span>
                               </button>
 
                               {/* SMS button hidden until DLT registration is complete */}

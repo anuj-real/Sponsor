@@ -698,7 +698,7 @@ export default function AgentPanel({
         {/* Right Widget: Sponsor sharing & alerts stream */}
         <div className="space-y-6">
           {/* Quick Share Sponsor ID */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
+          <div id="sbr-sponsor-code" className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs scroll-mt-24">
             <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block font-sans">Sponsor Reference Code</span>
             <p className="text-xs text-stone-500 mt-1.5 leading-relaxed font-sans">
               Copy and share your unique ID to register associates. When they register sales, you obtain team overrides up to 10 tier levels!
