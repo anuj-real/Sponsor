@@ -10,15 +10,19 @@ import {
   Eye, 
   EyeOff, 
   ChevronRight,
-  CheckCircle2
+  CheckCircle2,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 interface LoginScreenProps {
   onLogin: (role: UserRole, agentId?: string, passwordHash?: string) => void;
   onVerifyCredentials: (identifier: string, pass: string) => Promise<{ success: boolean; errorMsg?: string; role?: UserRole; agentId?: string; name?: string; passwordHash?: string }>;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
-export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onVerifyCredentials, theme = 'light', onToggleTheme }: LoginScreenProps) {
   // Login form states (strictly empty/blank by default, no prefilled demo credentials)
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -52,6 +56,19 @@ export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScree
         <div className="absolute top-[-25%] left-[-10%] w-[60%] h-[110%] rounded-full bg-amber-500/5 blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[90%] rounded-full bg-stone-500/5 blur-[120px]" />
       </div>
+
+      {/* Theme switch — available before sign-in */}
+      {onToggleTheme && (
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 p-2 rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+      )}
 
       {/* Main Container */}
       <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-10 md:py-16 z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 flex-grow items-center">
@@ -172,7 +189,7 @@ export default function LoginScreen({ onLogin, onVerifyCredentials }: LoginScree
 
           {/* SBR Sizing Rules card */}
           <div className="p-5 border border-stone-200/80 bg-white rounded-2xl shadow-xs space-y-2">
-            <h4 className="text-xs font-bold text-stone-850 uppercase tracking-widest flex items-center gap-1.5 font-sans">
+            <h4 className="text-xs font-bold text-stone-800 uppercase tracking-widest flex items-center gap-1.5 font-sans">
               <span className="text-emerald-600">✦</span> Sourcing Standard Ledger Rules
             </h4>
             <p className="text-xs text-stone-600 leading-relaxed font-sans">
