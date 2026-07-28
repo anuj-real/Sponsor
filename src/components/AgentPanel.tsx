@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
-import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
 import TreeVisualizer from './TreeVisualizer';
 
@@ -15,6 +15,8 @@ interface AgentPanelProps {
   config: MLMConfig;
   projects?: RealEstateProject[];
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
+  /** Active key from the App header nav; used to auto-open the matching section. */
+  navFocus?: string;
 }
 
 export default function AgentPanel({
@@ -27,7 +29,8 @@ export default function AgentPanel({
   onClearNotification,
   config,
   projects = [],
-  onUpdateUserProfile
+  onUpdateUserProfile,
+  navFocus
 }: AgentPanelProps) {
   const [copied, setCopied] = useState(false);
   const [activePanelTab, setActivePanelTab] = useState<'LEDGER' | 'INVENTORY'>('LEDGER');
@@ -41,7 +44,11 @@ export default function AgentPanel({
   const [zoomScale, setZoomScale] = useState<number>(1);
 
   // Broker Profile States
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  // Profile is rendered inline; the identity badge scrolls to it.
+  const scrollToProfile = () => {
+    document.getElementById('sbr-user-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setIsKycExpanded(true);
+  };
   const [isKycExpanded, setIsKycExpanded] = useState(false);
   const [isProfileExpanded, setIsProfileExpanded] = useState(false);
   const [bankAccountNumber, setBankAccountNumber] = useState('');
@@ -53,6 +60,20 @@ export default function AgentPanel({
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Open the section the header nav points at (the tree lives on the LEDGER tab).
+  useEffect(() => {
+    if (!navFocus) return;
+    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'PAYOUTS') {
+      setActivePanelTab('LEDGER');
+    } else if (navFocus === 'INVENTORY') {
+      setActivePanelTab('INVENTORY');
+    } else if (navFocus === 'USER_DETAIL') {
+      setIsKycExpanded(true);
+    } else if (navFocus === 'EDIT_DETAIL') {
+      setIsProfileExpanded(true);
+    }
+  }, [navFocus]);
 
   // Campaign date status checker logic
   const now = new Date();
@@ -149,11 +170,7 @@ export default function AgentPanel({
       setNomineeRelation(agent.nomineeRelation || '');
       setFatherOrHusbandName(agent.fatherOrHusbandName || '');
     }
-    if (isProfileOpen) {
-      setIsKycExpanded(false);
-      setIsProfileExpanded(false);
-    }
-  }, [agent, isProfileOpen]);
+  }, [agent]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,10 +189,7 @@ export default function AgentPanel({
         fatherOrHusbandName: fatherOrHusbandName.trim()
       });
       setProfileSuccess('Profile updated successfully in SBR secure records! 👤');
-      setTimeout(() => {
-        setProfileSuccess(null);
-        setIsProfileOpen(false);
-      }, 2500);
+      setTimeout(() => setProfileSuccess(null), 2500);
     } catch (err: any) {
       console.error(err);
       setProfileError(err?.message || 'Failed to update profile. Please try again.');
@@ -247,9 +261,9 @@ export default function AgentPanel({
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <div 
-                onClick={() => setIsProfileOpen(true)}
+                onClick={scrollToProfile}
                 className="flex items-center gap-2 cursor-pointer group"
-                title="Click to view/edit SBR profile details"
+                title="Jump to SBR profile details"
               >
                 <h2 className="text-lg sm:text-xl font-bold text-stone-900 group-hover:text-emerald-850 transition-colors">
                   {agent.name}
@@ -328,7 +342,7 @@ export default function AgentPanel({
 
             {/* Paid-out commissions */}
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Commissions Received</span>
+              <span id="sbr-payouts-section" className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block scroll-mt-24">Commissions Received</span>
               <h3 className="font-mono font-bold text-xl sm:text-lg text-emerald-800 mt-2">
                 {formatPoints(earningsNetPaid)}
               </h3>
@@ -349,7 +363,7 @@ export default function AgentPanel({
             </div>
 
             {/* Active Team Network */}
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
+            <div id="sbr-team-section" className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs scroll-mt-24">
               <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Active Team Network</span>
               <h3 className="font-mono font-bold text-xl sm:text-lg text-indigo-900 mt-2">
                 {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length} / {downlineNetwork.length}
@@ -361,12 +375,14 @@ export default function AgentPanel({
           </div>
 
           {/* SBR Referral Organigram for Associate Downline */}
-          <TreeVisualizer 
-            users={[agent, ...downlineNetwork.map(item => item.user)]}
-            onSelectUser={(id) => setSelectedTreeUserId(id)}
-            selectedUserId={selectedTreeUserId}
-            hideUpline={true}
-          />
+          <div id="sbr-tree-section" className="scroll-mt-24">
+            <TreeVisualizer
+              users={[agent, ...downlineNetwork.map(item => item.user)]}
+              onSelectUser={(id) => setSelectedTreeUserId(id)}
+              selectedUserId={selectedTreeUserId}
+              hideUpline={true}
+            />
+          </div>
 
           {/* Designation Progress Multi-bar Component */}
           <DesignationProgress 
@@ -377,7 +393,7 @@ export default function AgentPanel({
           />
 
           {/* Sourced property listings & Inventory sub-panel switcher */}
-          <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
+          <div id="sbr-inventory-section" className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden scroll-mt-24">
             <div className="p-5 border-b border-stone-150 bg-stone-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h3 className="font-bold text-stone-900 text-base">
@@ -1083,54 +1099,50 @@ export default function AgentPanel({
       )}
 
       {/* View/Edit Profile Modal - Screen Overlay on Mobile */}
-      {isProfileOpen && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
-          <form onSubmit={handleSaveProfile} className="bg-white w-full max-w-2xl h-[82dvh] sm:h-auto sm:max-h-[85vh] md:max-h-[90vh] rounded-2xl border border-stone-200 shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Header */}
-            <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-4 sm:p-5 text-white flex items-center justify-between shrink-0 border-b border-stone-850">
-              <div className="flex items-center gap-3 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setIsProfileOpen(false)}
-                  className="text-stone-400 hover:text-white p-1.5 hover:bg-stone-850 rounded-lg transition-all shrink-0 cursor-pointer"
-                  aria-label="Close"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div className="w-8 h-8 rounded-full bg-emerald-800/25 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-serif font-bold text-sm shrink-0">
-                  {agent.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="font-bold text-xs sm:text-sm text-stone-100 truncate">Partner Profile</h4>
-                  <p className="text-[10px] text-stone-400 truncate">
-                    Sponsor ID: <span className="font-mono font-bold text-emerald-400">{agent.id}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={isSavingProfile}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-stone-800 disabled:text-stone-500 disabled:border-stone-800 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] border border-emerald-500/30"
-                >
-                  {isSavingProfile ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span className="hidden xs:inline">Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Save Changes</span>
-                    </>
-                  )}
-                </button>
-              </div>
+      {/*
+        Partner profile is rendered inline with the rest of the dashboard detail
+        (previously it was hidden behind the "SBR Profile" badge modal).
+      */}
+      <form
+        id="sbr-user-detail"
+        onSubmit={handleSaveProfile}
+        className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24"
+      >
+        {/* Header */}
+        <div className="p-4 sm:p-5 border-b border-stone-200 bg-stone-50/50 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-800 font-serif font-bold text-sm shrink-0">
+              {agent.name.charAt(0).toUpperCase()}
             </div>
+            <div className="min-w-0">
+              <h4 className="font-bold text-xs sm:text-sm text-stone-900 truncate uppercase tracking-wide">Partner Profile & Compliance</h4>
+              <p className="text-[10px] text-stone-500 truncate">
+                Sponsor ID: <span className="font-mono font-bold text-emerald-800">{agent.id}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={isSavingProfile}
+            className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            {isSavingProfile ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Save Changes</span>
+              </>
+            )}
+          </button>
+        </div>
 
-            {/* Scrollable Fields Content */}
-            <div className="p-5 md:p-6 space-y-6 font-sans bg-white overflow-y-auto flex-1">
-                
+        {/* Fields Content */}
+        <div className="p-5 md:p-6 space-y-6 font-sans bg-white">
+
                 {/* Profile alerts / banners */}
                 {profileSuccess && (
                   <div className="bg-emerald-50 border border-emerald-250 p-3 rounded-xl text-emerald-850 text-xs font-semibold flex items-center gap-2">
@@ -1229,7 +1241,7 @@ export default function AgentPanel({
                 </div>
 
                 {/* SECTION 2: Editable bank/nominee details */}
-                <div className="border border-stone-200 rounded-xl overflow-hidden bg-stone-50/30">
+                <div id="sbr-edit-detail" className="border border-stone-200 rounded-xl overflow-hidden bg-stone-50/30 scroll-mt-24">
                   <button
                     type="button"
                     onClick={() => setIsProfileExpanded(!isProfileExpanded)}
@@ -1336,35 +1348,26 @@ export default function AgentPanel({
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Action buttons (pinned at bottom of modal) */}
-              <div className="bg-stone-50 border-t border-stone-150 p-4 sm:p-5 flex gap-3 justify-end shrink-0 mt-auto">
-                <button
-                  type="button"
-                  onClick={() => setIsProfileOpen(false)}
-                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold rounded-lg cursor-pointer transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingProfile}
-                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:bg-emerald-800/60 text-white text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  {isSavingProfile ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Saving Profile...</span>
-                    </>
-                  ) : (
-                    <span>Save Profile Changes</span>
-                  )}
-                </button>
-              </div>
-          </form>
         </div>
-      )}
+
+        {/* Save action */}
+        <div className="bg-stone-50 border-t border-stone-150 p-4 sm:p-5 flex justify-end">
+          <button
+            type="submit"
+            disabled={isSavingProfile}
+            className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:bg-emerald-800/60 text-white text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            {isSavingProfile ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Saving Profile...</span>
+              </>
+            ) : (
+              <span>Save Profile Changes</span>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
