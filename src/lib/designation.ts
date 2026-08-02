@@ -1,4 +1,5 @@
 import { User, MLMConfig, Sale, CommissionPayout } from '../types';
+import { getSalePoints, getSaleAgreementValueINR } from './points';
 
 /**
  * Counts the total recursive downline network size of a user.
@@ -106,7 +107,7 @@ export function normalizeUsersWithSales(users: User[], sales: Sale[], config?: M
     directSalesMap[u.id] = 0;
   });
   sales.forEach(s => {
-    const pt = Math.round(s.saleValue || 0);
+    const pt = getSalePoints(s);
     if (directSalesMap[s.agentId] !== undefined) {
       directSalesMap[s.agentId] += pt;
     } else {
@@ -195,15 +196,16 @@ export function rebuildPayoutsFromSales(
       const currentAgent = users.find(u => u.id === currentAgentId);
       if (!currentAgent) break;
 
-      const value = Math.round(sale.saleValue);
+      const agreementValueINR = getSaleAgreementValueINR(sale);
       const levelPct = levelConfig.percentage;
       const tdsPct = config?.tdsPercentage ?? 5.0;
-      const adminPct = config?.adminFeePercentage ?? 1.0;
+      // Flat Admin Fee (defaults to ₹1,000; if configured > 50, use configured flat amount)
+      const flatAdminFee = (config?.adminFeePercentage && config.adminFeePercentage > 50) ? config.adminFeePercentage : 1000;
 
-      const gross = parseFloat((value * (levelPct / 100)).toFixed(4));
-      const tds = parseFloat((gross * (tdsPct / 100)).toFixed(4));
-      const admin = parseFloat((gross * (adminPct / 100)).toFixed(4));
-      const net = parseFloat((gross - tds - admin).toFixed(4));
+      const gross = parseFloat((agreementValueINR * (levelPct / 100)).toFixed(2));
+      const tds = parseFloat((gross * (tdsPct / 100)).toFixed(2));
+      const admin = gross > 0 ? flatAdminFee : 0;
+      const net = parseFloat((gross - tds - admin).toFixed(2));
 
       // Look up if a payout already exists for this sale, agent, and level to preserve its status & id
       const match = existingPayouts.find(
@@ -231,7 +233,7 @@ export function rebuildPayoutsFromSales(
           saleId: sale.id,
           project: sale.project,
           unitNumber: sale.unitNumber,
-          saleValue: value,
+          saleValue: agreementValueINR,
           agentId: currentAgent.id,
           agentName: currentAgent.name,
           level: currentLevel,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog, LeadershipConfig } from '../types';
-import { calculatePointsFromSize } from '../lib/points';
+import { calculatePointsFromSize, getSalePoints, getSaleAgreementValueINR } from '../lib/points';
 import TreeVisualizer from './TreeVisualizer';
 import { 
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
@@ -39,6 +39,7 @@ interface AdminPanelProps {
   onUpdateProjects: (projects: RealEstateProject[]) => void;
   onApprovePayout: (payoutId: string) => void;
   onDisbursePayout: (payoutId: string) => void;
+  onUpdatePayoutStatus?: (payoutId: string, status: 'PENDING' | 'APPROVED' | 'DISBURSED') => void;
   onUpdateSaleBookingStatus?: (saleId: string, bookingStatus: 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE', tokenAmount?: number) => void;
   onUpdateSale?: (sale: Sale) => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
@@ -62,6 +63,7 @@ export default function AdminPanel({
   onUpdateProjects,
   onApprovePayout,
   onDisbursePayout,
+  onUpdatePayoutStatus,
   onUpdateSaleBookingStatus,
   onUpdateSale,
   onUpdateUserProfile,
@@ -536,7 +538,7 @@ export default function AdminPanel({
   }, [bookSizeCategory, selectedUnits]);
 
   // Calculate stats
-  const totalSalesVal = sales.reduce((acc, s) => acc + s.saleValue, 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + getSalePoints(s), 0);
   const totalCommissionDistributed = payouts
     .filter(p => p.status === 'DISBURSED')
     .reduce((acc, p) => acc + p.netCommission, 0);
@@ -879,70 +881,6 @@ export default function AdminPanel({
 
   return (
     <div className="space-y-6">
-      {/* SBR Administrative Performance Deck */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-bl-full pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Gross Sourced Volume</p>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-stone-900 mt-1">
-                {formatPoints(totalSalesVal)}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
-              <TrendingUp className="w-5 h-5 text-emerald-800" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Value of all booked plots/villas</p>
-        </div>
-
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Settled Commissions</p>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-emerald-800 mt-1">
-                {formatPoints(totalCommissionDistributed)}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
-              <DollarSign className="w-5 h-5 text-emerald-800" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Disbursed net bank transfers (tax withheld)</p>
-        </div>
-
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Commission Liabilities</p>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-amber-700 mt-1">
-                {formatPoints(totalCommissionPending)}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
-              <RefreshCw className="w-5 h-5 text-amber-700 font-bold" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Queue awaiting auditor release clearances</p>
-        </div>
-
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Active Sourcing Team</p>
-              <h3 className="text-xl sm:text-2xl font-bold text-stone-900 mt-1">
-                {users.filter(u => u.status === 'ACTIVE').length} / {users.length}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200">
-              <Users className="w-5 h-5 text-indigo-800" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Active sub-brokers mapped in team structure</p>
-        </div>
-      </div>
-
       {/* Admin Panel sub tab bar */}
       <div className="flex flex-wrap p-1.5 bg-stone-100 border border-stone-200/85 rounded-2xl gap-1">
         <button
@@ -1038,20 +976,19 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-600 uppercase tracking-wider block mb-1">SBR Admin Retention Fee</label>
+                  <label className="text-[10px] font-bold text-stone-600 uppercase tracking-wider block mb-1">SBR Admin Retention Fee (Flat ₹)</label>
                   <div className="relative">
                     <input
                       type="number"
-                      step="0.1"
+                      step="100"
                       min="0"
-                      max="100"
                       value={adminFee}
                       onChange={(e) => setAdminFee(parseFloat(e.target.value) || 0)}
                       className="w-full pr-8 pl-3 py-2 text-xs font-mono font-bold rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                     />
-                    <Percent className="absolute right-3 top-3 w-3.5 h-3.5 text-stone-400" />
+                    <DollarSign className="absolute right-3 top-3 w-3.5 h-3.5 text-stone-400" />
                   </div>
-                  <p className="text-[9.5px] text-stone-500 mt-1">Platform development and logistics operational charge</p>
+                  <p className="text-[9.5px] text-stone-500 mt-1">Flat administrative service fee deduction in ₹ per payout</p>
                 </div>
               </div>
 
@@ -3184,7 +3121,8 @@ export default function AdminPanel({
                   <th className="px-5 py-3">Acquirer Representative</th>
                   <th className="px-5 py-3">Broker Sourced</th>
                   <th className="px-5 py-3">Size dimension</th>
-                  <th className="px-5 py-3 font-mono">Agreement Price</th>
+                  <th className="px-5 py-3 font-mono">Total Points</th>
+                  <th className="px-5 py-3 font-mono">Agreement Price (INR)</th>
                   <th className="px-5 py-3">Payment Health (INR)</th>
                   <th className="px-5 py-3">Allotment State</th>
                   <th className="px-5 py-3">Milestone Booking Status</th>
@@ -3204,7 +3142,8 @@ export default function AdminPanel({
                       <p className="text-[9.5px] text-stone-500 mt-0.5 font-mono">{sale.agentId}</p>
                     </td>
                     <td className="px-5 py-3.5 text-stone-600 font-mono">{sale.sizeSqYards} SQ YD</td>
-                    <td className="px-5 py-3.5 font-bold text-stone-900 text-xs font-mono">{formatPoints(sale.saleValue)}</td>
+                    <td className="px-5 py-3.5 font-bold text-emerald-800 text-xs font-mono">{formatPoints(getSalePoints(sale))}</td>
+                    <td className="px-5 py-3.5 font-bold text-stone-900 text-xs font-mono">{formatINR(getSaleAgreementValueINR(sale))}</td>
                     <td className="px-5 py-3.5">
                       {renderPaymentProgress(sale)}
                       <button
@@ -3295,37 +3234,6 @@ export default function AdminPanel({
       {/* 6. OPERATIONS & PAYOUTS AUDITING */}
       {activeSubTab === 'PAYOUTS' && (
         <div id="sbr-payouts-section" className="space-y-6 animate-fade-in scroll-mt-24">
-          {/* Summary metrics cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Unprocessed Queue (Pending Approval)</span>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-amber-700 mt-1">
-                {formatPoints(payouts.filter(p => p.status === 'PENDING').reduce((acc, p) => acc + p.netCommission, 0))}
-              </h3>
-              <p className="text-[9.5px] text-stone-500 mt-2">
-                {payouts.filter(p => p.status === 'PENDING').length} commission transactions awaiting sanctioning
-              </p>
-            </div>
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Approved & Sanctioned (Awaiting bank release)</span>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-amber-900 mt-1">
-                {formatPoints(payouts.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + p.netCommission, 0))}
-              </h3>
-              <p className="text-[9.5px] text-stone-500 mt-2">
-                {payouts.filter(p => p.status === 'APPROVED').length} commission vouchers sanctioned for RTGS/NEFT
-              </p>
-            </div>
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Disbursed net bank transfers</span>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-emerald-800 mt-1">
-                {formatPoints(payouts.filter(p => p.status === 'DISBURSED').reduce((acc, p) => acc + p.netCommission, 0))}
-              </h3>
-              <p className="text-[9.5px] text-stone-500 mt-2">
-                {payouts.filter(p => p.status === 'DISBURSED').length} transactions cleared & marked paid
-              </p>
-            </div>
-          </div>
-
           <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center flex-col md:flex-row gap-4">
               <div>
@@ -3338,71 +3246,82 @@ export default function AdminPanel({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
-                    <th className="px-5 py-3">Payout ID</th>
-                    <th className="px-5 py-3">Beneficiary Sponsor</th>
-                    <th className="px-5 py-3 font-mono">Gross Calculated</th>
-                    <th className="px-5 py-3 font-mono">TDS Withheld (194H)</th>
-                    <th className="px-5 py-3 font-mono">Admin Retained</th>
-                    <th className="px-5 py-3 font-mono">Net Release</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Auditing Clearances</th>
+                    <th className="px-4 py-3">Payout / Sale ID</th>
+                    <th className="px-4 py-3">Payee Name / ID</th>
+                    <th className="px-4 py-3">Network Level</th>
+                    <th className="px-4 py-3 font-mono text-center">Comm %</th>
+                    <th className="px-4 py-3 font-mono">Gross Commission (₹)</th>
+                    <th className="px-4 py-3 font-mono">TDS 5% (₹)</th>
+                    <th className="px-4 py-3 font-mono">Flat Admin Fee (₹)</th>
+                    <th className="px-4 py-3 font-mono">Net Release (₹)</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Auditing Clearances</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-200 text-stone-800">
                   {payouts.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-10 text-center text-stone-400 font-medium font-sans">
+                      <td colSpan={10} className="px-5 py-10 text-center text-stone-400 font-medium font-sans">
                         No commission disbursements recorded yet. Create a plot booking first.
                       </td>
                     </tr>
                   ) : (
                     payouts.map((pay) => (
                       <tr key={pay.id} className="hover:bg-stone-50/30 transition-colors">
-                        <td className="px-5 py-3.5 font-bold font-mono text-stone-900">{pay.id}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-4 py-3.5">
+                          <p className="font-bold font-mono text-stone-900">{pay.id}</p>
+                          <p className="text-[9.5px] font-mono text-stone-500">{pay.saleId} ({pay.unitNumber})</p>
+                        </td>
+                        <td className="px-4 py-3.5">
                           <p className="font-bold text-stone-900">{pay.agentName}</p>
                           <p className="text-[9.5px] text-stone-500 mt-0.5 font-mono">{pay.agentId}</p>
                         </td>
-                        <td className="px-5 py-3.5 font-mono text-stone-600 font-bold">{formatPoints(pay.grossCommission)}</td>
-                        <td className="px-5 py-3.5 font-mono text-rose-600">-{formatPoints(pay.tdsDeduction)}</td>
-                        <td className="px-5 py-3.5 font-mono text-stone-500">-{formatPoints(pay.adminFee)}</td>
-                        <td className="px-5 py-3.5 font-bold text-stone-900 font-mono text-emerald-800">{formatPoints(pay.netCommission)}</td>
-                        <td className="px-5 py-3.5">
-                          <span className={`inline-flex items-center gap-1 text-[9.5px] font-bold uppercase rounded px-2 py-0.5 border ${
-                            pay.status === 'PENDING'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : pay.status === 'APPROVED'
-                              ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}>
-                            <span className={`w-1 h-1 rounded-full ${
-                              pay.status === 'PENDING' ? 'bg-amber-600' : pay.status === 'APPROVED' ? 'bg-blue-600' : 'bg-emerald-600'
-                            }`} />
-                            {pay.status}
-                          </span>
+                        <td className="px-4 py-3.5 font-semibold text-stone-700">Level {pay.level}</td>
+                        <td className="px-4 py-3.5 font-mono text-center font-bold text-stone-700">{pay.percentage}%</td>
+                        <td className="px-4 py-3.5 font-mono text-stone-900 font-bold">{formatINR(pay.grossCommission)}</td>
+                        <td className="px-4 py-3.5 font-mono text-rose-600">-{formatINR(pay.tdsDeduction)}</td>
+                        <td className="px-4 py-3.5 font-mono text-stone-500">-{formatINR(pay.adminFee)}</td>
+                        <td className="px-4 py-3.5 font-bold text-emerald-800 font-mono text-sm">{formatINR(pay.netCommission)}</td>
+                        <td className="px-4 py-3.5">
+                          <select
+                            value={pay.status}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as 'PENDING' | 'APPROVED' | 'DISBURSED';
+                              if (onUpdatePayoutStatus) {
+                                onUpdatePayoutStatus(pay.id, newStatus);
+                              } else if (newStatus === 'APPROVED') {
+                                onApprovePayout(pay.id);
+                              } else if (newStatus === 'DISBURSED') {
+                                onDisbursePayout(pay.id);
+                              }
+                            }}
+                            className={`text-xs font-bold rounded-lg border px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer shadow-2xs transition-all ${
+                              pay.status === 'PENDING'
+                                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                                : pay.status === 'APPROVED'
+                                ? 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
+                                : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <option value="PENDING" className="bg-white text-amber-900 font-bold">PENDING</option>
+                            <option value="APPROVED" className="bg-white text-blue-900 font-bold">APPROVED</option>
+                            <option value="DISBURSED" className="bg-white text-emerald-900 font-bold">DISBURSED</option>
+                          </select>
                         </td>
-                        <td className="px-5 py-3.5 text-right font-sans">
-                          {pay.status === 'PENDING' && (
-                            <button
-                              onClick={() => onApprovePayout(pay.id)}
-                              className="px-2.5 py-1 text-[10.5px] font-bold rounded bg-emerald-800 hover:bg-emerald-900 text-white transition-all cursor-pointer shadow-xs inline-flex items-center gap-1"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" /> Sanction Payout
-                            </button>
-                          )}
-                          {pay.status === 'APPROVED' && (
-                            <button
-                              onClick={() => onDisbursePayout(pay.id)}
-                              className="px-2.5 py-1 text-[10.5px] font-bold rounded bg-emerald-800 hover:bg-emerald-900 text-white transition-all cursor-pointer shadow-xs inline-flex items-center gap-1 animate-pulse"
-                            >
-                              <DollarSign className="w-3.5 h-3.5" /> Confirm Bank Dispatch
-                            </button>
-                          )}
-                          {pay.status === 'DISBURSED' && (
-                            <span className="text-[10px] text-emerald-700 font-bold block leading-relaxed font-sans">
-                              Cleared RTGS transfer
-                            </span>
-                          )}
+                        <td className="px-4 py-3.5 text-right font-sans">
+                          <span className={`text-[11px] font-bold ${
+                            pay.status === 'PENDING' 
+                              ? 'text-amber-700' 
+                              : pay.status === 'APPROVED' 
+                              ? 'text-blue-700' 
+                              : 'text-emerald-700 font-mono'
+                          }`}>
+                            {pay.status === 'PENDING' 
+                              ? 'Awaiting Sanction' 
+                              : pay.status === 'APPROVED' 
+                              ? 'Sanctioned for RTGS' 
+                              : 'Cleared Bank Transfer'}
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -3581,9 +3500,9 @@ export default function AdminPanel({
                     <p className="text-[10px] text-stone-500 font-mono">ID: {sale.agentId}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Agreement Price (PTS)</p>
-                    <p className="font-extrabold text-stone-900 font-mono text-sm">{formatPoints(sale.saleValue)}</p>
-                    <p className="text-[9.5px] text-stone-400 uppercase tracking-widest font-mono">({sale.sizeSqYards} SQ YD)</p>
+                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Points (From Size)</p>
+                    <p className="font-extrabold text-emerald-800 font-mono text-sm">{formatPoints(getSalePoints(sale))}</p>
+                    <p className="text-[10px] text-stone-600 font-mono font-bold mt-0.5">{formatINR(getSaleAgreementValueINR(sale))} ({sale.sizeSqYards} SQ YD)</p>
                   </div>
                 </div>
 

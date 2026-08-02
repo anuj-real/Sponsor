@@ -2,7 +2,7 @@ import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfi
 
 export const INITIAL_MLM_CONFIG: MLMConfig = {
   tdsPercentage: 5.0, // 5% standard withholding tax on points
-  adminFeePercentage: 1.0, // 1% administrative service fee in points
+  adminFeePercentage: 1000, // Flat ₹1,000 administrative service fee
   levels: [
     { level: 1, percentage: 7.0 },  // Level 1: 7.0% Direct Broker
     { level: 2, percentage: 2.0 },  // Level 2: 2.0% Upline 1
