@@ -130,6 +130,194 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
         ]
       }
     ]
+  },
+  {
+    id: 'PRJ-183',
+    name: 'Indri KMP',
+    location: 'Indri, KMP Expressway, Haryana',
+    minPrice: 1.8,
+    maxPrice: 4.5,
+    sqYardStartingPrice: 18000,
+    imageMapUrl: '',
+    projectStage: 'Under Construction',
+    registryStatus: 'In Progress',
+    registryDate: '2026-06-01',
+    sroOffice: 'Indri',
+    mutationStatus: 'Pending',
+    mutationDate: '',
+    mutationNumber: '',
+    inventory: [
+      {
+        size: "32' x 40' (142.20 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 96', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "30' x 33' (110.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 43', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "30' x 30' (100.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 21', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 32', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 54', status: 'BOOKED', bookedByAgentId: 'SBR0055', buyerName: 'Anju Devi', type: 'Residential' },
+          { unitNumber: 'Plot 60', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 66', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 72', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 78', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 89', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 90', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "25' x 37' (102.70 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 11', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "23' x 40' (102.20 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 12', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "23' x 30' (76.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 55', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 61', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "22' x 30' (73.30 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 67', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 73', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 79', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 88', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 91', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "20' x 40' (88.80 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 13', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 14', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 15', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 16', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 17', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 18', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 19', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 20', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 97', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 98', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 99', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 100', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "20' x 50' (111.11 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 1', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 2', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 3', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 4', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 5', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 6', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 7', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 8', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 9', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "19' x 50' (105.50 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 10', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "18' x 30' (60.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 22', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 33', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "18' x 33' (66.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 44', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "15' x 33' (55.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 45', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 46', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 47', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 48', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 49', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 50', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 51', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 52', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 53', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      },
+      {
+        size: "15' x 30' (50.00 Sq Yards)",
+        units: [
+          { unitNumber: 'Plot 23', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 24', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 25', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 26', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 27', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 28', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 29', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 30', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 31', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 34', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 35', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 36', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 37', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 38', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 39', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 40', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 41', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 42', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 56', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 57', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 58', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 59', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 62', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 63', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 64', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 65', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 68', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 69', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 70', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 71', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 74', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 75', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 76', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 77', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 80', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 81', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 82', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 83', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 84', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 85', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 86', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 87', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 92', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 93', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 94', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' },
+          { unitNumber: 'Plot 95', status: 'AVAILABLE', bookedByAgentId: null, buyerName: null, type: 'Residential' }
+        ]
+      }
+    ]
   }
 ];
 
@@ -212,7 +400,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'RAM',
-    name: 'Ram Family ID',
+    name: 'Ram Singh',
     email: 'ram@sbrassociates.com',
     phone: '+91 91111 22222',
     role: 'ADMIN',
@@ -228,6 +416,25 @@ export const INITIAL_USERS: User[] = [
     address: 'Indiranagar, Bengaluru',
     photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
     password: 'e0a19949ca7fab3c3082a69a1fcfa2d8d5b3196d785faf2f7855c706e763f4c6'
+  },
+  {
+    id: 'SBR0055',
+    name: 'SBR0055',
+    email: 'sbr0055@sbrassociates.com',
+    phone: '+91 74282 34591',
+    role: 'AGENT',
+    sponsorId: 'RAM',
+    joinedDate: '2026-08-01',
+    designation: 'Associate',
+    status: 'ACTIVE',
+    totalDirectSales: 1650000.0,
+    totalDownlineSales: 0.0,
+    dob: '1992-05-10',
+    aadhar: '5555 7777 8888',
+    pan: 'SBRCP0055A',
+    address: 'Sheetla Colony, Gurugram',
+    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+    password: '47ea7c8c4e02fc37b54fd9c210ee80431b8284c77863e723d8733fffe95725c7'
   },
   {
     id: 'DK',
@@ -269,7 +476,35 @@ export const INITIAL_USERS: User[] = [
   }
 ];
 
-export const INITIAL_SALES: Sale[] = [];
+export const INITIAL_SALES: Sale[] = [
+  {
+    id: 'SALE-183-54',
+    project: 'Indri KMP',
+    projectId: 'PRJ-183',
+    unitNumber: 'Plot 54',
+    buyerName: 'Anju Devi',
+    saleValue: 1650000,
+    agentId: 'SBR0055',
+    agentName: 'SBR0055',
+    saleDate: '2026-08-01',
+    referenceNumber: 'REF-INDR-54',
+    sizeSqYards: '100',
+    status: 'CONFIRMED',
+    bookingStatus: 'BOOKING_DONE',
+    tokenAmount: 495000,
+    ratePerSqYard: 16500,
+    payments: [
+      {
+        id: 'PAY-ANJU-54-1',
+        amount: 495000,
+        date: '2026-08-01',
+        paymentMode: 'BANK_TRANSFER',
+        reference: 'BOOKING-495K',
+        notes: 'Booking amount (30%) received from Anju Devi, Sheetla Colony Gurugram (Ph: 7428234591)'
+      }
+    ]
+  }
+];
 
 export const INITIAL_PAYOUTS: CommissionPayout[] = [];
 

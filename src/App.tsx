@@ -219,6 +219,54 @@ export default function App() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  const sanitizeProjects = (rawProjects: RealEstateProject[]): RealEstateProject[] => {
+    const filtered = (rawProjects || []).filter(p => p.id !== 'PRJ-251');
+    const nameMap = new Map<string, RealEstateProject>();
+
+    for (const proj of filtered) {
+      const normName = (proj.name || '').trim().toLowerCase();
+      const existing = nameMap.get(normName);
+      if (!existing) {
+        nameMap.set(normName, proj);
+      } else if (proj.id === 'PRJ-183') {
+        nameMap.set(normName, proj);
+      }
+    }
+
+    for (const initProj of INITIAL_PROJECTS) {
+      const normName = initProj.name.trim().toLowerCase();
+      if (!nameMap.has(normName)) {
+        nameMap.set(normName, initProj);
+      } else {
+        const curr = nameMap.get(normName)!;
+        if (initProj.id === 'PRJ-183') {
+          let updatedInv = (curr.inventory && curr.inventory.length >= 10) ? curr.inventory : initProj.inventory;
+          updatedInv = updatedInv.map(cat => ({
+            ...cat,
+            units: cat.units.map(u => {
+              if (u.unitNumber === 'Plot 54' || u.unitNumber === '54') {
+                return {
+                  ...u,
+                  status: 'BOOKED' as const,
+                  bookedByAgentId: 'SBR0055',
+                  buyerName: 'Anju Devi'
+                };
+              }
+              return u;
+            })
+          }));
+          nameMap.set(normName, {
+            ...curr,
+            id: 'PRJ-183',
+            inventory: updatedInv
+          });
+        }
+      }
+    }
+
+    return Array.from(nameMap.values());
+  };
+
   const loadPrivateData = async (
     sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string },
     preloadedData?: any,
@@ -242,11 +290,33 @@ export default function App() {
       const activeConfig = data.config || INITIAL_MLM_CONFIG;
       setConfig(activeConfig);
       
-      const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
-      const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+      const rawSales = data.sales || INITIAL_SALES;
+      let loadedSales = rawSales.map((s: any) => ({
+        ...s,
+        projectId: s.projectId === 'PRJ-251' ? 'PRJ-183' : s.projectId
+      }));
+      for (const initSale of INITIAL_SALES) {
+        if (!loadedSales.some((s: any) => s.id === initSale.id)) {
+          loadedSales = [initSale, ...loadedSales];
+          setDocumentData(COLLECTIONS.SALES, initSale.id, initSale).catch(() => {});
+        }
+      }
+
+      const loadedProjects = sanitizeProjects(data.projects || INITIAL_PROJECTS);
+      deleteDocument(COLLECTIONS.PROJECTS, 'PRJ-251').catch(() => {});
+      const indriProj = loadedProjects.find(p => p.id === 'PRJ-183' || p.name === 'Indri KMP');
+      if (indriProj) {
+        setDocumentData(COLLECTIONS.PROJECTS, indriProj.id, indriProj).catch(() => {});
+      }
       setProjects(loadedProjects);
 
       let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+      for (const initUser of INITIAL_USERS) {
+        if (!loadedUsers.some((u: any) => u.id === initUser.id)) {
+          loadedUsers = [...loadedUsers, initUser];
+          setDocumentData(COLLECTIONS.USERS, initUser.id, initUser).catch(() => {});
+        }
+      }
 
       // Force upgrade old vulnerable passwords to their correct secure hashes for the 7 secure nodes
       loadedUsers = loadedUsers.map(user => ({
@@ -481,8 +551,13 @@ export default function App() {
         } catch (_) {}
       }
 
-      let localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
-      let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
+      let localSales = storedSales ? JSON.parse(storedSales) : INITIAL_SALES;
+      for (const initSale of INITIAL_SALES) {
+        if (!localSales.some((s: any) => s.id === initSale.id)) {
+          localSales = [initSale, ...localSales];
+        }
+      }
+      let localProjects = sanitizeProjects(storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS);
       let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
 
       const rawLocalPayouts = storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS;
@@ -555,7 +630,8 @@ export default function App() {
         const activeConfig = data.config || INITIAL_MLM_CONFIG;
         setConfig(activeConfig);
         
-        const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+        let loadedProjects = sanitizeProjects(data.projects || INITIAL_PROJECTS);
+        deleteDocument(COLLECTIONS.PROJECTS, 'PRJ-251').catch(() => {});
         setProjects(loadedProjects);
 
         const storedSession = localStorage.getItem('SBR_SESSION');
@@ -569,7 +645,7 @@ export default function App() {
           }
         } else {
           // If no stored session, populate initial public states from fetched data
-          const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
+          const loadedSales = data.sales || INITIAL_SALES;
           setSales(loadedSales);
           setNotifications(data.notifications || INITIAL_NOTIFICATIONS);
           
