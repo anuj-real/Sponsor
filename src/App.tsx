@@ -24,7 +24,6 @@ import {
   Home,
   Menu,
   Moon,
-  Network,
   Sun,
   Wallet,
   X,
@@ -46,13 +45,13 @@ import {
 const NAV_ITEMS = [
   { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
-  { key: 'TREE', label: 'My Tree', icon: Network, anchor: 'sbr-tree-section' },
   { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
-  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, anchor: 'sbr-payouts-section' },
+  // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
+  // same reasoning as /profile: the dashboard is too long on mobile.
+  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, route: '/payouts' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  { key: 'USER_DETAIL', label: 'User Detail', icon: UserCog, anchor: 'sbr-user-detail' },
-  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, anchor: 'sbr-edit-detail' },
+  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile', anchor: 'profile-edit-section' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -65,6 +64,7 @@ import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
 import ProfilePage from './components/ProfilePage';
+import PayoutsDesk from './components/PayoutsDesk';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -135,7 +135,11 @@ export default function App() {
     const onHashChange = () => {
       const next = parseHashRoute();
       setRoute(next);
-      setActiveNav(next.startsWith('/profile') ? 'PROFILE' : 'HOME');
+      setActiveNav(
+        next.startsWith('/profile') ? 'PROFILE'
+        : next.startsWith('/payouts') ? 'PAYOUTS'
+        : 'HOME'
+      );
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -180,10 +184,31 @@ export default function App() {
     const target = NAV_ITEMS.find(item => item.key === key);
     if (!target) return;
 
-    // Route entries swap the main view instead of scrolling.
+    // Retry-scroll: the target may mount a tick later (route swap / sub-tab switch).
+    const scrollToAnchor = (anchor: string) => {
+      let attempts = 0;
+      const tryScroll = () => {
+        if (anchor === 'sbr-top') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        const el = document.getElementById(anchor);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (attempts++ < 10) {
+          setTimeout(tryScroll, 80);
+        }
+      };
+      setTimeout(tryScroll, 60);
+    };
+
+    // Route entries swap the main view; an optional anchor then scrolls within
+    // the new view (e.g. Edit Detail → /profile → bank-details section).
     if ('route' in target && target.route) {
       navigateTo(target.route);
       setActiveNav(key);
+      if (target.anchor) scrollToAnchor(target.anchor);
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -193,22 +218,7 @@ export default function App() {
       navigateTo('/');
     }
     setActiveNav(key);
-
-    const anchor = target.anchor!;
-    let attempts = 0;
-    const tryScroll = () => {
-      if (anchor === 'sbr-top') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      const el = document.getElementById(anchor);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else if (attempts++ < 10) {
-        setTimeout(tryScroll, 80);
-      }
-    };
-    setTimeout(tryScroll, 60);
+    scrollToAnchor(target.anchor!);
   };
 
   // Security Modal States
@@ -1699,6 +1709,29 @@ export default function App() {
             onBack={() => navigateTo('/')}
             onUpdateUserProfile={handleAdminUpdateUserProfile}
           />
+        ) : route.startsWith('/payouts') ? (
+          /* /payouts — the same desk the admin dashboard uses. Admins get the
+             full auditable list with sanction/dispatch; channel partners get
+             their own payouts, read-only (no handlers passed). */
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            {session?.role === 'ADMIN' ? (
+              <PayoutsDesk
+                payouts={payouts}
+                onApprovePayout={handleApprovePayout}
+                onDisbursePayout={handleDisbursePayout}
+              />
+            ) : (
+              <PayoutsDesk
+                payouts={payouts.filter(p => p.agentId?.toUpperCase() === session?.agentId?.toUpperCase())}
+              />
+            )}
+          </div>
         ) : (
           <>
         {activeRole === 'ADMIN' && (

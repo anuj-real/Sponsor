@@ -102,13 +102,24 @@ id it scrolls to:
 | Key | Label | Anchor |
 |---|---|---|
 | `HOME` | Home | `sbr-top` (scrolls to top) |
-| `TREE` | My Tree | `sbr-tree-section` |
+| `PROFILE` | Profile | *routes to* `/profile` |
 | `TEAM` | Team | `sbr-team-section` |
 | `INVENTORY` | Plot Inventory | `sbr-inventory-section` |
-| `PAYOUTS` | Payouts | `sbr-payouts-section` |
+| `PAYOUTS` | Payouts | *routes to* `/payouts` |
 | `SPONSOR_CODE` | Sponsor Reference Code | `sbr-sponsor-code` |
-| `USER_DETAIL` | User Detail | `sbr-user-detail` |
-| `EDIT_DETAIL` | Edit Detail | `sbr-edit-detail` |
+| `EDIT_DETAIL` | Edit Detail | *routes to* `/profile` → `profile-edit-section` |
+
+`TREE` (My Tree) and `USER_DETAIL` were **removed** from the nav (the tree is still rendered on
+the dashboard; `/profile` covers user detail). Route entries may carry an `anchor` scrolled to
+*after* navigation. The AgentPanel "SBR Profile" badge also routes to `/profile`.
+ProfilePage's performance stats row (direct/downline volume, paid/pending) is **commented out**
+for a leaner mobile profile — restore by uncommenting the `stats` array + its grid together.
+
+**`/payouts` route:** the payout filter tiles + audit desk were extracted into
+[src/components/PayoutsDesk.tsx](src/components/PayoutsDesk.tsx), rendered both by the AdminPanel
+PAYOUTS sub-tab and the `/payouts` page. Admins get the full list with sanction/dispatch handlers;
+channel partners get their own payouts read-only — **action buttons render only when the handlers
+are passed**, so the same component serves both. Edit the desk there, not in the panels.
 
 Drawer sections, in order: **identity card** → **Navigate** (the table above) → **Workspace**
 (admin-only role switch) → **Account** (Sync Cloud, Passcode Settings, Disconnect).
@@ -204,6 +215,42 @@ for two routes isn't warranted. Mechanics in [src/App.tsx](src/App.tsx):
 - **Access rule:** `#/profile` shows the signed-in user; `#/profile/<SBR ID>` shows that partner
   — honoured only when `session.role === 'ADMIN'`, everyone else silently gets their own record.
   The admin agents directory has a per-row "Profile" button that sets the hash directly.
+
+## 7. Mobile responsiveness pass
+
+**Pattern: card lists for wide tables.** Every data table keeps its full table on `sm+` and renders
+a stacked card list below `sm` (`sm:hidden` cards + `hidden sm:block`/`sm:table` table). Converted:
+
+- AdminPanel **agents directory** (7 cols) — identity + status chip, ID/designation/sponsor chips,
+  stats grid, then full-width tap-target action buttons in a 2-col grid.
+- AdminPanel **payouts** (8 cols) — gross → TDS → admin → net breakdown, full-width sanction/dispatch button.
+- AdminPanel **sales ledger** (9 cols) — same live controls as the row: payment progress, Manage
+  Payments, milestone `<select>` and token-amount input.
+- AdminPanel **lifecycle logs** (7 cols) — compact entries.
+- AgentPanel **direct ledger** and **downline network** tables. (The override receipts list was
+  already cards.)
+
+Cards and rows share behaviour through extracted handlers — `openCredentialsEditor`,
+`copyInviteMessage`, `confirmDeleteAgent`, `openPaymentsLedger`, `getDobPasscode` — which also
+de-duplicated ~90 lines of inline closures from the desktop rows. **Edit those helpers, not the
+markup, when changing row behaviour** — both layouts consume them.
+
+**Form grids:** eight `grid-cols-2` input grids (booking form selects, rate/token, project legal
+metadata, leadership/offer editors) became `grid-cols-1 sm:grid-cols-2` so inputs are full-width on
+phones. Display-only 2-col grids (stat pairs, date chips) were left alone deliberately.
+
+**Admin sub-tab bar** (earlier pass): scrollable pill strip with short labels + auto-centred active
+pill + context line on mobile; unchanged wrap layout on `sm+` (see `ADMIN_TABS` in AdminPanel).
+
+**Payout status filter:** the Payouts tab's three read-only summary cards were replaced by four
+tappable tiles (All / Pending / Approved / Disbursed) that show each bucket's count + net total
+*and* filter both the mobile card list and the desktop table (`payoutStatusFilter` /
+`filteredPayouts` in AdminPanel). The empty state distinguishes "no payouts at all" from
+"none matching the filter", and an active filter shows a "clear filter" line in the desk header.
+
+**Compact admin stat deck:** the four top cards (Gross Sourced Volume, Settled Commissions,
+Commission Liabilities, Active Sourcing Team) render as a tight 2×2 tile grid below `sm` —
+no icons or blurbs, smaller values — so they no longer fill the first mobile screen.
 
 ## Known gaps
 

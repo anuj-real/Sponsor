@@ -13,9 +13,7 @@ import {
   Phone,
   ShieldAlert,
   ShieldCheck,
-  TrendingUp,
-  Users as UsersIcon,
-  Wallet,
+  // TrendingUp, Users as UsersIcon, Wallet — used by the commented performance stats
 } from 'lucide-react';
 
 /**
@@ -185,10 +183,14 @@ export default function ProfilePage({
   const sponsor = users.find(u => u.id?.toUpperCase() === user.sponsorId?.toUpperCase());
   const directRecruits = users.filter(u => u.sponsorId?.toUpperCase() === user.id?.toUpperCase());
   const teamSize = countDownline(user.id, users);
+
+  /* Performance stats temporarily hidden for a leaner mobile profile — restore
+     with the "Performance summary" block below.
   const mySales = sales.filter(s => s.agentId?.toUpperCase() === user.id?.toUpperCase());
   const myPayouts = payouts.filter(p => p.agentId?.toUpperCase() === user.id?.toUpperCase());
   const paid = myPayouts.filter(p => p.status === 'DISBURSED').reduce((a, p) => a + p.netCommission, 0);
   const pending = myPayouts.filter(p => p.status !== 'DISBURSED').reduce((a, p) => a + p.netCommission, 0);
+  */
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,15 +216,18 @@ export default function ProfilePage({
     }
   };
 
+  /*
   const stats = [
     { label: 'Direct Volume', value: formatPoints(user.totalDirectSales), icon: TrendingUp, note: `${mySales.length} agreements` },
     { label: 'Downline Volume', value: formatPoints(user.totalDownlineSales), icon: UsersIcon, note: `${teamSize} in team` },
     { label: 'Commissions Paid', value: formatPoints(paid), icon: Wallet, note: 'Cleared to bank' },
     { label: 'Pending Payouts', value: formatPoints(pending), icon: CreditCard, note: 'Awaiting release' },
   ];
+  */
 
   return (
-    <div className="space-y-6">
+    /* Tighter rhythm below sm — the profile should read as one calm column on phones. */
+    <div className="space-y-4 sm:space-y-6">
       <button
         onClick={onBack}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
@@ -231,26 +236,26 @@ export default function ProfilePage({
       </button>
 
       {/* Identity banner */}
-      <div className="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center gap-5">
+      <div className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-row sm:items-center gap-3.5 sm:gap-5">
         {user.photo ? (
           <img
             src={user.photo}
             alt={user.name}
             referrerPolicy="no-referrer"
-            className="w-20 h-20 rounded-2xl object-cover border border-stone-200 bg-stone-100 shrink-0"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl object-cover border border-stone-200 bg-stone-100 shrink-0"
             onError={e => {
               e.currentTarget.style.display = 'none';
             }}
           />
         ) : (
-          <div className="w-20 h-20 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-800 font-serif font-bold text-2xl shrink-0">
+          <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-800 font-serif font-bold text-xl sm:text-2xl shrink-0">
             {user.name.charAt(0).toUpperCase()}
           </div>
         )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-bold text-stone-900 font-serif truncate">{user.name}</h2>
+            <h2 className="text-base sm:text-xl font-bold text-stone-900 font-serif truncate">{user.name}</h2>
             <span
               className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
                 user.status === 'ACTIVE'
@@ -275,6 +280,24 @@ export default function ProfilePage({
             <span className="text-[10.5px] text-stone-500">Joined {user.joinedDate}</span>
           </div>
 
+          {/* Contact line */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+            {user.phone && (
+              <a
+                href={`tel:${user.phone}`}
+                className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded hover:bg-emerald-100 transition-colors"
+              >
+                <Phone className="w-3 h-3 shrink-0" /> {user.phone}
+              </a>
+            )}
+            {user.email && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-stone-600 min-w-0">
+                <Mail className="w-3 h-3 text-stone-400 shrink-0" />
+                <span className="truncate">{user.email}</span>
+              </span>
+            )}
+          </div>
+
           <p className="text-[11px] text-stone-500 mt-2 leading-relaxed">
             {sponsor ? (
               <>
@@ -289,7 +312,8 @@ export default function ProfilePage({
         </div>
       </div>
 
-      {/* Performance summary */}
+      {/* Performance summary — hidden for now (leaner mobile profile); uncomment
+          together with the `stats` array above to restore.
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(({ label, value, icon: Icon, note }) => (
           <div key={label} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs">
@@ -302,6 +326,7 @@ export default function ProfilePage({
           </div>
         ))}
       </div>
+      */}
 
       {/* Personal details */}
       <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
@@ -311,7 +336,7 @@ export default function ProfilePage({
           </h4>
           <p className="text-[10px] text-stone-500 mt-0.5">Identity on file with SBR Associates</p>
         </div>
-        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Field label="Full Name" value={user.name} />
           <Field label="Mobile Number" value={user.phone} icon={Phone} mono />
           <Field label="Email Address" value={user.email} icon={Mail} />
@@ -324,8 +349,10 @@ export default function ProfilePage({
         </div>
       </div>
 
-      {/* Compliance + editable bank details */}
-      <form onSubmit={handleSave} className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
+      {/* Compliance + editable bank details.
+          `profile-edit-section` is the "Edit Detail" nav target (App routes here
+          then scrolls); scroll-mt clears the sticky header. */}
+      <form id="profile-edit-section" onSubmit={handleSave} className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden scroll-mt-24">
         <div className="p-4 sm:p-5 border-b border-stone-200 bg-stone-50 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wide flex items-center gap-2">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog, LeadershipConfig } from '../types';
 import { calculatePointsFromSize, getSalePoints, getSaleAgreementValueINR } from '../lib/points';
 import TreeVisualizer from './TreeVisualizer';
+import PayoutsDesk from './PayoutsDesk';
 import { 
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
@@ -49,6 +50,28 @@ interface AdminPanelProps {
   navFocus?: string;
 }
 
+type AdminTabKey = 'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'LOGS';
+
+/**
+ * Sub-tab metadata. `shortLabel` is what fits in the mobile pill bar; the full
+ * `label` + `description` are shown in the mobile context line and on sm+.
+ */
+const ADMIN_TABS: {
+  key: AdminTabKey;
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  { key: 'SETTINGS', label: 'Compensation & Incentives', shortLabel: 'Settings', description: 'Commission slabs (L1–L10), TDS/admin rates, rewards, leadership tiers and T&Cs.', icon: Settings },
+  { key: 'AGENTS', label: 'Onboard Sponsors (SBR)', shortLabel: 'Sponsors', description: 'Register partners, browse the team directory and referral tree.', icon: Users },
+  { key: 'PROJECTS', label: 'SBR Projects Setup', shortLabel: 'Projects', description: 'Create projects, layout maps, unit inventory and legal metadata.', icon: Map },
+  { key: 'BOOKINGS', label: 'Book Plot Inventory', shortLabel: 'Bookings', description: 'Register sale agreements and view live unit availability.', icon: Layers },
+  { key: 'SALES', label: 'Corporate Sales Ledger', shortLabel: 'Sales', description: 'Audit trail of sold plots, payment health and milestones.', icon: FileSpreadsheet },
+  { key: 'PAYOUTS', label: 'Operations & Payouts Auditing', shortLabel: 'Payouts', description: 'Sanction and disburse commission payouts.', icon: CreditCard },
+  { key: 'LOGS', label: 'Daily Lifecycle Logs', shortLabel: 'Logs', description: 'User addition/deletion audit ledger with CSV export.', icon: Calendar },
+];
+
 export default function AdminPanel({
   users,
   onAddUser,
@@ -91,16 +114,31 @@ export default function AdminPanel({
   };
 
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, LOGS
-  const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'LOGS'>('SETTINGS');
+  const [activeSubTab, setActiveSubTab] = useState<AdminTabKey>('SETTINGS');
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
+
+
+  const activeTabMeta = ADMIN_TABS.find(t => t.key === activeSubTab) ?? ADMIN_TABS[0];
+
+  // Keep the active pill visible in the mobile scroll strip, whether the change
+  // came from a tap on a partly-hidden pill or from the header nav (navFocus).
+  const tabBarRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const bar = tabBarRef.current;
+    const el = document.getElementById(`admin-tab-${activeSubTab}`);
+    if (!bar || !el) return;
+    // Only the mobile strip scrolls; on sm+ this is a no-op.
+    if (bar.scrollWidth <= bar.clientWidth) return;
+    const target = el.offsetLeft - (bar.clientWidth - el.offsetWidth) / 2;
+    bar.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  }, [activeSubTab]);
 
   // Reveal the sub-tab that owns the section the header nav is pointing at.
   React.useEffect(() => {
     if (!navFocus) return;
-    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'USER_DETAIL' || navFocus === 'EDIT_DETAIL' || navFocus === 'SPONSOR_CODE') {
+    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
+    if (navFocus === 'TEAM' || navFocus === 'SPONSOR_CODE') {
       setActiveSubTab('AGENTS');
-    } else if (navFocus === 'PAYOUTS') {
-      setActiveSubTab('PAYOUTS');
     } else if (navFocus === 'INVENTORY') {
       setActiveSubTab('BOOKINGS');
     }
@@ -272,6 +310,68 @@ export default function AdminPanel({
       return knownPlaintexts[uppercaseId];
     }
     return currentPasswordValue || calculatedDefault;
+  };
+
+  /** DOB-derived default passcode: `{ID}{DD}{MM}{YYYY}` (matches App.tsx auth). */
+  const getDobPasscode = (agent: User): string => {
+    if (!agent.dob) return '';
+    const parts = agent.dob.split('-');
+    if (parts.length !== 3) return '';
+    const [year, month, day] = parts;
+    if (year.length !== 4 || month.length !== 2 || day.length !== 2) return '';
+    return `${agent.id.toUpperCase()}${day}${month}${year}`;
+  };
+
+  /** Opens the credentials editor modal pre-filled with the agent's record.
+      Shared by the desktop table row and the mobile card. */
+  const openCredentialsEditor = (agent: User) => {
+    setSelectedAgentForPassword(agent);
+    setEditName(agent.name || '');
+    setEditEmail(agent.email || '');
+    setEditPhone(agent.phone || '');
+    setEditDob(agent.dob || '');
+    setEditAadhar(agent.aadhar || '');
+    setEditPan(agent.pan || '');
+    setEditAddress(agent.address || '');
+    setEditFatherOrHusbandName(agent.fatherOrHusbandName || '');
+    setEditBankAccountNumber(agent.bankAccountNumber || '');
+    setEditIfscCode(agent.ifscCode || '');
+    setEditBranchName(agent.branchName || '');
+    setEditNominee(agent.nominee || '');
+    setEditNomineeRelation(agent.nomineeRelation || '');
+    setTempPassword(getDisplayPasscode(agent.id, agent.password || '', getDobPasscode(agent)));
+    setPasswordStatusMsg('');
+  };
+
+  /** Copies the WhatsApp-style onboarding invite (portal link + ID + passcode). */
+  const copyInviteMessage = (agent: User) => {
+    const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
+      `Hello *${agent.name}*,\n` +
+      `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
+      `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
+      `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
+      `🔑 *Default Passcode:* ${getDisplayPasscode(agent.id, agent.password || '', getDobPasscode(agent))}\n\n` +
+      `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
+    navigator.clipboard.writeText(inviteText);
+    setCopiedUserId(agent.id);
+    setTimeout(() => setCopiedUserId(null), 2000);
+  };
+
+  const confirmDeleteAgent = (agent: User) => {
+    if (window.confirm(`Are you sure you want to permanently delete sponsor ${agent.name} (${agent.id})? This will remove their user profile. Any immediate downlines will be reparented to their sponsor.`)) {
+      onDeleteUser?.(agent.id);
+    }
+  };
+
+  /** Opens the payment-installments modal for a sale with a reset entry form. */
+  const openPaymentsLedger = (saleId: string) => {
+    setSelectedPaymentSaleId(saleId);
+    setPaymentFormId(null);
+    setPaymentFormAmount('');
+    setPaymentFormDate(new Date().toISOString().split('T')[0]);
+    setPaymentFormMode('BANK_TRANSFER');
+    setPaymentFormReference('');
+    setPaymentFormNotes('');
   };
 
   // SBR SMS Dispatch Portal state
@@ -905,40 +1005,29 @@ export default function AdminPanel({
             activeSubTab === 'PROJECTS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
           }`}
         >
-          <Map className="w-4 h-4" /> SBR Projects Setup
-        </button>
-        <button
-          onClick={() => setActiveSubTab('BOOKINGS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'BOOKINGS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Layers className="w-4 h-4" /> Book Plot Inventory
-        </button>
-        <button
-          onClick={() => setActiveSubTab('SALES')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'SALES' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4" /> Corporate Sales Ledger
-        </button>
-        <button
-          onClick={() => setActiveSubTab('PAYOUTS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'PAYOUTS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" /> Operations & Payouts Auditing
-        </button>
-        <button
-          onClick={() => setActiveSubTab('LOGS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'LOGS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Calendar className="w-4 h-4" /> Daily Lifecycle Logs
-        </button>
+          {ADMIN_TABS.map(({ key, label, shortLabel, icon: Icon }) => (
+            <button
+              key={key}
+              id={`admin-tab-${key}`}
+              onClick={() => setActiveSubTab(key)}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                activeSubTab === key
+                  ? 'bg-emerald-800 text-white shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="sm:hidden">{shortLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Mobile-only context line: full name + purpose of the open section */}
+        <div className="sm:hidden px-4 py-2 border-t border-stone-200 bg-white">
+          <p className="text-[11px] font-bold text-stone-900">{activeTabMeta.label}</p>
+          <p className="text-[10px] text-stone-500 mt-0.5 leading-snug">{activeTabMeta.description}</p>
+        </div>
       </div>
 
       {/* SUB-TAB PANELS */}
@@ -1059,7 +1148,7 @@ export default function AdminPanel({
                       {editingLeadIdx === idx ? (
                         <div className="bg-emerald-50/45 border border-emerald-200 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
                           <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wide">Edit Designation Config</span>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-bold text-stone-500 uppercase block mb-0.5">Designation</label>
                               <input
@@ -1191,7 +1280,7 @@ export default function AdminPanel({
                 {/* Inline Add Form */}
                 <div className="p-3 bg-stone-50/50 border border-dashed border-stone-200 rounded-xl space-y-2.5">
                   <span className="text-[9.5px] font-bold text-stone-600 uppercase tracking-wide block font-sans">Add Custom Designation Config</span>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <input
                       type="text"
                       id="lead-rank"
@@ -1418,7 +1507,7 @@ export default function AdminPanel({
                       {editingOfferIdx === idx ? (
                         <div className="bg-emerald-50/45 border border-emerald-200 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
                           <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wide">Edit Special Offer Config</span>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-bold text-stone-500 uppercase block mb-0.5 font-sans">Target Volume (sq yd)</label>
                               <input
@@ -2051,7 +2140,110 @@ export default function AdminPanel({
               </div>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
+            {/* Mobile: stacked partner cards (the 7-column table is unreadable <sm) */}
+            <div className="sm:hidden divide-y divide-stone-200">
+              {filteredAgents.map((agent) => (
+                <div key={agent.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-stone-900 text-sm truncate">{agent.name}</p>
+                      <p className="text-[10px] text-stone-500 mt-0.5 truncate">{agent.email ? `${agent.email} • ` : ''}{agent.phone}</p>
+                    </div>
+                    <span className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                      agent.status === 'ACTIVE'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-stone-100 text-stone-600 border-stone-200'
+                    }`}>
+                      {agent.status}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono font-bold text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">{agent.id}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-800 border border-stone-200">{agent.designation || 'Associate'}</span>
+                    {agent.sponsorId ? (
+                      <span className="text-[9px] font-mono bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded border border-stone-200">Spon: {agent.sponsorId}</span>
+                    ) : (
+                      <span className="text-[9px] text-amber-800 bg-amber-50 px-1.5 py-0.5 border border-amber-200 rounded">Independent Director</span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] bg-stone-50 border border-stone-200 rounded-lg p-2.5">
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Direct Sales</span>
+                      <span className="font-mono font-bold text-stone-900">{formatPoints(agent.totalDirectSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Downline</span>
+                      <span className="font-mono font-bold text-stone-900">{formatPoints(agent.totalDownlineSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Aadhaar</span>
+                      <span className="font-mono text-stone-600">{agent.aadhar || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">PAN</span>
+                      <span className="font-mono uppercase text-stone-600">{agent.pan || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions: full-width tap targets in a 2-col grid */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {!isRestrictedForCurrentUser(agent.id) ? (
+                      <>
+                        <button
+                          onClick={() => openCredentialsEditor(agent)}
+                          className="flex items-center justify-center gap-1 py-2 text-[11px] font-bold rounded-lg border border-stone-200 bg-white text-stone-700 active:bg-stone-100 cursor-pointer"
+                        >
+                          <Key className="w-3 h-3 text-stone-500" /> Credentials
+                        </button>
+                        <button
+                          onClick={() => { window.location.hash = `/profile/${agent.id}`; }}
+                          className="flex items-center justify-center gap-1 py-2 text-[11px] font-bold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 active:bg-emerald-100 cursor-pointer"
+                        >
+                          <Users className="w-3 h-3" /> Profile
+                        </button>
+                        <button
+                          onClick={() => copyInviteMessage(agent)}
+                          className={`flex items-center justify-center gap-1 py-2 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                            copiedUserId === agent.id
+                              ? 'bg-emerald-800 border-emerald-800 text-white'
+                              : 'bg-white border-stone-200 text-stone-700 active:bg-stone-100'
+                          }`}
+                        >
+                          <Share2 className="w-3 h-3" /> {copiedUserId === agent.id ? 'Copied ✓' : 'Invite'}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="flex items-center justify-center py-2 text-[11px] bg-stone-50 text-stone-400 font-bold rounded-lg border border-stone-200 select-none">
+                        🔒 Restricted
+                      </span>
+                    )}
+                    <button
+                      onClick={() => onToggleUserStatus(agent.id)}
+                      className={`flex items-center justify-center py-2 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                        agent.status === 'ACTIVE'
+                          ? 'bg-rose-50 border-rose-200 text-rose-800 active:bg-rose-100'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-800 active:bg-emerald-100'
+                      }`}
+                    >
+                      {agent.status === 'ACTIVE' ? 'Suspend' : 'Authorize'}
+                    </button>
+                    {!isAdminId(agent.id) && (
+                      <button
+                        onClick={() => confirmDeleteAgent(agent)}
+                        className="col-span-2 flex items-center justify-center py-2 text-[11px] font-bold rounded-lg bg-rose-600 border border-rose-700 text-white active:bg-rose-700 cursor-pointer"
+                      >
+                        Delete Sponsor
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
@@ -2101,37 +2293,7 @@ export default function AdminPanel({
                           {!isRestrictedForCurrentUser(agent.id) ? (
                             <>
                               <button
-                                onClick={() => {
-                                  setSelectedAgentForPassword(agent);
-                                  setEditName(agent.name || '');
-                                  setEditEmail(agent.email || '');
-                                  setEditPhone(agent.phone || '');
-                                  setEditDob(agent.dob || '');
-                                  setEditAadhar(agent.aadhar || '');
-                                  setEditPan(agent.pan || '');
-                                  setEditAddress(agent.address || '');
-                                  setEditFatherOrHusbandName(agent.fatherOrHusbandName || '');
-                                  setEditBankAccountNumber(agent.bankAccountNumber || '');
-                                  setEditIfscCode(agent.ifscCode || '');
-                                  setEditBranchName(agent.branchName || '');
-                                  setEditNominee(agent.nominee || '');
-                                  setEditNomineeRelation(agent.nomineeRelation || '');
-                                  const username = agent.id.toUpperCase();
-                                  let calculatedDefaultPass = '';
-                                  if (agent.dob) {
-                                    const parts = agent.dob.split('-');
-                                    if (parts.length === 3) {
-                                      const year = parts[0];
-                                      const month = parts[1];
-                                      const day = parts[2];
-                                      if (year.length === 4 && month.length === 2 && day.length === 2) {
-                                        calculatedDefaultPass = `${username}${day}${month}${year}`;
-                                      }
-                                    }
-                                  }
-                                  setTempPassword(getDisplayPasscode(agent.id, agent.password || '', calculatedDefaultPass));
-                                  setPasswordStatusMsg('');
-                                }}
+                                onClick={() => openCredentialsEditor(agent)}
                                 className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
                                 title="Edit secure credentials"
                               >
@@ -2161,31 +2323,7 @@ export default function AdminPanel({
                               */}
 
                               <button
-                                onClick={() => {
-                                  const username = agent.id.toUpperCase();
-                                  let calculatedDefaultPass = '';
-                                  if (agent.dob) {
-                                    const parts = agent.dob.split('-');
-                                    if (parts.length === 3) {
-                                      const year = parts[0];
-                                      const month = parts[1];
-                                      const day = parts[2];
-                                      if (year.length === 4 && month.length === 2 && day.length === 2) {
-                                        calculatedDefaultPass = `${username}${day}${month}${year}`;
-                                      }
-                                    }
-                                  }
-                                  const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
-                                    `Hello *${agent.name}*,\n` +
-                                    `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
-                                    `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
-                                    `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
-                                    `🔑 *Default Passcode:* ${getDisplayPasscode(agent.id, agent.password || '', calculatedDefaultPass)}\n\n` +
-                                    `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
-                                  navigator.clipboard.writeText(inviteText);
-                                  setCopiedUserId(agent.id);
-                                  setTimeout(() => setCopiedUserId(null), 2000);
-                                }}
+                                onClick={() => copyInviteMessage(agent)}
                                 className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-all cursor-pointer flex items-center gap-1 ${
                                   copiedUserId === agent.id
                                     ? 'bg-emerald-800 border-emerald-800 text-white'
@@ -2216,11 +2354,7 @@ export default function AdminPanel({
 
                           {!isAdminId(agent.id) && (
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to permanently delete sponsor ${agent.name} (${agent.id})? This will remove their user profile. Any immediate downlines will be reparented to their sponsor.`)) {
-                                  onDeleteUser?.(agent.id);
-                                }
-                              }}
+                              onClick={() => confirmDeleteAgent(agent)}
                               className="text-[10px] font-bold px-2.5 py-1 rounded bg-rose-600 border border-rose-700 text-white hover:bg-rose-700 transition-all cursor-pointer"
                               title="Permanently Delete Sponsor"
                             >
@@ -2274,7 +2408,7 @@ export default function AdminPanel({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Starting Price per Sq Yd</label>
                   <div className="relative">
@@ -2330,7 +2464,7 @@ export default function AdminPanel({
                   SBR Project Registration & Legal Metadata
                 </span>
                 
-                <div className="grid grid-cols-2 gap-3 bg-stone-50/50 p-3 rounded-xl border border-stone-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-stone-50/50 p-3 rounded-xl border border-stone-200">
                   <div>
                     <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Project Stage</label>
                     <select
@@ -2734,7 +2868,7 @@ export default function AdminPanel({
             </div>
 
             <form onSubmit={handleBookInventorySubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 
                 <div>
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">1. Select SBR Project</label>
@@ -2882,7 +3016,7 @@ export default function AdminPanel({
                   <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider font-sans">👑 Admin-Only Booking Parameters</h4>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Rate per Sq Yard (INR)</label>
                     <div className="relative">
@@ -2923,7 +3057,7 @@ export default function AdminPanel({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Actual Sale Value (Points)</label>
                   <div className="relative">
@@ -3112,7 +3246,99 @@ export default function AdminPanel({
             </div>
           </div>
 
-          <div className="overflow-x-auto custom-scrollbar">
+          {/* Mobile: one card per booking with the same controls as the table row */}
+          <div className="sm:hidden divide-y divide-stone-200">
+            {sales.map((sale) => (
+              <div key={sale.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-stone-900 text-sm truncate">{sale.project} · <span className="text-emerald-800">{sale.unitNumber}</span></p>
+                    <p className="text-[10px] text-stone-500 font-mono mt-0.5">{sale.id} · {sale.sizeSqYards} SQ YD</p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 text-[9px] uppercase font-bold rounded px-1.5 py-0.5 border shrink-0 ${
+                    sale.status === 'HOLD'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}>
+                    {sale.status === 'HOLD' ? 'HOLD' : 'CONFIRMED'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[10px] bg-stone-50 border border-stone-200 rounded-lg p-2.5">
+                  <div>
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Buyer</span>
+                    <span className="font-bold text-stone-800">{sale.buyerName}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Broker</span>
+                    <span className="font-bold text-stone-800">{sale.agentName}</span>
+                    <span className="font-mono text-stone-500 block text-[9px]">{sale.agentId}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Agreement Price</span>
+                    <span className="font-mono font-bold text-stone-900">{formatPoints(sale.saleValue)}</span>
+                  </div>
+                </div>
+
+                {renderPaymentProgress(sale)}
+                <button
+                  onClick={() => openPaymentsLedger(sale.id)}
+                  className="w-full py-2 text-[11px] font-bold text-emerald-800 bg-emerald-50 active:bg-emerald-100 border border-emerald-200 rounded-lg cursor-pointer"
+                >
+                  💳 Manage Payments ({getSalePayments(sale).length})
+                </button>
+
+                <div className="space-y-1.5">
+                  <select
+                    value={sale.bookingStatus || 'TOKEN_RECEIVED'}
+                    onChange={(e) => {
+                      if (onUpdateSaleBookingStatus) {
+                        const newStatus = e.target.value as 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE';
+                        const currentAmt = sale.tokenAmount !== undefined ? sale.tokenAmount : 75000;
+                        onUpdateSaleBookingStatus(sale.id, newStatus, currentAmt);
+                      }
+                    }}
+                    className={`w-full text-[11px] font-bold px-2 py-2 rounded-lg border focus:outline-none cursor-pointer ${
+                      sale.bookingStatus === 'REGISTRY_DONE'
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                        : sale.bookingStatus === 'BOOKING_DONE'
+                        ? 'bg-blue-50 text-blue-900 border-blue-200'
+                        : 'bg-amber-50 text-amber-900 border-amber-200'
+                    }`}
+                  >
+                    <option value="TOKEN_RECEIVED">Token Received</option>
+                    <option value="BOOKING_DONE">Booking Done (30% paid)</option>
+                    <option value="REGISTRY_DONE">Registry Done (100% paid)</option>
+                  </select>
+
+                  {(sale.bookingStatus || 'TOKEN_RECEIVED') === 'TOKEN_RECEIVED' ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-stone-500 whitespace-nowrap">Token Amt:</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={sale.tokenAmount !== undefined ? sale.tokenAmount : 75000}
+                        onChange={(e) => {
+                          if (onUpdateSaleBookingStatus && e.target.value !== '') {
+                            onUpdateSaleBookingStatus(sale.id, 'TOKEN_RECEIVED', parseFloat(e.target.value));
+                          }
+                        }}
+                        className="flex-1 px-2 py-1.5 text-[11px] font-mono font-bold bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                        title="Edit token amount in INR"
+                      />
+                      <span className="text-[9px] text-stone-500 font-bold">INR</span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-stone-500 italic">
+                      {sale.bookingStatus === 'REGISTRY_DONE' ? '100% fully paid' : '30% paid done'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
@@ -3147,15 +3373,7 @@ export default function AdminPanel({
                     <td className="px-5 py-3.5">
                       {renderPaymentProgress(sale)}
                       <button
-                        onClick={() => {
-                          setSelectedPaymentSaleId(sale.id);
-                          setPaymentFormId(null);
-                          setPaymentFormAmount('');
-                          setPaymentFormDate(new Date().toISOString().split('T')[0]);
-                          setPaymentFormMode('BANK_TRANSFER');
-                          setPaymentFormReference('');
-                          setPaymentFormNotes('');
-                        }}
+                        onClick={() => openPaymentsLedger(sale.id)}
                         className="mt-1.5 flex items-center gap-1 px-2.5 py-1 text-[10.5px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg cursor-pointer transition-all w-full justify-center shadow-2xs"
                       >
                         💳 Manage Payments ({getSalePayments(sale).length})
@@ -3231,7 +3449,7 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* 6. OPERATIONS & PAYOUTS AUDITING */}
+      {/* 6. OPERATIONS & PAYOUTS AUDITING — shared desk, also served at /payouts */}
       {activeSubTab === 'PAYOUTS' && (
         <div id="sbr-payouts-section" className="space-y-6 animate-fade-in scroll-mt-24">
           <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
@@ -3384,7 +3602,40 @@ export default function AdminPanel({
               </button>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
+            {/* Mobile: compact log entries */}
+            <div className="sm:hidden divide-y divide-stone-200">
+              {userLogs.length === 0 ? (
+                <p className="px-5 py-10 text-center text-stone-400 text-xs font-medium">
+                  No user lifecycle activities have been logged yet today.
+                </p>
+              ) : (
+                userLogs.map((log) => (
+                  <div key={log.id} className="p-4 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1 text-[9px] font-extrabold uppercase rounded-full px-2 py-0.5 border ${
+                        log.action === 'ADDITION'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {log.action}
+                      </span>
+                      <span className="font-mono text-[9.5px] text-stone-400">
+                        {new Date(log.timestamp).toLocaleString('en-IN', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-stone-900">
+                      {log.userName} <span className="font-mono font-normal text-stone-500">({log.userId})</span>
+                    </p>
+                    <p className="text-[10px] text-stone-500">
+                      Sponsor: <span className="font-mono">{log.sponsorId || '—'}</span> · By {log.performedBy}
+                    </p>
+                    <p className="text-[10.5px] text-stone-600 leading-snug">{log.details}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="hidden sm:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
