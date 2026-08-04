@@ -102,19 +102,24 @@ id it scrolls to:
 | Key | Label | Anchor |
 |---|---|---|
 | `HOME` | Home | `sbr-top` (scrolls to top) |
-| `TREE` | My Tree | `sbr-tree-section` |
+| `PROFILE` | Profile | *routes to* `/profile` |
 | `TEAM` | Team | `sbr-team-section` |
 | `INVENTORY` | Plot Inventory | `sbr-inventory-section` |
-| `PAYOUTS` | Payouts | `sbr-payouts-section` |
+| `PAYOUTS` | Payouts | *routes to* `/payouts` |
 | `SPONSOR_CODE` | Sponsor Reference Code | `sbr-sponsor-code` |
-| `USER_DETAIL` | User Detail | *routes to* `/profile` |
 | `EDIT_DETAIL` | Edit Detail | *routes to* `/profile` → `profile-edit-section` |
 
-`USER_DETAIL`/`EDIT_DETAIL` no longer scroll the dashboard — they open the `/profile` page
-(Edit Detail then scrolls to the bank-details form). Route entries may now carry an `anchor`
-scrolled to *after* navigation. The AgentPanel "SBR Profile" badge also routes to `/profile`.
+`TREE` (My Tree) and `USER_DETAIL` were **removed** from the nav (the tree is still rendered on
+the dashboard; `/profile` covers user detail). Route entries may carry an `anchor` scrolled to
+*after* navigation. The AgentPanel "SBR Profile" badge also routes to `/profile`.
 ProfilePage's performance stats row (direct/downline volume, paid/pending) is **commented out**
 for a leaner mobile profile — restore by uncommenting the `stats` array + its grid together.
+
+**`/payouts` route:** the payout filter tiles + audit desk were extracted into
+[src/components/PayoutsDesk.tsx](src/components/PayoutsDesk.tsx), rendered both by the AdminPanel
+PAYOUTS sub-tab and the `/payouts` page. Admins get the full list with sanction/dispatch handlers;
+channel partners get their own payouts read-only — **action buttons render only when the handlers
+are passed**, so the same component serves both. Edit the desk there, not in the panels.
 
 Drawer sections, in order: **identity card** → **Navigate** (the table above) → **Workspace**
 (admin-only role switch) → **Account** (Sync Cloud, Passcode Settings, Disconnect).
@@ -236,6 +241,16 @@ phones. Display-only 2-col grids (stat pairs, date chips) were left alone delibe
 
 **Admin sub-tab bar** (earlier pass): scrollable pill strip with short labels + auto-centred active
 pill + context line on mobile; unchanged wrap layout on `sm+` (see `ADMIN_TABS` in AdminPanel).
+
+**Payout status filter:** the Payouts tab's three read-only summary cards were replaced by four
+tappable tiles (All / Pending / Approved / Disbursed) that show each bucket's count + net total
+*and* filter both the mobile card list and the desktop table (`payoutStatusFilter` /
+`filteredPayouts` in AdminPanel). The empty state distinguishes "no payouts at all" from
+"none matching the filter", and an active filter shows a "clear filter" line in the desk header.
+
+**Compact admin stat deck:** the four top cards (Gross Sourced Volume, Settled Commissions,
+Commission Liabilities, Active Sourcing Team) render as a tight 2×2 tile grid below `sm` —
+no icons or blurbs, smaller values — so they no longer fill the first mobile screen.
 
 ## Known gaps
 

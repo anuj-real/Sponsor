@@ -63,12 +63,12 @@ export default function AgentPanel({
   // Open the section the header nav points at (the tree lives on the LEDGER tab).
   useEffect(() => {
     if (!navFocus) return;
-    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'PAYOUTS') {
+    if (navFocus === 'TEAM') {
       setActivePanelTab('LEDGER');
     } else if (navFocus === 'INVENTORY') {
       setActivePanelTab('INVENTORY');
     }
-    // USER_DETAIL / EDIT_DETAIL now route to /profile — no dashboard reaction needed.
+    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
   }, [navFocus]);
 
   // Campaign date status checker logic
@@ -338,7 +338,7 @@ export default function AgentPanel({
 
             {/* Paid-out commissions */}
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
-              <span id="sbr-payouts-section" className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block scroll-mt-24">Commissions Received</span>
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Commissions Received</span>
               <h3 className="font-mono font-bold text-xl sm:text-lg text-emerald-800 mt-2">
                 {formatPoints(earningsNetPaid)}
               </h3>

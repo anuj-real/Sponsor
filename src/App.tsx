@@ -24,7 +24,6 @@ import {
   Home,
   Menu,
   Moon,
-  Network,
   Sun,
   Wallet,
   X,
@@ -46,14 +45,12 @@ import {
 const NAV_ITEMS = [
   { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
-  { key: 'TREE', label: 'My Tree', icon: Network, anchor: 'sbr-tree-section' },
   { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
-  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, anchor: 'sbr-payouts-section' },
+  // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
+  // same reasoning as /profile: the dashboard is too long on mobile.
+  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, route: '/payouts' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  // User/Edit Detail open the profile PAGE rather than scrolling the dashboard —
-  // on mobile the dashboard is long, so in-page scrolling buried these sections.
-  { key: 'USER_DETAIL', label: 'User Detail', icon: UserCog, route: '/profile' },
   { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile', anchor: 'profile-edit-section' },
 ];
 
@@ -67,6 +64,7 @@ import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
 import ProfilePage from './components/ProfilePage';
+import PayoutsDesk from './components/PayoutsDesk';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -137,7 +135,11 @@ export default function App() {
     const onHashChange = () => {
       const next = parseHashRoute();
       setRoute(next);
-      setActiveNav(next.startsWith('/profile') ? 'PROFILE' : 'HOME');
+      setActiveNav(
+        next.startsWith('/profile') ? 'PROFILE'
+        : next.startsWith('/payouts') ? 'PAYOUTS'
+        : 'HOME'
+      );
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -1626,6 +1628,29 @@ export default function App() {
             onBack={() => navigateTo('/')}
             onUpdateUserProfile={handleAdminUpdateUserProfile}
           />
+        ) : route.startsWith('/payouts') ? (
+          /* /payouts — the same desk the admin dashboard uses. Admins get the
+             full auditable list with sanction/dispatch; channel partners get
+             their own payouts, read-only (no handlers passed). */
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            {session?.role === 'ADMIN' ? (
+              <PayoutsDesk
+                payouts={payouts}
+                onApprovePayout={handleApprovePayout}
+                onDisbursePayout={handleDisbursePayout}
+              />
+            ) : (
+              <PayoutsDesk
+                payouts={payouts.filter(p => p.agentId?.toUpperCase() === session?.agentId?.toUpperCase())}
+              />
+            )}
+          </div>
         ) : (
           <>
         {activeRole === 'ADMIN' && (
