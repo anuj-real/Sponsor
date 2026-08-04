@@ -229,6 +229,54 @@ export default function App() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  const sanitizeProjects = (rawProjects: RealEstateProject[]): RealEstateProject[] => {
+    const filtered = (rawProjects || []).filter(p => p.id !== 'PRJ-251');
+    const nameMap = new Map<string, RealEstateProject>();
+
+    for (const proj of filtered) {
+      const normName = (proj.name || '').trim().toLowerCase();
+      const existing = nameMap.get(normName);
+      if (!existing) {
+        nameMap.set(normName, proj);
+      } else if (proj.id === 'PRJ-183') {
+        nameMap.set(normName, proj);
+      }
+    }
+
+    for (const initProj of INITIAL_PROJECTS) {
+      const normName = initProj.name.trim().toLowerCase();
+      if (!nameMap.has(normName)) {
+        nameMap.set(normName, initProj);
+      } else {
+        const curr = nameMap.get(normName)!;
+        if (initProj.id === 'PRJ-183') {
+          let updatedInv = (curr.inventory && curr.inventory.length >= 10) ? curr.inventory : initProj.inventory;
+          updatedInv = updatedInv.map(cat => ({
+            ...cat,
+            units: cat.units.map(u => {
+              if (u.unitNumber === 'Plot 54' || u.unitNumber === '54') {
+                return {
+                  ...u,
+                  status: 'BOOKED' as const,
+                  bookedByAgentId: 'SBR0055',
+                  buyerName: 'Anju Devi'
+                };
+              }
+              return u;
+            })
+          }));
+          nameMap.set(normName, {
+            ...curr,
+            id: 'PRJ-183',
+            inventory: updatedInv
+          });
+        }
+      }
+    }
+
+    return Array.from(nameMap.values());
+  };
+
   const loadPrivateData = async (
     sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string },
     preloadedData?: any,
@@ -252,11 +300,33 @@ export default function App() {
       const activeConfig = data.config || INITIAL_MLM_CONFIG;
       setConfig(activeConfig);
       
-      const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
-      const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+      const rawSales = data.sales || INITIAL_SALES;
+      let loadedSales = rawSales.map((s: any) => ({
+        ...s,
+        projectId: s.projectId === 'PRJ-251' ? 'PRJ-183' : s.projectId
+      }));
+      for (const initSale of INITIAL_SALES) {
+        if (!loadedSales.some((s: any) => s.id === initSale.id)) {
+          loadedSales = [initSale, ...loadedSales];
+          setDocumentData(COLLECTIONS.SALES, initSale.id, initSale).catch(() => {});
+        }
+      }
+
+      const loadedProjects = sanitizeProjects(data.projects || INITIAL_PROJECTS);
+      deleteDocument(COLLECTIONS.PROJECTS, 'PRJ-251').catch(() => {});
+      const indriProj = loadedProjects.find(p => p.id === 'PRJ-183' || p.name === 'Indri KMP');
+      if (indriProj) {
+        setDocumentData(COLLECTIONS.PROJECTS, indriProj.id, indriProj).catch(() => {});
+      }
       setProjects(loadedProjects);
 
       let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+      for (const initUser of INITIAL_USERS) {
+        if (!loadedUsers.some((u: any) => u.id === initUser.id)) {
+          loadedUsers = [...loadedUsers, initUser];
+          setDocumentData(COLLECTIONS.USERS, initUser.id, initUser).catch(() => {});
+        }
+      }
 
       // Force upgrade old vulnerable passwords to their correct secure hashes for the 7 secure nodes
       loadedUsers = loadedUsers.map(user => ({
@@ -420,7 +490,17 @@ export default function App() {
         loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
       }
 
-      const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
+      const rawPayouts = data.payouts || INITIAL_PAYOUTS;
+      const sanitizedExistingPayouts = rawPayouts.map(p => {
+        if (p.status === 'DISBURSED') {
+          const resetPayout = { ...p, status: 'PENDING' as const };
+          setDocumentData(COLLECTIONS.PAYOUTS, p.id, resetPayout).catch(e => console.error(e));
+          return resetPayout;
+        }
+        return p;
+      });
+
+      const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, sanitizedExistingPayouts);
 
       // Automatic background passcode modification migration is disabled to ensure passcodes are not altered
       // unless explicitly requested by the admin or user.
@@ -481,11 +561,18 @@ export default function App() {
         } catch (_) {}
       }
 
-      let localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
-      let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
+      let localSales = storedSales ? JSON.parse(storedSales) : INITIAL_SALES;
+      for (const initSale of INITIAL_SALES) {
+        if (!localSales.some((s: any) => s.id === initSale.id)) {
+          localSales = [initSale, ...localSales];
+        }
+      }
+      let localProjects = sanitizeProjects(storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS);
       let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
 
-      const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
+      const rawLocalPayouts = storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS;
+      const sanitizedLocalPayouts = rawLocalPayouts.map((p: any) => ({ ...p, status: p.status === 'DISBURSED' ? 'PENDING' : p.status }));
+      const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, sanitizedLocalPayouts);
       const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
 
       // Sanitize localUsers if not admin
@@ -553,7 +640,8 @@ export default function App() {
         const activeConfig = data.config || INITIAL_MLM_CONFIG;
         setConfig(activeConfig);
         
-        const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+        let loadedProjects = sanitizeProjects(data.projects || INITIAL_PROJECTS);
+        deleteDocument(COLLECTIONS.PROJECTS, 'PRJ-251').catch(() => {});
         setProjects(loadedProjects);
 
         const storedSession = localStorage.getItem('SBR_SESSION');
@@ -567,7 +655,7 @@ export default function App() {
           }
         } else {
           // If no stored session, populate initial public states from fetched data
-          const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
+          const loadedSales = data.sales || INITIAL_SALES;
           setSales(loadedSales);
           setNotifications(data.notifications || INITIAL_NOTIFICATIONS);
           
@@ -870,9 +958,15 @@ export default function App() {
   const handleUpdateConfig = async (newConfig: MLMConfig) => {
     setConfig(newConfig);
     const normalized = normalizeUsersWithSales(users, sales, newConfig);
+    const updatedPayouts = rebuildPayoutsFromSales(sales, normalized, newConfig, payouts);
     setUsers(normalized);
+    setPayouts(updatedPayouts);
     try {
       await setDocumentData(COLLECTIONS.CONFIG, 'main_config', newConfig);
+      // Save updated payouts if any
+      for (const p of updatedPayouts) {
+        await setDocumentData(COLLECTIONS.PAYOUTS, p.id, p);
+      }
       // Save any users whose designations have changed
       for (const u of normalized) {
         const original = users.find(o => o.id === u.id);
@@ -1212,11 +1306,15 @@ export default function App() {
     }
   };
 
-  const handleApprovePayout = async (payoutId: string) => {
+  const handleUpdatePayoutStatus = async (payoutId: string, newStatus: 'PENDING' | 'APPROVED' | 'DISBURSED') => {
     let targetPayout: CommissionPayout | undefined;
     const updatedPayouts = payouts.map(p => {
       if (p.id === payoutId) {
-        const nextPay = { ...p, status: 'APPROVED' as const };
+        const nextPay = {
+          ...p,
+          status: newStatus,
+          payoutDate: newStatus === 'DISBURSED' ? new Date().toISOString().split('T')[0] : p.payoutDate
+        };
         targetPayout = nextPay;
         return nextPay;
       }
@@ -1225,17 +1323,25 @@ export default function App() {
     setPayouts(updatedPayouts);
 
     if (targetPayout) {
+      let notifMsg = `Payout status updated to ${newStatus}.`;
+      if (newStatus === 'DISBURSED') {
+        notifMsg = `Clearance settled for ₹${targetPayout.netCommission.toLocaleString('en-IN')}. Ledger finalized.`;
+      } else if (newStatus === 'APPROVED') {
+        notifMsg = `Payout sanctioned for ₹${targetPayout.netCommission.toLocaleString('en-IN')}. Awaiting bank dispatch.`;
+      }
+
       const notif: Notification = {
         id: `NOT-${Math.floor(100 + Math.random() * 900)}`,
         userId: targetPayout.agentId,
-        title: 'Commission Approved for Disbursal',
-        message: `Your override of ${targetPayout.netCommission.toLocaleString()} PTS for ${targetPayout.project} (${targetPayout.unitNumber}) was verified by Accounting.`,
+        title: `Payout Status: ${newStatus}`,
+        message: notifMsg,
         amount: targetPayout.netCommission,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
         isRead: false
       };
       const updatedNotifs = [notif, ...notifications];
       setNotifications(updatedNotifs);
+
       try {
         await setDocumentData(COLLECTIONS.PAYOUTS, payoutId, targetPayout);
         await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
@@ -1245,37 +1351,12 @@ export default function App() {
     }
   };
 
-  const handleDisbursePayout = async (payoutId: string) => {
-    let targetPayout: CommissionPayout | undefined;
-    const updatedPayouts = payouts.map(p => {
-      if (p.id === payoutId) {
-        const nextPay = { ...p, status: 'DISBURSED' as const, payoutDate: new Date().toISOString().split('T')[0] };
-        targetPayout = nextPay;
-        return nextPay;
-      }
-      return p;
-    });
-    setPayouts(updatedPayouts);
+  const handleApprovePayout = async (payoutId: string) => {
+    await handleUpdatePayoutStatus(payoutId, 'APPROVED');
+  };
 
-    if (targetPayout) {
-      const notif: Notification = {
-        id: `NOT-${Math.floor(100 + Math.random() * 900)}`,
-        userId: targetPayout.agentId,
-        title: 'Payout Bank Clearance Cleared',
-        message: `Clearance settled for ${targetPayout.netCommission.toLocaleString()} PTS. Ledger finalized.`,
-        amount: targetPayout.netCommission,
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        isRead: false
-      };
-      const updatedNotifs = [notif, ...notifications];
-      setNotifications(updatedNotifs);
-      try {
-        await setDocumentData(COLLECTIONS.PAYOUTS, payoutId, targetPayout);
-        await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
-      } catch (e) {
-        console.error('Firestore save failed', e);
-      }
-    }
+  const handleDisbursePayout = async (payoutId: string) => {
+    await handleUpdatePayoutStatus(payoutId, 'DISBURSED');
   };
 
   const handleUpdateSaleBookingStatus = async (saleId: string, bookingStatus: 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE', tokenAmount?: number) => {
@@ -1677,6 +1758,7 @@ export default function App() {
               onUpdateProjects={handleUpdateProjects}
               onApprovePayout={handleApprovePayout}
               onDisbursePayout={handleDisbursePayout}
+              onUpdatePayoutStatus={handleUpdatePayoutStatus}
               onUpdateSaleBookingStatus={handleUpdateSaleBookingStatus}
               onUpdateSale={handleUpdateSale}
               onUpdateUserProfile={handleAdminUpdateUserProfile}

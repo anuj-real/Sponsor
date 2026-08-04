@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProject } from '../types';
+import { getSalePoints, getSaleAgreementValueINR } from '../lib/points';
 import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
 import TreeVisualizer from './TreeVisualizer';
@@ -65,6 +66,11 @@ export default function AgentPanel({
     if (!navFocus) return;
     if (navFocus === 'TEAM') {
       setActivePanelTab('LEDGER');
+      if (navFocus === 'PAYOUTS') {
+        setTimeout(() => {
+          document.getElementById('sbr-payouts-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
     } else if (navFocus === 'INVENTORY') {
       setActivePanelTab('INVENTORY');
     }
@@ -249,6 +255,14 @@ export default function AgentPanel({
     return `${Math.round(val).toLocaleString()} PTS`;
   };
 
+  const formatINR = (val: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(val || 0);
+  };
+
   return (
     <div className="space-y-6">
       {/* Partner Identity Banner */}
@@ -324,52 +338,6 @@ export default function AgentPanel({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Statistics Left */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {/* Direct Sourced Volume */}
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Closed Sourced Volume</span>
-              <h3 className="font-mono font-bold text-xl sm:text-lg text-stone-900 mt-2">
-                {formatPoints(agent.totalDirectSales)}
-              </h3>
-              <p className="text-[10.5px] text-stone-500 mt-1.5">
-                From {directDeals.length} direct property agreements
-              </p>
-            </div>
-
-            {/* Paid-out commissions */}
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Commissions Received</span>
-              <h3 className="font-mono font-bold text-xl sm:text-lg text-emerald-800 mt-2">
-                {formatPoints(earningsNetPaid)}
-              </h3>
-              <p className="text-[10.5px] text-emerald-700 mt-1.5 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Confirmed ledger clearance
-              </p>
-            </div>
-
-            {/* Pending commissions */}
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Pending Points</span>
-              <h3 className="font-mono font-bold text-xl sm:text-lg text-amber-700 mt-2">
-                {formatPoints(earningsNetPending)}
-              </h3>
-              <p className="text-[10.5px] text-stone-500 mt-1.5">
-                Calculated overrides in pipeline
-              </p>
-            </div>
-
-            {/* Active Team Network */}
-            <div id="sbr-team-section" className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs scroll-mt-24">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Active Team Network</span>
-              <h3 className="font-mono font-bold text-xl sm:text-lg text-indigo-900 mt-2">
-                {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length} / {downlineNetwork.length}
-              </h3>
-              <p className="text-[10.5px] text-stone-500 mt-1.5">
-                Active sub-brokers in your downline
-              </p>
-            </div>
-          </div>
-
           {/* SBR Referral Organigram for Associate Downline */}
           <div id="sbr-tree-section" className="scroll-mt-24">
             <TreeVisualizer
@@ -480,7 +448,7 @@ export default function AgentPanel({
                               <p className="text-[10px] text-stone-500 mt-0.5">Unit: {deal.unitNumber} • Buyer: {deal.buyerName}</p>
                             </div>
                           </td>
-                          <td className="px-5 py-3 font-mono font-bold text-emerald-800">{formatPoints(deal.saleValue)}</td>
+                          <td className="px-5 py-3 font-mono font-bold text-emerald-800">{formatPoints(getSalePoints(deal))}</td>
                           <td className="px-5 py-3 font-mono text-stone-500">{deal.saleDate}</td>
                           <td className="px-5 py-3">
                             {!deal.bookingStatus || deal.bookingStatus === 'TOKEN_RECEIVED' ? (
@@ -1022,55 +990,236 @@ export default function AgentPanel({
           </div>
         </div>
 
-        {/* Override Ledger */}
-        <div className="lg:col-span-12 bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-stone-200 bg-stone-50/40">
-            <h3 className="font-bold text-stone-900 text-base">Calculated Override Receipts</h3>
-            <p className="text-xs text-stone-500 mt-1">
-              Detailed tracking of multitier commission shares calculated on SBR inventory sales.
-            </p>
+        {/* Payout Section */}
+        <div id="sbr-payouts-section" className="lg:col-span-12 bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden scroll-mt-24">
+          <div className="p-5 border-b border-stone-200 bg-stone-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-stone-900 text-base flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-emerald-800" />
+                Payout
+              </h3>
+              <p className="text-xs text-stone-500 mt-1">
+                Detailed statement of commission payouts, overrides, tax withholdings, and payment statuses.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-semibold text-stone-700 bg-stone-100 px-3 py-1 rounded-full border border-stone-200">
+                Total Payout Statements: {myPayouts.length}
+              </span>
+            </div>
           </div>
 
-          <div className="overflow-y-auto max-h-[350px] divide-y divide-stone-200 custom-scrollbar">
+          <div className="p-4 sm:p-6 bg-stone-50/30">
             {myPayouts.length > 0 ? (
-              myPayouts.map((payout) => (
-                <div key={payout.id} className="p-4 hover:bg-stone-50/50 flex items-start justify-between gap-3 font-medium transition-colors">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-stone-900">{payout.project}</p>
-                    <p className="text-[10px] text-stone-500">Unit: {payout.unitNumber} • Total Sourced: {formatPoints(payout.saleValue)}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
-                        payout.level === 1 
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                      }`}>
-                        {payout.level === 1 ? 'Direct L1 Sourcing' : `Indirect Level ${payout.level} Overrides`}
-                      </span>
-                      <span className="text-[10px] font-bold font-mono text-stone-500">
-                        {payout.percentage}% Cut
-                      </span>
-                    </div>
-                  </div>
+              <div className="space-y-4">
+                {myPayouts.map((payout, idx) => {
+                  const matchingSale = sales.find(s => s.id === payout.saleId);
+                  const applicantName = matchingSale?.buyerName || 'N/A';
+                  const totalSaleValINR = matchingSale 
+                    ? getSaleAgreementValueINR(matchingSale) 
+                    : (payout.saleValue ? payout.saleValue * 15000 : 0);
 
-                  <div className="text-right space-y-1 shrink-0 font-mono">
-                    <p className="font-bold text-emerald-800 text-xs">{formatPoints(payout.netCommission)}</p>
-                    <p className="text-[9.5px] text-stone-500 font-sans">Gross: {formatPoints(payout.grossCommission)}</p>
-                    <span className={`inline-block text-[9px] font-bold py-0.5 px-2 rounded-full border ${
-                      payout.status === 'DISBURSED' 
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                        : payout.status === 'APPROVED'
-                          ? 'bg-emerald-50/50 text-emerald-700 border-emerald-200'
-                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                    }`}>
-                      {payout.status}
-                    </span>
-                  </div>
-                </div>
-              ))
+                  const displayStatus = payout.status || 'PENDING';
+
+                  return (
+                    <form 
+                      key={payout.id} 
+                      onSubmit={(e) => e.preventDefault()} 
+                      className="bg-white border border-stone-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4"
+                    >
+                      {/* Statement Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-100">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center font-mono">
+                            #{idx + 1}
+                          </span>
+                          <h4 className="font-bold text-stone-900 text-sm">
+                            Payout Voucher — <span className="font-mono text-emerald-900">{payout.id}</span>
+                          </h4>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase rounded-full px-3 py-0.5 border ${
+                            displayStatus === 'DISBURSED'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : displayStatus === 'APPROVED'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              displayStatus === 'DISBURSED' ? 'bg-emerald-600' : displayStatus === 'APPROVED' ? 'bg-blue-600' : 'bg-amber-600'
+                            }`} />
+                            {displayStatus === 'PENDING' ? 'Pending' : displayStatus}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Form Fields Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                        {/* 1. Sale ID */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Sale ID
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={payout.saleId}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono font-bold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 2. Site / Project */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Site / Project
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={payout.project}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-semibold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 3. Unit Number */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Unit Number
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={payout.unitNumber}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono text-stone-800 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 4. Applicant Name */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Applicant Name
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={applicantName}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-semibold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 5. Total Sale Value (₹) */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Total Sale Value (₹)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={formatINR(totalSaleValINR)}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono font-bold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 6. Payee Name / ID */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Payee Name / ID
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={`${payout.agentName} (${payout.agentId})`}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-semibold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 7. Network Level */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Network Level
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={`Level ${payout.level} ${payout.level === 1 ? '(Direct Sourcing)' : '(Indirect Sponsor)'}`}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-semibold text-stone-800 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 8. Commission % */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Commission %
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={`${payout.percentage}%`}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono font-bold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 9. Gross Commission (₹) */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Gross Commission (₹)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={formatINR(payout.grossCommission)}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono font-bold text-stone-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 10. TDS 5% (₹) */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            TDS 5% (₹)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={`-${formatINR(payout.tdsDeduction)}`}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono font-bold text-rose-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 11. Flat Admin Fee (₹) */}
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Flat Admin Fee (₹)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={`-${formatINR(payout.adminFee)}`}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 font-mono font-bold text-stone-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* 12. Net Payout (₹) */}
+                        <div>
+                          <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                            Net Payout (₹)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={formatINR(payout.netCommission)}
+                            className="w-full bg-emerald-50 border border-emerald-300 rounded-lg px-3 py-2 font-mono font-extrabold text-emerald-900 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </form>
+                  );
+                })}
+              </div>
             ) : (
               <div className="p-10 text-center text-stone-400 flex flex-col items-center justify-center min-h-[220px]">
                 <Wallet className="w-10 h-10 text-stone-300 stroke-1 mb-2" />
-                <p className="text-xs">No receipt calculations issued to your account ledger.</p>
+                <p className="text-xs font-semibold text-stone-600">No payout statements issued yet.</p>
+                <p className="text-[11px] text-stone-400 mt-1 max-w-sm">When property bookings and overrides are recorded, payout statements will appear here with complete tax and fee breakdowns.</p>
               </div>
             )}
           </div>
