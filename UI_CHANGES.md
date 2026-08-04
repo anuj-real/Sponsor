@@ -107,8 +107,14 @@ id it scrolls to:
 | `INVENTORY` | Plot Inventory | `sbr-inventory-section` |
 | `PAYOUTS` | Payouts | `sbr-payouts-section` |
 | `SPONSOR_CODE` | Sponsor Reference Code | `sbr-sponsor-code` |
-| `USER_DETAIL` | User Detail | `sbr-user-detail` |
-| `EDIT_DETAIL` | Edit Detail | `sbr-edit-detail` |
+| `USER_DETAIL` | User Detail | *routes to* `/profile` |
+| `EDIT_DETAIL` | Edit Detail | *routes to* `/profile` → `profile-edit-section` |
+
+`USER_DETAIL`/`EDIT_DETAIL` no longer scroll the dashboard — they open the `/profile` page
+(Edit Detail then scrolls to the bank-details form). Route entries may now carry an `anchor`
+scrolled to *after* navigation. The AgentPanel "SBR Profile" badge also routes to `/profile`.
+ProfilePage's performance stats row (direct/downline volume, paid/pending) is **commented out**
+for a leaner mobile profile — restore by uncommenting the `stats` array + its grid together.
 
 Drawer sections, in order: **identity card** → **Navigate** (the table above) → **Workspace**
 (admin-only role switch) → **Account** (Sync Cloud, Passcode Settings, Disconnect).

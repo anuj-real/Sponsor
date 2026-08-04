@@ -51,8 +51,10 @@ const NAV_ITEMS = [
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
   { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, anchor: 'sbr-payouts-section' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  { key: 'USER_DETAIL', label: 'User Detail', icon: UserCog, anchor: 'sbr-user-detail' },
-  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, anchor: 'sbr-edit-detail' },
+  // User/Edit Detail open the profile PAGE rather than scrolling the dashboard —
+  // on mobile the dashboard is long, so in-page scrolling buried these sections.
+  { key: 'USER_DETAIL', label: 'User Detail', icon: UserCog, route: '/profile' },
+  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile', anchor: 'profile-edit-section' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -180,10 +182,31 @@ export default function App() {
     const target = NAV_ITEMS.find(item => item.key === key);
     if (!target) return;
 
-    // Route entries swap the main view instead of scrolling.
+    // Retry-scroll: the target may mount a tick later (route swap / sub-tab switch).
+    const scrollToAnchor = (anchor: string) => {
+      let attempts = 0;
+      const tryScroll = () => {
+        if (anchor === 'sbr-top') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        const el = document.getElementById(anchor);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (attempts++ < 10) {
+          setTimeout(tryScroll, 80);
+        }
+      };
+      setTimeout(tryScroll, 60);
+    };
+
+    // Route entries swap the main view; an optional anchor then scrolls within
+    // the new view (e.g. Edit Detail → /profile → bank-details section).
     if ('route' in target && target.route) {
       navigateTo(target.route);
       setActiveNav(key);
+      if (target.anchor) scrollToAnchor(target.anchor);
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -193,22 +216,7 @@ export default function App() {
       navigateTo('/');
     }
     setActiveNav(key);
-
-    const anchor = target.anchor!;
-    let attempts = 0;
-    const tryScroll = () => {
-      if (anchor === 'sbr-top') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      const el = document.getElementById(anchor);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else if (attempts++ < 10) {
-        setTimeout(tryScroll, 80);
-      }
-    };
-    setTimeout(tryScroll, 60);
+    scrollToAnchor(target.anchor!);
   };
 
   // Security Modal States

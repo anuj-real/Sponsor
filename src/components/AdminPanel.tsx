@@ -132,7 +132,8 @@ export default function AdminPanel({
   // Reveal the sub-tab that owns the section the header nav is pointing at.
   React.useEffect(() => {
     if (!navFocus) return;
-    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'USER_DETAIL' || navFocus === 'EDIT_DETAIL' || navFocus === 'SPONSOR_CODE') {
+    // USER_DETAIL / EDIT_DETAIL route to /profile and don't touch the dashboard.
+    if (navFocus === 'TREE' || navFocus === 'TEAM' || navFocus === 'SPONSOR_CODE') {
       setActiveSubTab('AGENTS');
     } else if (navFocus === 'PAYOUTS') {
       setActiveSubTab('PAYOUTS');

@@ -44,10 +44,9 @@ export default function AgentPanel({
   const [zoomScale, setZoomScale] = useState<number>(1);
 
   // Broker Profile States
-  // Profile is rendered inline; the identity badge scrolls to it.
+  // The identity badge opens the dedicated /profile page (routing lives in App).
   const scrollToProfile = () => {
-    document.getElementById('sbr-user-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setIsKycExpanded(true);
+    window.location.hash = '/profile';
   };
   const [isKycExpanded, setIsKycExpanded] = useState(false);
   const [isProfileExpanded, setIsProfileExpanded] = useState(false);
@@ -68,11 +67,8 @@ export default function AgentPanel({
       setActivePanelTab('LEDGER');
     } else if (navFocus === 'INVENTORY') {
       setActivePanelTab('INVENTORY');
-    } else if (navFocus === 'USER_DETAIL') {
-      setIsKycExpanded(true);
-    } else if (navFocus === 'EDIT_DETAIL') {
-      setIsProfileExpanded(true);
     }
+    // USER_DETAIL / EDIT_DETAIL now route to /profile — no dashboard reaction needed.
   }, [navFocus]);
 
   // Campaign date status checker logic
