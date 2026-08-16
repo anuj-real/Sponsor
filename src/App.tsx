@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+// rewamp this as a samundra ui
 import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
   INITIAL_MLM_CONFIG, 
