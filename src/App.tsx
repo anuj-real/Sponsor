@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-// rewamp this as a samundra ui
+
 import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
   INITIAL_MLM_CONFIG, 
@@ -9,24 +9,67 @@ import {
   INITIAL_PAYOUTS, 
   INITIAL_NOTIFICATIONS 
 } from './data/seedData';
-import { 
-  Building2, 
-  Users, 
-  TrendingUp, 
-  IndianRupee, 
-  Briefcase, 
-  ShieldCheck, 
-  Award, 
-  BookOpen, 
-  Lock, 
+import {
+  Building2,
+  Users,
+  TrendingUp,
+  IndianRupee,
+  Briefcase,
+  ShieldCheck,
+  Award,
+  BookOpen,
+  Lock,
   HelpCircle,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  Home,
+  Menu,
+  Moon,
+  Sun,
+  Wallet,
+  X,
+  IdCard,
+  UserCog,
+  Layers,
+  Share2,
+  FileSpreadsheet
 } from 'lucide-react';
+
+/**
+ * Primary navigation. Entries either scroll to an `anchor` (a DOM id the panels
+ * render — they switch sub-tabs via navFocus) or navigate to a hash `route`.
+ *
+ * Routing is hash-based (`#/profile`) on purpose: the production build is a
+ * static GitHub Pages SPA with `base: './'`, so history-based paths would 404
+ * on refresh. Anchored entries keep the dashboard a single scrollable page;
+ * `route` entries swap the whole main view.
+ */
+const NAV_ITEMS = [
+  { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
+  { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
+  { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
+  { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
+  // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
+  // same reasoning as /profile: the dashboard is too long on mobile.
+  { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, route: '/payouts' },
+  // Sales as a dense data table — the dashboard card view hides fields on mobile.
+  { key: 'SALES_REPORT', label: 'Sales Report', icon: FileSpreadsheet, route: '/sales-report' },
+  { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
+  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile', anchor: 'profile-edit-section' },
+];
+
+/** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
+function parseHashRoute(): string {
+  const hash = window.location.hash.replace(/^#/, '');
+  return hash.startsWith('/') ? hash : '/';
+}
 import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
+import ProfilePage from './components/ProfilePage';
+import PayoutsDesk from './components/PayoutsDesk';
+import SalesReport from './components/SalesReport';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -81,6 +124,109 @@ export default function App() {
   // Selected User in the Tree diagram
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>('C');
 
+  // Header shell: light/dark preference + primary navigation
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem('SBR_THEME');
+    return stored === 'dark' ? 'dark' : 'light';
+  });
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState('HOME');
+
+  // Hash route (`#/profile`, `#/profile/<id>`). Kept in state so back/forward
+  // buttons re-render; the hash itself is the source of truth.
+  const [route, setRoute] = useState<string>(parseHashRoute);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const next = parseHashRoute();
+      setRoute(next);
+      setActiveNav(
+        next.startsWith('/profile') ? 'PROFILE'
+        : next.startsWith('/payouts') ? 'PAYOUTS'
+        : next.startsWith('/sales-report') ? 'SALES_REPORT'
+        : 'HOME'
+      );
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const navigateTo = (path: string) => {
+    if (path === '/') {
+      // Clear the route without leaving a dangling '#/' in the URL bar.
+      history.pushState(null, '', window.location.pathname + window.location.search);
+      setRoute('/');
+      setActiveNav('HOME');
+    } else {
+      window.location.hash = path; // fires hashchange → state sync above
+    }
+  };
+
+  // The `.dark` class lives on <html> (not the layout root) so it also covers
+  // <body> and the pre-login screen. All colour rules hang off it — see theme.css.
+  useEffect(() => {
+    localStorage.setItem('SBR_THEME', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
+  // Freeze the page behind the nav drawer so only the drawer scrolls.
+  useEffect(() => {
+    if (!isNavOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isNavOpen]);
+
+  /**
+   * Nav selection: highlight the entry, close the drawer, then scroll to its
+   * anchor. The target may not exist yet (the panels switch sub-tab in response
+   * to navFocus), so poll briefly instead of assuming it is already mounted.
+   */
+  const handleNavSelect = (key: string) => {
+    setIsNavOpen(false);
+
+    const target = NAV_ITEMS.find(item => item.key === key);
+    if (!target) return;
+
+    // Retry-scroll: the target may mount a tick later (route swap / sub-tab switch).
+    const scrollToAnchor = (anchor: string) => {
+      let attempts = 0;
+      const tryScroll = () => {
+        if (anchor === 'sbr-top') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        const el = document.getElementById(anchor);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (attempts++ < 10) {
+          setTimeout(tryScroll, 80);
+        }
+      };
+      setTimeout(tryScroll, 60);
+    };
+
+    // Route entries swap the main view; an optional anchor then scrolls within
+    // the new view (e.g. Edit Detail → /profile → bank-details section).
+    if ('route' in target && target.route) {
+      navigateTo(target.route);
+      setActiveNav(key);
+      if (target.anchor) scrollToAnchor(target.anchor);
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Anchored entries live on the dashboard — leave /profile first if needed.
+    // (navigateTo('/') resets activeNav, so set the highlight after it.)
+    if (route !== '/') {
+      navigateTo('/');
+    }
+    setActiveNav(key);
+    scrollToAnchor(target.anchor!);
+  };
+
   // Security Modal States
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -88,6 +234,54 @@ export default function App() {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  const sanitizeProjects = (rawProjects: RealEstateProject[]): RealEstateProject[] => {
+    const filtered = (rawProjects || []).filter(p => p.id !== 'PRJ-251');
+    const nameMap = new Map<string, RealEstateProject>();
+
+    for (const proj of filtered) {
+      const normName = (proj.name || '').trim().toLowerCase();
+      const existing = nameMap.get(normName);
+      if (!existing) {
+        nameMap.set(normName, proj);
+      } else if (proj.id === 'PRJ-183') {
+        nameMap.set(normName, proj);
+      }
+    }
+
+    for (const initProj of INITIAL_PROJECTS) {
+      const normName = initProj.name.trim().toLowerCase();
+      if (!nameMap.has(normName)) {
+        nameMap.set(normName, initProj);
+      } else {
+        const curr = nameMap.get(normName)!;
+        if (initProj.id === 'PRJ-183') {
+          let updatedInv = (curr.inventory && curr.inventory.length >= 10) ? curr.inventory : initProj.inventory;
+          updatedInv = updatedInv.map(cat => ({
+            ...cat,
+            units: cat.units.map(u => {
+              if (u.unitNumber === 'Plot 54' || u.unitNumber === '54') {
+                return {
+                  ...u,
+                  status: 'BOOKED' as const,
+                  bookedByAgentId: 'SBR0055',
+                  buyerName: 'Anju Devi'
+                };
+              }
+              return u;
+            })
+          }));
+          nameMap.set(normName, {
+            ...curr,
+            id: 'PRJ-183',
+            inventory: updatedInv
+          });
+        }
+      }
+    }
+
+    return Array.from(nameMap.values());
+  };
 
   const loadPrivateData = async (
     sessionParsed: { role: UserRole; agentId?: string; name: string; passwordHash?: string },
@@ -112,11 +306,33 @@ export default function App() {
       const activeConfig = data.config || INITIAL_MLM_CONFIG;
       setConfig(activeConfig);
       
-      const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
-      const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+      const rawSales = data.sales || INITIAL_SALES;
+      let loadedSales = rawSales.map((s: any) => ({
+        ...s,
+        projectId: s.projectId === 'PRJ-251' ? 'PRJ-183' : s.projectId
+      }));
+      for (const initSale of INITIAL_SALES) {
+        if (!loadedSales.some((s: any) => s.id === initSale.id)) {
+          loadedSales = [initSale, ...loadedSales];
+          setDocumentData(COLLECTIONS.SALES, initSale.id, initSale).catch(() => {});
+        }
+      }
+
+      const loadedProjects = sanitizeProjects(data.projects || INITIAL_PROJECTS);
+      deleteDocument(COLLECTIONS.PROJECTS, 'PRJ-251').catch(() => {});
+      const indriProj = loadedProjects.find(p => p.id === 'PRJ-183' || p.name === 'Indri KMP');
+      if (indriProj) {
+        setDocumentData(COLLECTIONS.PROJECTS, indriProj.id, indriProj).catch(() => {});
+      }
       setProjects(loadedProjects);
 
       let loadedUsers = normalizeUsersWithSales(data.users || INITIAL_USERS, loadedSales, activeConfig);
+      for (const initUser of INITIAL_USERS) {
+        if (!loadedUsers.some((u: any) => u.id === initUser.id)) {
+          loadedUsers = [...loadedUsers, initUser];
+          setDocumentData(COLLECTIONS.USERS, initUser.id, initUser).catch(() => {});
+        }
+      }
 
       // Force upgrade old vulnerable passwords to their correct secure hashes for the 7 secure nodes
       loadedUsers = loadedUsers.map(user => ({
@@ -280,7 +496,17 @@ export default function App() {
         loadedUsers = normalizeUsersWithSales(loadedUsers, loadedSales, activeConfig);
       }
 
-      const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, data.payouts || INITIAL_PAYOUTS);
+      const rawPayouts = data.payouts || INITIAL_PAYOUTS;
+      const sanitizedExistingPayouts = rawPayouts.map(p => {
+        if (p.status === 'DISBURSED') {
+          const resetPayout = { ...p, status: 'PENDING' as const };
+          setDocumentData(COLLECTIONS.PAYOUTS, p.id, resetPayout).catch(e => console.error(e));
+          return resetPayout;
+        }
+        return p;
+      });
+
+      const loadedPayouts = rebuildPayoutsFromSales(loadedSales, loadedUsers, activeConfig, sanitizedExistingPayouts);
 
       // Automatic background passcode modification migration is disabled to ensure passcodes are not altered
       // unless explicitly requested by the admin or user.
@@ -313,10 +539,16 @@ export default function App() {
       setNotifications(loadedNotifs);
 
       setSession(sessionParsed);
-      setActiveRole(sessionParsed.role);
-      if (sessionParsed.agentId) {
-        setActiveAgentId(sessionParsed.agentId);
-        setSelectedTreeUserId(sessionParsed.agentId);
+      // Only align UI to the session on foreground loads. The 10s background
+      // poll also runs through here — resetting these would silently kick an
+      // admin out of the Channel Partner Panel (and clobber the agent they are
+      // inspecting) on every tick.
+      if (!isBackground) {
+        setActiveRole(sessionParsed.role);
+        if (sessionParsed.agentId) {
+          setActiveAgentId(sessionParsed.agentId);
+          setSelectedTreeUserId(sessionParsed.agentId);
+        }
       }
     } catch (error) {
       console.error("Failed to load private data from Firestore:", error);
@@ -335,11 +567,18 @@ export default function App() {
         } catch (_) {}
       }
 
-      let localSales = (storedSales ? JSON.parse(storedSales) : INITIAL_SALES).filter((s: any) => s.project === 'IMT Sohna');
-      let localProjects = (storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS).filter((p: any) => p.name === 'IMT Sohna');
+      let localSales = storedSales ? JSON.parse(storedSales) : INITIAL_SALES;
+      for (const initSale of INITIAL_SALES) {
+        if (!localSales.some((s: any) => s.id === initSale.id)) {
+          localSales = [initSale, ...localSales];
+        }
+      }
+      let localProjects = sanitizeProjects(storedProjects ? JSON.parse(storedProjects) : INITIAL_PROJECTS);
       let localUsers = normalizeUsersWithSales(storedUsers ? JSON.parse(storedUsers) : INITIAL_USERS, localSales, activeConfig);
 
-      const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS);
+      const rawLocalPayouts = storedPayouts ? JSON.parse(storedPayouts) : INITIAL_PAYOUTS;
+      const sanitizedLocalPayouts = rawLocalPayouts.map((p: any) => ({ ...p, status: p.status === 'DISBURSED' ? 'PENDING' : p.status }));
+      const localPayouts = rebuildPayoutsFromSales(localSales, localUsers, activeConfig, sanitizedLocalPayouts);
       const localNotifs = (storedNotifs ? JSON.parse(storedNotifs) : INITIAL_NOTIFICATIONS).filter((n: any) => localUsers.some(u => u.id === n.userId));
 
       // Sanitize localUsers if not admin
@@ -371,10 +610,14 @@ export default function App() {
       setNotifications(localNotifs);
 
       setSession(sessionParsed);
-      setActiveRole(sessionParsed.role);
-      if (sessionParsed.agentId) {
-        setActiveAgentId(sessionParsed.agentId);
-        setSelectedTreeUserId(sessionParsed.agentId);
+      // Same guard as the Firestore path: background polls must not reset the
+      // admin's workspace toggle or selected agent.
+      if (!isBackground) {
+        setActiveRole(sessionParsed.role);
+        if (sessionParsed.agentId) {
+          setActiveAgentId(sessionParsed.agentId);
+          setSelectedTreeUserId(sessionParsed.agentId);
+        }
       }
     } finally {
       if (!isBackground) {
@@ -403,7 +646,8 @@ export default function App() {
         const activeConfig = data.config || INITIAL_MLM_CONFIG;
         setConfig(activeConfig);
         
-        const loadedProjects = (data.projects || INITIAL_PROJECTS).filter(p => p.name === 'IMT Sohna');
+        let loadedProjects = sanitizeProjects(data.projects || INITIAL_PROJECTS);
+        deleteDocument(COLLECTIONS.PROJECTS, 'PRJ-251').catch(() => {});
         setProjects(loadedProjects);
 
         const storedSession = localStorage.getItem('SBR_SESSION');
@@ -417,7 +661,7 @@ export default function App() {
           }
         } else {
           // If no stored session, populate initial public states from fetched data
-          const loadedSales = (data.sales || INITIAL_SALES).filter(s => s.project === 'IMT Sohna');
+          const loadedSales = data.sales || INITIAL_SALES;
           setSales(loadedSales);
           setNotifications(data.notifications || INITIAL_NOTIFICATIONS);
           
@@ -720,9 +964,15 @@ export default function App() {
   const handleUpdateConfig = async (newConfig: MLMConfig) => {
     setConfig(newConfig);
     const normalized = normalizeUsersWithSales(users, sales, newConfig);
+    const updatedPayouts = rebuildPayoutsFromSales(sales, normalized, newConfig, payouts);
     setUsers(normalized);
+    setPayouts(updatedPayouts);
     try {
       await setDocumentData(COLLECTIONS.CONFIG, 'main_config', newConfig);
+      // Save updated payouts if any
+      for (const p of updatedPayouts) {
+        await setDocumentData(COLLECTIONS.PAYOUTS, p.id, p);
+      }
       // Save any users whose designations have changed
       for (const u of normalized) {
         const original = users.find(o => o.id === u.id);
@@ -1062,11 +1312,15 @@ export default function App() {
     }
   };
 
-  const handleApprovePayout = async (payoutId: string) => {
+  const handleUpdatePayoutStatus = async (payoutId: string, newStatus: 'PENDING' | 'APPROVED' | 'DISBURSED') => {
     let targetPayout: CommissionPayout | undefined;
     const updatedPayouts = payouts.map(p => {
       if (p.id === payoutId) {
-        const nextPay = { ...p, status: 'APPROVED' as const };
+        const nextPay = {
+          ...p,
+          status: newStatus,
+          payoutDate: newStatus === 'DISBURSED' ? new Date().toISOString().split('T')[0] : p.payoutDate
+        };
         targetPayout = nextPay;
         return nextPay;
       }
@@ -1075,17 +1329,25 @@ export default function App() {
     setPayouts(updatedPayouts);
 
     if (targetPayout) {
+      let notifMsg = `Payout status updated to ${newStatus}.`;
+      if (newStatus === 'DISBURSED') {
+        notifMsg = `Clearance settled for ₹${targetPayout.netCommission.toLocaleString('en-IN')}. Ledger finalized.`;
+      } else if (newStatus === 'APPROVED') {
+        notifMsg = `Payout sanctioned for ₹${targetPayout.netCommission.toLocaleString('en-IN')}. Awaiting bank dispatch.`;
+      }
+
       const notif: Notification = {
         id: `NOT-${Math.floor(100 + Math.random() * 900)}`,
         userId: targetPayout.agentId,
-        title: 'Commission Approved for Disbursal',
-        message: `Your override of ${targetPayout.netCommission.toLocaleString()} PTS for ${targetPayout.project} (${targetPayout.unitNumber}) was verified by Accounting.`,
+        title: `Payout Status: ${newStatus}`,
+        message: notifMsg,
         amount: targetPayout.netCommission,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
         isRead: false
       };
       const updatedNotifs = [notif, ...notifications];
       setNotifications(updatedNotifs);
+
       try {
         await setDocumentData(COLLECTIONS.PAYOUTS, payoutId, targetPayout);
         await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
@@ -1095,37 +1357,12 @@ export default function App() {
     }
   };
 
-  const handleDisbursePayout = async (payoutId: string) => {
-    let targetPayout: CommissionPayout | undefined;
-    const updatedPayouts = payouts.map(p => {
-      if (p.id === payoutId) {
-        const nextPay = { ...p, status: 'DISBURSED' as const, payoutDate: new Date().toISOString().split('T')[0] };
-        targetPayout = nextPay;
-        return nextPay;
-      }
-      return p;
-    });
-    setPayouts(updatedPayouts);
+  const handleApprovePayout = async (payoutId: string) => {
+    await handleUpdatePayoutStatus(payoutId, 'APPROVED');
+  };
 
-    if (targetPayout) {
-      const notif: Notification = {
-        id: `NOT-${Math.floor(100 + Math.random() * 900)}`,
-        userId: targetPayout.agentId,
-        title: 'Payout Bank Clearance Cleared',
-        message: `Clearance settled for ${targetPayout.netCommission.toLocaleString()} PTS. Ledger finalized.`,
-        amount: targetPayout.netCommission,
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        isRead: false
-      };
-      const updatedNotifs = [notif, ...notifications];
-      setNotifications(updatedNotifs);
-      try {
-        await setDocumentData(COLLECTIONS.PAYOUTS, payoutId, targetPayout);
-        await setDocumentData(COLLECTIONS.NOTIFICATIONS, notif.id, notif);
-      } catch (e) {
-        console.error('Firestore save failed', e);
-      }
-    }
+  const handleDisbursePayout = async (payoutId: string) => {
+    await handleUpdatePayoutStatus(payoutId, 'DISBURSED');
   };
 
   const handleUpdateSaleBookingStatus = async (saleId: string, bookingStatus: 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE', tokenAmount?: number) => {
@@ -1259,12 +1496,24 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginScreen onLogin={handleLogin} onVerifyCredentials={handleVerifyCredentials} />;
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        onVerifyCredentials={handleVerifyCredentials}
+        theme={theme}
+        onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+      />
+    );
   }
 
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-hidden">
+    /*
+      overflow-x-clip (not -hidden): `overflow-x: hidden` computes overflow-y to
+      `auto`, which makes this div a scroll container and stops the sticky header
+      from pinning to the viewport. `clip` still clips horizontally without that.
+    */
+    <div className="min-h-screen bg-[#fafaf7] text-[#1c1917] flex flex-col antialiased font-sans relative overflow-x-clip">
       {/* Soft Elegant Warm Ambient Light Gradients - highly subtle */}
       <div className="absolute top-0 left-0 w-full h-[500px] overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-25%] left-[-10%] w-[60%] h-[110%] rounded-full bg-amber-500/5 blur-[120px]" />
@@ -1272,103 +1521,296 @@ export default function App() {
       </div>
 
       {/* Top Banner */}
-      <header className="border-b border-stone-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="z-10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold text-lg select-none shadow-sm">
-                P
-              </div>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight text-stone-900 font-serif">SBR <span className="text-emerald-850 font-normal">Sponsors</span></h1>
-              </div>
-            </div>
+      <header className="border-b border-stone-200/80 bg-white/85 backdrop-blur-md sticky top-0 z-30 shrink-0 shadow-xs">
+        {/*
+          Three columns so the brand sits dead-centre regardless of how wide the
+          side controls are. Everything else (session badge, role selector, sync,
+          passcode, logout) now lives in the slide-over nav.
+        */}
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-2.5 flex items-center gap-3">
+
+          {/* Left: menu trigger */}
+          <div className="flex-1 flex justify-start">
+            <button
+              onClick={() => setIsNavOpen(open => !open)}
+              aria-label={isNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isNavOpen}
+              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0"
+            >
+              {isNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
           </div>
 
-          {/* Interactive Role Selector / User Identity Block */}
-          {session ? (
-            <div className="flex flex-row flex-wrap items-center justify-end gap-1.5 sm:gap-2 z-20 self-center md:self-auto w-auto">
-              
-              {/* Authenticated Broker or Admin Badge */}
-              <div className="flex items-center gap-1 bg-stone-100 border border-stone-200 rounded-lg px-2 py-1 text-[10.5px] sm:text-xs text-stone-700">
-                <div className={`w-1.5 h-1.5 rounded-full ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                <span className="font-semibold text-stone-900 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{session.name}</span>
-                <span className="text-[8px] uppercase font-bold tracking-wider px-1 py-0.5 rounded bg-stone-200 text-stone-800 font-mono scale-90 origin-right">
-                  {session.role === 'ADMIN' ? 'ADMIN' : 'ASSOCIATE'}
-                </span>
-              </div>
+          {/* Center: logo + name */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold select-none shadow-sm shrink-0">
+              P
+            </div>
+            <h1 className="text-base sm:text-xl font-bold tracking-tight text-stone-900 font-serif whitespace-nowrap">
+              SBR <span className="text-emerald-800 font-normal">Sponsors</span>
+            </h1>
+          </div>
 
-              {/* Interactive Role selector ONLY FOR ADMINISTRATOR SESSIONS */}
-              {session.role === 'ADMIN' ? (
-                <div className="flex p-0.5 bg-stone-100 border border-stone-250 rounded-lg shadow-xs">
-                  <button
-                    onClick={() => setActiveRole('ADMIN')}
-                    className={`px-2 py-1 rounded text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                      activeRole === 'ADMIN' 
-                        ? 'bg-emerald-800 text-white shadow-xs' 
-                        : 'text-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    👑 <span className="hidden xs:inline">Owner/Admin</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveRole('AGENT')}
-                    className={`px-1.5 py-1 rounded text-[10px] sm:text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                      activeRole === 'AGENT' 
-                        ? 'bg-emerald-800 text-white shadow-xs' 
-                        : 'text-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    💼 <span className="hidden xs:inline">Channel Partner Panel</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="hidden sm:flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 text-[10.5px] sm:text-xs text-emerald-800 font-medium">
-                  🔑 Session Verified
-                </div>
-              )}
-
-
-
-              {/* Manual Cloud Sync Button */}
-              <button
-                onClick={handleManualSync}
-                disabled={isManualSyncing}
-                className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-850 border border-emerald-200/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50"
-                title="Sync database immediately"
-              >
-                <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-800 ${isManualSyncing ? 'animate-spin' : ''}`} />
-                <span>{isManualSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
-              </button>
-
-              {/* Security Credentials Button */}
-              {session.agentId && (
+          {/* Right: workspace switch (desktop) + theme switch */}
+          <div className="flex-1 flex justify-end items-center gap-2">
+            {session?.role === 'ADMIN' && (
+              <div className="hidden md:flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs shrink-0">
                 <button
-                  onClick={() => setIsSecurityModalOpen(true)}
-                  className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300/80 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                  title="Change your secure login passcode"
+                  onClick={() => setActiveRole('ADMIN')}
+                  title="Owner / Admin workspace"
+                  className={`px-2 py-1 rounded text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    activeRole === 'ADMIN' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500 hover:text-stone-900'
+                  }`}
                 >
-                  <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-stone-600" />
-                  <span className="hidden sm:inline">Passcode Settings</span>
+                  👑 <span className="hidden lg:inline">Owner/Admin</span>
                 </button>
-              )}
+                <button
+                  onClick={() => setActiveRole('AGENT')}
+                  title="Channel Partner workspace"
+                  className={`px-2 py-1 rounded text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    activeRole === 'AGENT' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500 hover:text-stone-900'
+                  }`}
+                >
+                  💼 <span className="hidden lg:inline">Partner Panel</span>
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-100 transition-all cursor-pointer shadow-xs shrink-0"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
 
-              {/* Log Out Button */}
+        {/* Mobile workspace switch — its own slim row so the centred brand row
+            stays uncrowded on small screens. Admin sessions only. */}
+        {session?.role === 'ADMIN' && (
+          <div className="md:hidden px-3 pb-2">
+            <div className="flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs">
               <button
-                onClick={handleLogout}
-                className="px-2 py-1 font-bold text-[10.5px] sm:text-xs rounded-lg bg-stone-200/60 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-stone-300/80 text-stone-700 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                title="Disconnect from session"
+                onClick={() => setActiveRole('ADMIN')}
+                className={`flex-1 px-2 py-1.5 rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  activeRole === 'ADMIN' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500'
+                }`}
               >
-                <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                <span className="hidden sm:inline">Disconnect</span>
+                👑 Owner/Admin
+              </button>
+              <button
+                onClick={() => setActiveRole('AGENT')}
+                className={`flex-1 px-2 py-1.5 rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  activeRole === 'AGENT' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500'
+                }`}
+              >
+                💼 Partner Panel
               </button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
       </header>
 
+      {/*
+        Left slide-over navigation. Fixed + overlaid so opening it never reflows
+        the page content underneath (no layout shift).
+      */}
+      {isNavOpen && (
+        <>
+          <div
+            onClick={() => setIsNavOpen(false)}
+            className="fixed inset-0 z-40 bg-stone-900/40 backdrop-blur-xs"
+            aria-hidden="true"
+          />
+          <nav className="fixed top-0 left-0 z-50 h-full w-68 max-w-[82vw] bg-white border-r border-stone-200 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-white font-serif font-semibold text-sm select-none">
+                  P
+                </div>
+                <span className="font-serif font-bold text-sm text-stone-900">Menu</span>
+              </div>
+              <button
+                onClick={() => setIsNavOpen(false)}
+                aria-label="Close navigation menu"
+                className="p-1.5 rounded-lg text-stone-500 hover:bg-stone-100 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+
+              {/* Signed-in identity */}
+              {session && (
+                <div className="m-3 p-3 rounded-xl bg-stone-50 border border-stone-200">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.role === 'ADMIN' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
+                    <span className="font-semibold text-xs text-stone-900 truncate">{session.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span className="text-[8.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-800 font-mono">
+                      {session.role === 'ADMIN' ? 'ADMIN' : 'ASSOCIATE'}
+                    </span>
+                    {session.agentId && (
+                      <span className="text-[9.5px] font-mono text-stone-500 truncate">{session.agentId}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Primary navigation */}
+              <div className="px-2 pb-1 flex flex-col gap-0.5">
+                <span className="px-3 pt-1 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400">Navigate</span>
+                {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => handleNavSelect(key)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                      activeNav === key
+                        ? 'bg-emerald-800 text-white shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {session && (
+                <>
+                  {/* Workspace switch — administrators only */}
+                  {session.role === 'ADMIN' && (
+                    <div className="px-2 pt-2 flex flex-col gap-0.5 border-t border-stone-200 mt-2">
+                      <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400">Workspace</span>
+                      <button
+                        onClick={() => { setActiveRole('ADMIN'); setIsNavOpen(false); }}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                          activeRole === 'ADMIN'
+                            ? 'bg-emerald-800 text-white shadow-xs'
+                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+                        }`}
+                      >
+                        <span className="w-4 text-center shrink-0">👑</span> Owner / Admin
+                      </button>
+                      <button
+                        onClick={() => { setActiveRole('AGENT'); setIsNavOpen(false); }}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left transition-all cursor-pointer ${
+                          activeRole === 'AGENT'
+                            ? 'bg-emerald-800 text-white shadow-xs'
+                            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+                        }`}
+                      >
+                        <span className="w-4 text-center shrink-0">💼</span> Channel Partner Panel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Account actions */}
+                  <div className="px-2 pt-2 pb-3 flex flex-col gap-0.5 border-t border-stone-200 mt-2">
+                    <span className="px-3 pt-2 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-400">Account</span>
+
+                    <button
+                      onClick={handleManualSync}
+                      disabled={isManualSyncing}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 shrink-0 text-emerald-800 ${isManualSyncing ? 'animate-spin' : ''}`} />
+                      {isManualSyncing ? 'Syncing...' : 'Sync Cloud'}
+                    </button>
+
+                    {session.agentId && (
+                      <button
+                        onClick={() => { setIsSecurityModalOpen(true); setIsNavOpen(false); }}
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-all cursor-pointer"
+                      >
+                        <Lock className="w-4 h-4 shrink-0" />
+                        Passcode Settings
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => { setIsNavOpen(false); handleLogout(); }}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-left text-rose-700 hover:bg-rose-50 transition-all cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4 shrink-0" />
+                      Disconnect
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </nav>
+        </>
+      )}
+
       {/* Primary Dashboard Content Area */}
-      <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+      <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        {route.startsWith('/profile') ? (
+          /* /profile or /profile/<SBR ID> — full partner record */
+          <ProfilePage
+            users={users}
+            sales={sales}
+            payouts={payouts}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onBack={() => navigateTo('/')}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
+        ) : route.startsWith('/payouts') ? (
+          /* /payouts — the same desk the admin dashboard uses. Admins get the
+             full auditable list with sanction/dispatch; channel partners get
+             their own payouts, read-only (no handlers passed). */
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            {session?.role === 'ADMIN' ? (
+              <PayoutsDesk
+                payouts={payouts}
+                onApprovePayout={handleApprovePayout}
+                onDisbursePayout={handleDisbursePayout}
+              />
+            ) : (
+              <PayoutsDesk
+                payouts={payouts.filter(p => p.agentId?.toUpperCase() === session?.agentId?.toUpperCase())}
+              />
+            )}
+          </div>
+        ) : route.startsWith('/sales-report') ? (
+          /* /sales-report — dense, mobile-first table of the sales ledger.
+             Admins see every booking; a channel partner sees only their own. */
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            <SalesReport
+              users={users}
+              sales={
+                session?.role === 'ADMIN'
+                  ? sales
+                  : sales.filter(s => s.agentId?.toUpperCase() === session?.agentId?.toUpperCase())
+              }
+              scopeNote={
+                session?.role === 'ADMIN'
+                  ? 'Full booking ledger · scroll sideways for all columns'
+                  : 'Your sourced bookings · scroll sideways for all columns'
+              }
+            />
+          </div>
+        ) : (
+          <>
         {activeRole === 'ADMIN' && (
           <div className="space-y-6">
             <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
@@ -1393,11 +1835,13 @@ export default function App() {
               onUpdateProjects={handleUpdateProjects}
               onApprovePayout={handleApprovePayout}
               onDisbursePayout={handleDisbursePayout}
+              onUpdatePayoutStatus={handleUpdatePayoutStatus}
               onUpdateSaleBookingStatus={handleUpdateSaleBookingStatus}
               onUpdateSale={handleUpdateSale}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
               currentUserAgentId={session?.agentId}
               userLogs={userLogs}
+              navFocus={activeNav}
             />
           </div>
         )}
@@ -1406,12 +1850,12 @@ export default function App() {
 
         {activeRole === 'AGENT' && (
           <div className="space-y-6">
-            <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
+            {/* <div className="glass-panel p-6 rounded-2xl bg-white border border-stone-200/80 shadow-xs">
               <h2 className="text-lg font-bold text-stone-900 font-serif">SBR Channel Partner Deck</h2>
               <p className="text-xs text-stone-500 mt-1 leading-relaxed">
                 Track direct sales volumes, strategic team downlines, and check your commission bank slip alerts.
               </p>
-            </div>
+            </div> */}
 
             <AgentPanel 
               users={users}
@@ -1424,8 +1868,11 @@ export default function App() {
               config={config}
               projects={projects}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
+              navFocus={activeNav}
             />
           </div>
+        )}
+          </>
         )}
       </main>
 
@@ -1434,7 +1881,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
           <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
           <div className="flex gap-4 justify-center text-stone-400">
-            <span>Support: helpdesk@propspire.in</span>
+            <span>Support: malav.nitin199@gmail.com</span>
             <span>|</span>
             <span>Policy: Standard Compliance Manual</span>
           </div>
@@ -1488,7 +1935,7 @@ export default function App() {
             >
               <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl space-y-1 text-xs">
                 <div className="text-stone-500">Updating credentials for:</div>
-                <div className="font-bold text-stone-850 flex items-center gap-1.5">
+                <div className="font-bold text-stone-800 flex items-center gap-1.5">
                   <span className="font-mono bg-stone-200 px-1.5 py-0.5 rounded text-stone-800">{session.agentId}</span>
                   <span>({session.name})</span>
                 </div>
@@ -1548,7 +1995,7 @@ export default function App() {
                     setPasswordError('');
                     setPasswordSuccess('');
                   }}
-                  className="flex-1 px-4 py-2.5 text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 border border-stone-250 rounded-xl transition-all cursor-pointer text-center"
+                  className="flex-1 px-4 py-2.5 text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-xl transition-all cursor-pointer text-center"
                 >
                   Cancel
                 </button>

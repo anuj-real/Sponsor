@@ -192,10 +192,10 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
 
   if (isCorporateNode) {
     return (
-      <div className="bg-white border border-stone-250/90 rounded-2xl p-6 shadow-sm space-y-4">
+      <div className="bg-white border border-stone-200/90 rounded-2xl p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shadow-xs border border-amber-200/50">
-            <Award className="w-5.5 h-4.5 text-amber-680 stroke-[2.5]" />
+            <Award className="w-5.5 h-4.5 text-amber-700 stroke-[2.5]" />
           </div>
           <div>
             <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wider font-sans flex items-center gap-2">
@@ -224,12 +224,12 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
   }
 
   return (
-    <div className="bg-white border border-stone-250/90 rounded-2xl p-6 shadow-sm space-y-6">
+    <div className="bg-white border border-stone-200/90 rounded-2xl p-6 shadow-sm space-y-6">
       {/* Block Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-stone-200 pb-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shadow-xs border border-amber-200/50">
-            <Award className="w-5.5 h-4.5 text-amber-680 stroke-[2.5]" />
+            <Award className="w-5.5 h-4.5 text-amber-700 stroke-[2.5]" />
           </div>
           <div>
             <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wider font-sans flex items-center gap-2">
@@ -284,7 +284,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-stone-200 pb-3 mb-4">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-stone-500 text-xs">Current: <strong className="text-stone-880">{agent.designation || 'Associate'}</strong></span>
+                    <span className="text-stone-500 text-xs">Current: <strong className="text-stone-900">{agent.designation || 'Associate'}</strong></span>
                     <span className="text-stone-400 text-xs font-bold">➔</span>
                     <h4 className={`text-sm font-sans tracking-wide uppercase ${headingColor}`}>
                       {nextReq.designation}
@@ -302,7 +302,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
               {/* Two Column Bars: 1-Directs, 2-Team Size */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Direct sales quota */}
-                <div className="space-y-2 bg-white p-3.5 rounded-lg border border-stone-250/80">
+                <div className="space-y-2 bg-white p-3.5 rounded-lg border border-stone-200/80">
                   <div className="flex justify-between items-center">
                     <span className="text-[10.5px] text-stone-600 font-sans flex items-center gap-1.5">
                       <Award className="w-3.5 h-3.5 text-emerald-700" />
@@ -332,7 +332,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                 </div>
 
                 {/* Team downline quota */}
-                <div className="space-y-2 bg-white p-3.5 rounded-lg border border-stone-250/80">
+                <div className="space-y-2 bg-white p-3.5 rounded-lg border border-stone-200/80">
                   <div className="flex justify-between items-center">
                     <span className="text-[10.5px] text-stone-600 font-sans flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-emerald-700" />
@@ -377,7 +377,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
               <Sparkles className="w-4.5 h-4.5 text-emerald-700 mt-0.5 shrink-0" />
               <div>
                 <h5 className="text-xs font-bold text-stone-800 uppercase tracking-wide">Next Tier Target</h5>
-                <p className="text-[11px] text-stone-650 mt-1 leading-relaxed">
+                <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
                   By stepping up to <strong className="text-emerald-800">{nextReq.designation}</strong>, you will amplify your team overriding commission structures. Keep coaching your active legs, coordinate with key direct associates, and maximize monthly payouts!
                 </p>
               </div>
@@ -397,7 +397,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
       {/* SBR Sponsoring and Promotional Milestones */}
       <div className="border-t border-stone-200 pt-6 mt-6 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-250 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
             <Trophy className="w-5 h-5 text-emerald-800" />
           </div>
           <div>
@@ -434,7 +434,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-stone-600 flex items-center gap-1 font-sans font-medium">
-                      Next Core Goal: <strong className="text-stone-905 font-extrabold uppercase">{nextReward.award}</strong>
+                      Next Core Goal: <strong className="text-stone-900 font-extrabold uppercase">{nextReward.award}</strong>
                     </span>
                     <span className="text-emerald-800 font-bold font-mono">
                       {nextReward.progressPercent}%
@@ -450,11 +450,11 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                   </div>
 
                   <p className="text-[10.5px] text-stone-600 leading-relaxed font-sans">
-                    Requires: <span className="font-bold text-stone-850 font-mono">{nextReward.condition}</span>. Keep building your sponsorship downline to qualify!
+                    Requires: <span className="font-bold text-stone-800 font-mono">{nextReward.condition}</span>. Keep building your sponsorship downline to qualify!
                   </p>
                 </div>
               ) : (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-250 rounded-xl text-center">
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
                   <p className="text-xs text-emerald-800 font-bold flex items-center justify-center gap-1.5 font-sans">
                     <Star className="w-4 h-4 text-emerald-700 fill-current" /> SBR Milestone Master!
                   </p>
@@ -467,9 +467,9 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
             <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-2.5">
               <span className="text-[9px] uppercase font-bold tracking-wider text-stone-500 block font-sans">Milestone Progress Standing</span>
               <div className="space-y-2">
-                <div className="flex justify-between items-center text-xs py-1.5 border-b border-stone-150">
+                <div className="flex justify-between items-center text-xs py-1.5 border-b border-stone-200">
                   <span className="text-stone-500">Highest Achieved Reward:</span>
-                  <span className="font-bold text-emerald-850 uppercase text-[10.5px] text-right font-sans truncate max-w-[200px]" title={highestAchieved ? highestAchieved.award : 'None yet'}>
+                  <span className="font-bold text-emerald-800 uppercase text-[10.5px] text-right font-sans truncate max-w-[200px]" title={highestAchieved ? highestAchieved.award : 'None yet'}>
                     {highestAchieved ? highestAchieved.award : 'None yet'}
                   </span>
                 </div>
@@ -499,7 +499,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                       isUnlocked 
                         ? 'bg-emerald-50/40 border-emerald-200/80 shadow-xs' 
                         : isNextTarget 
-                          ? 'bg-amber-50/40 border-amber-300 shadow-xs ring-1 ring-amber-250' 
+                          ? 'bg-amber-50/40 border-amber-300 shadow-xs ring-1 ring-amber-200' 
                           : 'bg-white border-stone-200 opacity-70'
                     }`}
                   >
@@ -523,27 +523,27 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                             Milestone #{i + 1}
                           </h5>
                           {isNextTarget && (
-                            <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold border border-amber-250">
+                            <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">
                               Target Goal
                             </span>
                           )}
                           {isUnlocked && (
-                            <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-250 font-sans">
+                            <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 font-sans">
                               Achieved
                             </span>
                           )}
                         </div>
-                        <p className="text-[11.5px] font-semibold text-stone-850 mt-1 leading-normal font-sans">Reward: {rew.award}</p>
-                        <p className="text-[10px] text-stone-550 mt-0.5 font-sans">Condition: <span className="font-bold text-stone-700 font-mono">{rew.condition}</span></p>
+                        <p className="text-[11.5px] font-semibold text-stone-800 mt-1 leading-normal font-sans">Reward: {rew.award}</p>
+                        <p className="text-[10px] text-stone-500 mt-0.5 font-sans">Condition: <span className="font-bold text-stone-700 font-mono">{rew.condition}</span></p>
                       </div>
                     </div>
 
                     <div className="text-right shrink-0 sm:pl-3 self-end sm:self-auto font-mono">
                       <span className={`text-[10px] px-2 py-0.8 rounded border font-bold ${
                         isUnlocked 
-                          ? 'bg-emerald-50 border-emerald-250 text-emerald-800' 
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
                           : isNextTarget 
-                            ? 'bg-amber-50 border-amber-250 text-amber-800' 
+                            ? 'bg-amber-50 border-amber-200 text-amber-800' 
                             : 'bg-stone-50 border-stone-200 text-stone-600'
                       }`}>
                         {isUnlocked ? 'Achieved' : `${rew.progressPercent}% Met`}
@@ -613,12 +613,12 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                   transition: { type: "spring", damping: 15, stiffness: 100 }
                 }}
                 exit={{ scale: 0.95, y: 15, opacity: 0 }}
-                className="relative w-full max-w-xl bg-white rounded-3xl p-6 md:p-8 border border-stone-250 shadow-xl text-center text-stone-800 overflow-hidden max-h-[90vh] overflow-y-auto"
+                className="relative w-full max-w-xl bg-white rounded-3xl p-6 md:p-8 border border-stone-200 shadow-xl text-center text-stone-800 overflow-hidden max-h-[90vh] overflow-y-auto"
               >
                 {/* Close Button */}
                 <button
                   onClick={() => setShowCelebration(false)}
-                  className="absolute top-4 right-4 p-2 rounded-full bg-stone-100 border border-stone-255 hover:bg-stone-200 text-stone-600 transition-all z-10 cursor-pointer"
+                  className="absolute top-4 right-4 p-2 rounded-full bg-stone-100 border border-stone-200 hover:bg-stone-200 text-stone-600 transition-all z-10 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -642,7 +642,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                   <h2 className="text-2xl md:text-3xl font-bold text-stone-900 leading-tight py-1 font-serif">
                     CONGRATULATIONS, {agent.name.toUpperCase()}!
                   </h2>
-                  <p className="text-stone-605 text-xs md:text-sm max-w-md mx-auto leading-relaxed">
+                  <p className="text-stone-600 text-xs md:text-sm max-w-md mx-auto leading-relaxed">
                     {isSGM 
                       ? 'You are at the pinnacle of the SBR sourcing network! Senior General Manager status gives you maximum privileges.'
                       : `Your outstanding direct sales and strong downline active network legs has qualified you as an SBR ${displayRank}!`}
@@ -654,7 +654,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                   <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1">
                     <span className="text-[9.5px] text-stone-500 uppercase tracking-wider block">Direct Sales Volume</span>
                     <div className="text-2xl font-bold text-emerald-800 font-serif">
-                      {agent.totalDirectSales} <span className="text-xs text-stone-550 font-sans">/ {directsTarget} PTS</span>
+                      {agent.totalDirectSales} <span className="text-xs text-stone-500 font-sans">/ {directsTarget} PTS</span>
                     </div>
                     <div className="text-[10px] text-emerald-700 font-bold">✓ Target Cleared</div>
                   </div>
@@ -662,7 +662,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                   <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1">
                     <span className="text-[9.5px] text-stone-500 uppercase tracking-wider block">Downline size</span>
                     <div className="text-2xl font-bold text-emerald-800 font-serif">
-                      {teamMembersCount} <span className="text-xs text-stone-550 font-sans">/ {teamTarget}</span>
+                      {teamMembersCount} <span className="text-xs text-stone-500 font-sans">/ {teamTarget}</span>
                     </div>
                     <div className="text-[10px] text-emerald-700 font-bold">✓ Target Cleared</div>
                   </div>
@@ -671,7 +671,7 @@ export default function DesignationProgress({ agent, users, downlineNetwork, con
                 {/* Benefits highlight card */}
                 <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-left mb-6 space-y-1">
                   <div className="flex items-center gap-1.5 text-[10.5px] text-amber-800 font-bold uppercase tracking-wider">
-                    <Star className="w-3.5 h-3.5 fill-current text-amber-620" />
+                    <Star className="w-3.5 h-3.5 fill-current text-amber-600" />
                     <span>Incentives & Overrides Unlocked:</span>
                   </div>
                   <p className="text-[11px] text-stone-800 leading-relaxed font-sans font-semibold">

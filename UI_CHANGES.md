@@ -1,0 +1,268 @@
+# UI Change Context
+
+Running reference for the header-navigation / theming / tree work. Keep this updated when
+touching the header, `TreeVisualizer`, or the profile sections — it records **why** things are
+wired the way they are, which is not obvious from the code alone.
+
+Companion to [../CLAUDE.md](../CLAUDE.md) (architecture) — this file covers only UI/shell changes.
+
+---
+
+## 1. Theme (light + dark) — **all colour lives in `src/theme.css`**
+
+**App-wide.** Every view is themed: login screen, header, drawer, `AdminPanel`, `AgentPanel`,
+`DesignationProgress`, `TreeVisualizer`, footer, modals and form controls.
+
+### Where to edit colour
+
+[src/theme.css](src/theme.css) — nowhere else. Components keep their existing light-mode Tailwind
+classes (`bg-white`, `text-stone-900`, `border-stone-200`); dark mode is produced by re-pointing
+those same utilities under a `.dark` ancestor. **Components carry no `dark:` classes** — those were
+removed once the central layer landed, so there is exactly one place colour is decided.
+
+### Why utility overrides, not variable inversion
+
+Tailwind v4 emits `background-color: var(--color-stone-900)`, so inverting `--color-*` under `.dark`
+looks like a one-line win. It breaks, because the same colour does two opposite jobs:
+
+```
+bg-stone-900 + text-white   →  solid dark button
+text-stone-900              →  primary body text
+```
+
+Inverting the variable turns the button background light while its label stays white. Overriding
+*utilities* keeps the two independent — `text-stone-900` can be lightened without touching
+`bg-stone-900`. The same reasoning drives the accent split: only shades 50–200 are re-pointed for
+backgrounds and only 600–950 for text, which is what keeps `bg-emerald-800 text-white` buttons intact.
+
+### Structure of `theme.css`
+
+Tokens (§1) → base/body (§2) → neutral surfaces (§3) → neutral text (§4) → borders (§5) →
+accent tints (§6) → accent text (§7) → solid actions (§8) → hover states (§9) → form controls (§10)
+→ legacy `.glass-panel` unwind (§11) → chrome (§12). Semantic tokens (`--sbr-surface`, `--sbr-text`,
+`--sbr-border`, …) mean a palette change is a handful of edits at the top.
+
+### Gotchas worth knowing
+
+- **`.dark` is on `<html>`**, not the layout root — `body` has a `background-color: … !important`
+  rule in index.css that can only be reached from an ancestor of `body`, and the login screen
+  renders outside the app shell.
+- **Hover variants need their own rules.** `hover:bg-stone-100` is a *different class* from
+  `bg-stone-100`, so `.dark .bg-stone-100` does not touch it. §9 handles them explicitly.
+- **Opacity variants likewise** — `bg-emerald-50/40` is its own class, listed separately in §6.
+- **`slate-*` is left alone on purpose** — it is the dark ramp itself.
+- **`.glass-panel` fights back.** index.css forces light text/background inside it with
+  `!important` (a legacy hack to neutralise AI-Studio dark classes). §11 unwinds that at equal
+  specificity, so those `!important`s are required, not sloppiness.
+- **Re-auditing coverage:** extract colour utilities from the built CSS and diff against theme.css.
+  28 utilities are uncovered *by design* — see the header comment in theme.css for why.
+
+### State and toggle
+
+`theme` lives in [src/App.tsx](src/App.tsx), persisted to `localStorage` under `SBR_THEME`. That key
+is deliberately **not** in the list App clears on login/logout, so the preference survives sessions.
+Toggles: header right column when signed in, top-right of the login screen before sign-in. The icon
+shows the mode you switch *to* — Sun while dark, Moon while light.
+
+### Palette repair (done as part of this)
+
+254 occurrences of **invalid Tailwind shades** (`text-stone-550`, `border-stone-150`,
+`text-emerald-850`, `text-stone-90`, … 47 distinct) were normalised to real steps. Tailwind
+generates nothing for a non-existent shade, so those elements had **no colour at all** — borders
+fell back to `currentColor` and text silently inherited. They were broken in light mode too; the
+theme work simply made it visible. Do not reintroduce off-scale shades: the valid steps are
+50/100/200/300/400/500/600/700/800/900/950.
+
+## 2. Header layout
+
+Three flex columns so the brand sits dead-centre regardless of side-control width:
+
+```
+[ ☰ menu ]  ·flex-1·  [ P  SBR Sponsors ]  ·flex-1·  [ ☀/🌙 ]
+```
+
+Only those three things live in the header. The session badge, role selector, Sync Cloud,
+Passcode Settings and Disconnect were **moved into the drawer** — a centred logo cannot coexist
+with five right-side buttons without crowding.
+
+### Sticky header — do not reintroduce `overflow-x-hidden`
+
+The layout root uses **`overflow-x-clip`, not `overflow-x-hidden`**. Per spec `overflow-x: hidden`
+computes `overflow-y` to `auto`, which makes that div a scroll container; a `sticky` descendant then
+pins to *it* rather than the viewport, so the header scrolls away. `clip` still clips horizontally
+without establishing a scroll container. This is why the header appeared non-sticky before.
+
+If the header ever stops sticking again, check every ancestor for `overflow` on either axis first.
+
+## 3. Nav drawer
+
+`NAV_ITEMS` lives at the top of [src/App.tsx](src/App.tsx). Each entry carries an `anchor` — the DOM
+id it scrolls to:
+
+| Key | Label | Anchor |
+|---|---|---|
+| `HOME` | Home | `sbr-top` (scrolls to top) |
+| `PROFILE` | Profile | *routes to* `/profile` |
+| `TEAM` | Team | `sbr-team-section` |
+| `INVENTORY` | Plot Inventory | `sbr-inventory-section` |
+| `PAYOUTS` | Payouts | *routes to* `/payouts` |
+| `SPONSOR_CODE` | Sponsor Reference Code | `sbr-sponsor-code` |
+| `EDIT_DETAIL` | Edit Detail | *routes to* `/profile` → `profile-edit-section` |
+
+`TREE` (My Tree) and `USER_DETAIL` were **removed** from the nav (the tree is still rendered on
+the dashboard; `/profile` covers user detail). Route entries may carry an `anchor` scrolled to
+*after* navigation. The AgentPanel "SBR Profile" badge also routes to `/profile`.
+ProfilePage's performance stats row (direct/downline volume, paid/pending) is **commented out**
+for a leaner mobile profile — restore by uncommenting the `stats` array + its grid together.
+
+**`/payouts` route:** the payout filter tiles + audit desk were extracted into
+[src/components/PayoutsDesk.tsx](src/components/PayoutsDesk.tsx), rendered both by the AdminPanel
+PAYOUTS sub-tab and the `/payouts` page. Admins get the full list with sanction/dispatch handlers;
+channel partners get their own payouts read-only — **action buttons render only when the handlers
+are passed**, so the same component serves both. Edit the desk there, not in the panels.
+
+Drawer sections, in order: **identity card** → **Navigate** (the table above) → **Workspace**
+(admin-only role switch) → **Account** (Sync Cloud, Passcode Settings, Disconnect).
+
+- **Shown at every breakpoint.** Not `xl:hidden` — logout and sync now live here, so hiding the
+  drawer on desktop would make them unreachable. The inline `xl` nav was removed for the same
+  reason (it fought the centred logo).
+- **No layout shift.** `fixed top-0 left-0 z-50` with a `z-40` backdrop — it overlays content rather
+  than pushing it. The earlier inline `{isNavOpen && <nav>}` below the header reflowed the page on
+  every open/close.
+- **Background scroll is locked** while open via a `useEffect` that sets `document.body.style.overflow`
+  and restores the previous value on cleanup (restores, not hardcodes `''`, so it composes with any
+  other component doing the same).
+- **Close-on-click is deliberate, not uniform.** Workspace switches, passcode and logout close the
+  drawer; **Sync Cloud intentionally leaves it open** so the spinner stays visible — closing would
+  hide the only feedback that the sync is running.
+- **Scrolling is retry-based.** `handleNavSelect` polls for the anchor (10 attempts, 80 ms apart)
+  because the target may not be mounted yet — the panels switch sub-tab in response to `navFocus`,
+  so the element appears a tick after the click. Do not replace this with a single
+  `getElementById` call.
+- **Anchors carry `scroll-mt-24`** so the sticky header does not cover the heading being scrolled to.
+
+### `navFocus` prop
+
+`activeNav` is passed to both panels as `navFocus`; each maps it to the view that owns the section:
+
+- **`AdminPanel`** — `TREE` / `TEAM` / `USER_DETAIL` / `EDIT_DETAIL` / `SPONSOR_CODE` → `AGENTS` sub-tab;
+  `PAYOUTS` → `PAYOUTS` sub-tab; `INVENTORY` → `BOOKINGS` sub-tab (which holds the live inventory
+  table). Without this the anchors would not exist in the DOM, since sub-tab content is
+  conditionally rendered.
+- **`AgentPanel`** — `TREE` / `TEAM` / `PAYOUTS` → `LEDGER` tab; `INVENTORY` → `INVENTORY` tab;
+  `USER_DETAIL` expands the KYC section; `EDIT_DETAIL` expands the bank-details section.
+
+**Duplicate ids are intentional.** `sbr-user-detail`, `sbr-inventory-section`, `sbr-tree-section` etc.
+exist in *both* panels, but `activeRole` means only one panel is ever mounted, so lookups stay
+unambiguous.
+
+## 4. TreeVisualizer
+
+Rewritten from ~950 lines to ~215. See [src/components/TreeVisualizer.tsx](src/components/TreeVisualizer.tsx).
+
+- **Removed:** pan/zoom, drag + pinch gestures, wheel zoom, expand/collapse, search, fullscreen,
+  the LIST view toggle, auto-centering on select, and the selected-node details sidebar.
+- **Data:** renders the **real** `users` prop. `buildTree()` groups by `sponsorId` and derives
+  `directPts` (`totalDirectSales`), `networkPts` (subtree sum) and `teamSize` (recursive count).
+  Roots are users whose sponsor is absent from the passed list — so `AgentPanel` (which passes
+  `[agent, ...downline]`) correctly roots at the agent.
+  A `visited` set guards against a malformed `sponsorId` cycle causing infinite recursion.
+- The old `DUMMY_TREE` constant is kept **commented out** at the top for offline design work.
+- **Layout:** recursive `TreeBranch` — card, vertical stem, horizontal bridge across siblings,
+  drop line into each child. Root centres because every parent centres over its own subtree.
+  The connector row uses `self-stretch` with `-mx-1.5` rather than `w-[calc(100%+…)]`; CSS `calc`
+  needs spaces around `+`, and relying on Tailwind's operator normalisation is fragile.
+- Wrapper is `w-max min-w-full justify-center` inside `overflow-auto`: scrolls when wider than the
+  viewport, centres when not.
+- **Props are inert except `users`.** `onSelectUser` / `selectedUserId` / `hideUpline` are still
+  accepted so the existing call sites type-check, but nothing reads them — selecting a node no
+  longer drives the parent panels.
+
+## 5. Agent profile surfaced inline
+
+Previously KYC and bank details lived in a modal gated behind the "SBR Profile 👤" badge.
+
+- The modal is **removed**. Both collapsible sections now render inline in the dashboard, in a
+  `<form id="sbr-user-detail">` card alongside the other detail.
+- "KYC Compliance (Locked)" and "Profile Info & Bank Details" remain collapsible; they are simply
+  no longer hidden behind a click-to-open dialog.
+- The badge now calls `scrollToProfile()` — scrolls to the card and expands KYC — instead of
+  opening a modal.
+- `isProfileOpen` state, the modal header/footer, and the `ArrowLeft` import were deleted with it.
+
+---
+
+## 6. `/profile` route (hash router)
+
+[src/components/ProfilePage.tsx](src/components/ProfilePage.tsx) — the full partner record:
+identity banner (photo or initial, status, designation, sponsor line), performance stats
+(direct/downline volume, paid/pending payouts), read-only personal details (name, phone, email,
+DOB, PAN, Aadhaar, address), plus the same "KYC Compliance (Locked)" and editable
+"Profile Info & Bank Details" sections the dashboard shows. Saves go through
+`handleAdminUpdateUserProfile`, same as the inline form.
+
+**Routing is hash-based, hand-rolled — no react-router.** The production build is a static
+GitHub Pages SPA with `base: './'`, so history-based paths would 404 on refresh; a dependency
+for two routes isn't warranted. Mechanics in [src/App.tsx](src/App.tsx):
+
+- `route` state mirrors `window.location.hash` (`parseHashRoute`); a `hashchange` listener keeps
+  it in sync, so browser back/forward work.
+- `NAV_ITEMS` entries now carry either `anchor` (scroll on the dashboard) **or** `route` (swap
+  the main view). "Profile" is a `route` entry. Selecting an *anchored* item while on `/profile`
+  first navigates back to `/`, then the retry-scroll finds the anchor once the dashboard mounts.
+- `navigateTo('/')` uses `pushState` to strip the hash entirely rather than leaving `#/`.
+- **Access rule:** `#/profile` shows the signed-in user; `#/profile/<SBR ID>` shows that partner
+  — honoured only when `session.role === 'ADMIN'`, everyone else silently gets their own record.
+  The admin agents directory has a per-row "Profile" button that sets the hash directly.
+
+## 7. Mobile responsiveness pass
+
+**Pattern: card lists for wide tables.** Every data table keeps its full table on `sm+` and renders
+a stacked card list below `sm` (`sm:hidden` cards + `hidden sm:block`/`sm:table` table). Converted:
+
+- AdminPanel **agents directory** (7 cols) — identity + status chip, ID/designation/sponsor chips,
+  stats grid, then full-width tap-target action buttons in a 2-col grid.
+- AdminPanel **payouts** (8 cols) — gross → TDS → admin → net breakdown, full-width sanction/dispatch button.
+- AdminPanel **sales ledger** (9 cols) — same live controls as the row: payment progress, Manage
+  Payments, milestone `<select>` and token-amount input.
+- AdminPanel **lifecycle logs** (7 cols) — compact entries.
+- AgentPanel **direct ledger** and **downline network** tables. (The override receipts list was
+  already cards.)
+
+Cards and rows share behaviour through extracted handlers — `openCredentialsEditor`,
+`copyInviteMessage`, `confirmDeleteAgent`, `openPaymentsLedger`, `getDobPasscode` — which also
+de-duplicated ~90 lines of inline closures from the desktop rows. **Edit those helpers, not the
+markup, when changing row behaviour** — both layouts consume them.
+
+**Form grids:** eight `grid-cols-2` input grids (booking form selects, rate/token, project legal
+metadata, leadership/offer editors) became `grid-cols-1 sm:grid-cols-2` so inputs are full-width on
+phones. Display-only 2-col grids (stat pairs, date chips) were left alone deliberately.
+
+**Admin sub-tab bar** (earlier pass): scrollable pill strip with short labels + auto-centred active
+pill + context line on mobile; unchanged wrap layout on `sm+` (see `ADMIN_TABS` in AdminPanel).
+
+**Payout status filter:** the Payouts tab's three read-only summary cards were replaced by four
+tappable tiles (All / Pending / Approved / Disbursed) that show each bucket's count + net total
+*and* filter both the mobile card list and the desktop table (`payoutStatusFilter` /
+`filteredPayouts` in AdminPanel). The empty state distinguishes "no payouts at all" from
+"none matching the filter", and an active filter shows a "clear filter" line in the desk header.
+
+**Compact admin stat deck:** the four top cards (Gross Sourced Volume, Settled Commissions,
+Commission Liabilities, Active Sourcing Team) render as a tight 2×2 tile grid below `sm` —
+no icons or blurbs, smaller values — so they no longer fill the first mobile screen.
+
+## Known gaps
+
+- Nav items **highlight and scroll only**. There is no router; `App` switches views via
+  `activeRole`, and there are no distinct Home/Team/Payouts *views* to route to. Making them real
+  navigation means either introducing a router or lifting each panel's sub-tab state into `App`.
+- Dark mode stops at the shell (see §1).
+- Pre-existing type errors in `AdminPanel` (free-text designation assigned to the `LeadershipConfig`
+  union) were fixed with `as LeadershipConfig['designation']` casts at the two call sites. The
+  underlying issue remains: the "Add Custom Designation Config" form accepts any string, so an
+  unrecognised designation silently fails to match the ladder in `designation.ts`.
+
+## Verification
+
+`npm run lint` (`tsc --noEmit`) and `npm run build` — both clean. There is no test framework.

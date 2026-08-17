@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog } from '../types';
-import { calculatePointsFromSize } from '../lib/points';
+import { User, MLMConfig, CommissionPayout, Sale, RealEstateProject, PaymentRecord, UserLog, LeadershipConfig } from '../types';
+import { calculatePointsFromSize, getSalePoints, getSaleAgreementValueINR } from '../lib/points';
 import TreeVisualizer from './TreeVisualizer';
+import PayoutsDesk from './PayoutsDesk';
 import { 
   Settings, Users, PlusCircle, Save, TrendingUp, DollarSign, Percent, 
   ShieldCheck, RefreshCw, Star, Map, FileSpreadsheet, Layers, CheckCircle, 
@@ -39,12 +40,37 @@ interface AdminPanelProps {
   onUpdateProjects: (projects: RealEstateProject[]) => void;
   onApprovePayout: (payoutId: string) => void;
   onDisbursePayout: (payoutId: string) => void;
+  onUpdatePayoutStatus?: (payoutId: string, status: 'PENDING' | 'APPROVED' | 'DISBURSED') => void;
   onUpdateSaleBookingStatus?: (saleId: string, bookingStatus: 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE', tokenAmount?: number) => void;
   onUpdateSale?: (sale: Sale) => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
   currentUserAgentId?: string;
   userLogs?: UserLog[];
+  /** Active key from the App header nav; drives which sub-tab is revealed. */
+  navFocus?: string;
 }
+
+type AdminTabKey = 'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'LOGS';
+
+/**
+ * Sub-tab metadata. `shortLabel` is what fits in the mobile pill bar; the full
+ * `label` + `description` are shown in the mobile context line and on sm+.
+ */
+const ADMIN_TABS: {
+  key: AdminTabKey;
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  { key: 'SETTINGS', label: 'Compensation & Incentives', shortLabel: 'Settings', description: 'Commission slabs (L1–L10), TDS/admin rates, rewards, leadership tiers and T&Cs.', icon: Settings },
+  { key: 'AGENTS', label: 'Onboard Sponsors (SBR)', shortLabel: 'Sponsors', description: 'Register partners, browse the team directory and referral tree.', icon: Users },
+  { key: 'PROJECTS', label: 'SBR Projects Setup', shortLabel: 'Projects', description: 'Create projects, layout maps, unit inventory and legal metadata.', icon: Map },
+  { key: 'BOOKINGS', label: 'Book Plot Inventory', shortLabel: 'Bookings', description: 'Register sale agreements and view live unit availability.', icon: Layers },
+  { key: 'SALES', label: 'Corporate Sales Ledger', shortLabel: 'Sales', description: 'Audit trail of sold plots, payment health and milestones.', icon: FileSpreadsheet },
+  { key: 'PAYOUTS', label: 'Operations & Payouts Auditing', shortLabel: 'Payouts', description: 'Sanction and disburse commission payouts.', icon: CreditCard },
+  { key: 'LOGS', label: 'Daily Lifecycle Logs', shortLabel: 'Logs', description: 'User addition/deletion audit ledger with CSV export.', icon: Calendar },
+];
 
 export default function AdminPanel({
   users,
@@ -60,12 +86,14 @@ export default function AdminPanel({
   onUpdateProjects,
   onApprovePayout,
   onDisbursePayout,
+  onUpdatePayoutStatus,
   onUpdateSaleBookingStatus,
   onUpdateSale,
   onUpdateUserProfile,
   currentUserAgentId,
   onDeleteUser,
-  userLogs = []
+  userLogs = [],
+  navFocus
 }: AdminPanelProps) {
   const isFamilyId = (id?: string) => {
     if (!id) return false;
@@ -86,8 +114,35 @@ export default function AdminPanel({
   };
 
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, LOGS
-  const [activeSubTab, setActiveSubTab] = useState<'SETTINGS' | 'AGENTS' | 'PROJECTS' | 'BOOKINGS' | 'SALES' | 'PAYOUTS' | 'LOGS'>('SETTINGS');
+  const [activeSubTab, setActiveSubTab] = useState<AdminTabKey>('SETTINGS');
   const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
+
+
+  const activeTabMeta = ADMIN_TABS.find(t => t.key === activeSubTab) ?? ADMIN_TABS[0];
+
+  // Keep the active pill visible in the mobile scroll strip, whether the change
+  // came from a tap on a partly-hidden pill or from the header nav (navFocus).
+  const tabBarRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const bar = tabBarRef.current;
+    const el = document.getElementById(`admin-tab-${activeSubTab}`);
+    if (!bar || !el) return;
+    // Only the mobile strip scrolls; on sm+ this is a no-op.
+    if (bar.scrollWidth <= bar.clientWidth) return;
+    const target = el.offsetLeft - (bar.clientWidth - el.offsetWidth) / 2;
+    bar.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  }, [activeSubTab]);
+
+  // Reveal the sub-tab that owns the section the header nav is pointing at.
+  React.useEffect(() => {
+    if (!navFocus) return;
+    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
+    if (navFocus === 'TEAM' || navFocus === 'SPONSOR_CODE') {
+      setActiveSubTab('AGENTS');
+    } else if (navFocus === 'INVENTORY') {
+      setActiveSubTab('BOOKINGS');
+    }
+  }, [navFocus]);
 
   const formatPoints = (val: number) => {
     return `${Math.round(val).toLocaleString()} PTS`;
@@ -255,6 +310,68 @@ export default function AdminPanel({
       return knownPlaintexts[uppercaseId];
     }
     return currentPasswordValue || calculatedDefault;
+  };
+
+  /** DOB-derived default passcode: `{ID}{DD}{MM}{YYYY}` (matches App.tsx auth). */
+  const getDobPasscode = (agent: User): string => {
+    if (!agent.dob) return '';
+    const parts = agent.dob.split('-');
+    if (parts.length !== 3) return '';
+    const [year, month, day] = parts;
+    if (year.length !== 4 || month.length !== 2 || day.length !== 2) return '';
+    return `${agent.id.toUpperCase()}${day}${month}${year}`;
+  };
+
+  /** Opens the credentials editor modal pre-filled with the agent's record.
+      Shared by the desktop table row and the mobile card. */
+  const openCredentialsEditor = (agent: User) => {
+    setSelectedAgentForPassword(agent);
+    setEditName(agent.name || '');
+    setEditEmail(agent.email || '');
+    setEditPhone(agent.phone || '');
+    setEditDob(agent.dob || '');
+    setEditAadhar(agent.aadhar || '');
+    setEditPan(agent.pan || '');
+    setEditAddress(agent.address || '');
+    setEditFatherOrHusbandName(agent.fatherOrHusbandName || '');
+    setEditBankAccountNumber(agent.bankAccountNumber || '');
+    setEditIfscCode(agent.ifscCode || '');
+    setEditBranchName(agent.branchName || '');
+    setEditNominee(agent.nominee || '');
+    setEditNomineeRelation(agent.nomineeRelation || '');
+    setTempPassword(getDisplayPasscode(agent.id, agent.password || '', getDobPasscode(agent)));
+    setPasswordStatusMsg('');
+  };
+
+  /** Copies the WhatsApp-style onboarding invite (portal link + ID + passcode). */
+  const copyInviteMessage = (agent: User) => {
+    const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
+      `Hello *${agent.name}*,\n` +
+      `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
+      `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
+      `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
+      `🔑 *Default Passcode:* ${getDisplayPasscode(agent.id, agent.password || '', getDobPasscode(agent))}\n\n` +
+      `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
+    navigator.clipboard.writeText(inviteText);
+    setCopiedUserId(agent.id);
+    setTimeout(() => setCopiedUserId(null), 2000);
+  };
+
+  const confirmDeleteAgent = (agent: User) => {
+    if (window.confirm(`Are you sure you want to permanently delete sponsor ${agent.name} (${agent.id})? This will remove their user profile. Any immediate downlines will be reparented to their sponsor.`)) {
+      onDeleteUser?.(agent.id);
+    }
+  };
+
+  /** Opens the payment-installments modal for a sale with a reset entry form. */
+  const openPaymentsLedger = (saleId: string) => {
+    setSelectedPaymentSaleId(saleId);
+    setPaymentFormId(null);
+    setPaymentFormAmount('');
+    setPaymentFormDate(new Date().toISOString().split('T')[0]);
+    setPaymentFormMode('BANK_TRANSFER');
+    setPaymentFormReference('');
+    setPaymentFormNotes('');
   };
 
   // SBR SMS Dispatch Portal state
@@ -479,11 +596,11 @@ export default function AdminPanel({
           <span className="font-bold text-stone-800">{formatINR(totalPaid)}</span>
           <span className="text-stone-500 font-bold">({pct.toFixed(1)}%)</span>
         </div>
-        <div className="w-full bg-stone-150 h-1.5 rounded-full overflow-hidden">
+        <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
           <div 
             className={`h-full transition-all duration-300 ${
               pct >= 100 
-                ? 'bg-emerald-650' 
+                ? 'bg-emerald-600' 
                 : pct >= 30 
                 ? 'bg-blue-600' 
                 : 'bg-amber-600'
@@ -521,7 +638,7 @@ export default function AdminPanel({
   }, [bookSizeCategory, selectedUnits]);
 
   // Calculate stats
-  const totalSalesVal = sales.reduce((acc, s) => acc + s.saleValue, 0);
+  const totalSalesVal = sales.reduce((acc, s) => acc + getSalePoints(s), 0);
   const totalCommissionDistributed = payouts
     .filter(p => p.status === 'DISBURSED')
     .reduce((acc, p) => acc + p.netCommission, 0);
@@ -864,128 +981,40 @@ export default function AdminPanel({
 
   return (
     <div className="space-y-6">
-      {/* SBR Administrative Performance Deck */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-bl-full pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-550 uppercase tracking-wider">Gross Sourced Volume</p>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-stone-900 mt-1">
-                {formatPoints(totalSalesVal)}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-150">
-              <TrendingUp className="w-5 h-5 text-emerald-800" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Value of all booked plots/villas</p>
+      {/* Admin Panel sub tab bar.
+          Mobile: one horizontally-scrollable row of compact pills (short labels,
+          active pill auto-centred) + a context line naming the active section.
+          Desktop (sm+): wraps into the familiar multi-row bar with full labels.
+          NOTE: repaired after merge 2fedca1 interleaved the old hardcoded
+          buttons with this ADMIN_TABS bar and broke the JSX. */}
+      <div className="bg-stone-100 border border-stone-200 rounded-2xl overflow-hidden">
+        <div
+          ref={tabBarRef}
+          className="flex flex-nowrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible gap-1 p-1.5 custom-scrollbar"
+        >
+          {ADMIN_TABS.map(({ key, label, shortLabel, icon: Icon }) => (
+            <button
+              key={key}
+              id={`admin-tab-${key}`}
+              onClick={() => setActiveSubTab(key)}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                activeSubTab === key
+                  ? 'bg-emerald-800 text-white shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="sm:hidden">{shortLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
         </div>
 
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-550 uppercase tracking-wider">Settled Commissions</p>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-emerald-800 mt-1">
-                {formatPoints(totalCommissionDistributed)}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-150">
-              <DollarSign className="w-5 h-5 text-emerald-800" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Disbursed net bank transfers (tax withheld)</p>
+        {/* Mobile-only context line: full name + purpose of the open section */}
+        <div className="sm:hidden px-4 py-2 border-t border-stone-200 bg-white">
+          <p className="text-[11px] font-bold text-stone-900">{activeTabMeta.label}</p>
+          <p className="text-[10px] text-stone-500 mt-0.5 leading-snug">{activeTabMeta.description}</p>
         </div>
-
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-550 uppercase tracking-wider">Commission Liabilities</p>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-amber-700 mt-1">
-                {formatPoints(totalCommissionPending)}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-150">
-              <RefreshCw className="w-5 h-5 text-amber-700 font-bold" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Queue awaiting auditor release clearances</p>
-        </div>
-
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-stone-550 uppercase tracking-wider">Active Sourcing Team</p>
-              <h3 className="text-xl sm:text-2xl font-bold text-stone-900 mt-1">
-                {users.filter(u => u.status === 'ACTIVE').length} / {users.length}
-              </h3>
-            </div>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-150">
-              <Users className="w-5 h-5 text-indigo-800" />
-            </div>
-          </div>
-          <p className="text-[10px] text-stone-500 mt-2">Active sub-brokers mapped in team structure</p>
-        </div>
-      </div>
-
-      {/* Admin Panel sub tab bar */}
-      <div className="flex flex-wrap p-1.5 bg-stone-100 border border-stone-200/85 rounded-2xl gap-1">
-        <button
-          onClick={() => setActiveSubTab('SETTINGS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'SETTINGS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Settings className="w-4 h-4" /> Compensation & Incentives
-        </button>
-        <button
-          onClick={() => setActiveSubTab('AGENTS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'AGENTS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Users className="w-4 h-4" /> Onboard Sponsors (SBR)
-        </button>
-        <button
-          onClick={() => setActiveSubTab('PROJECTS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'PROJECTS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Map className="w-4 h-4" /> SBR Projects Setup
-        </button>
-        <button
-          onClick={() => setActiveSubTab('BOOKINGS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'BOOKINGS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Layers className="w-4 h-4" /> Book Plot Inventory
-        </button>
-        <button
-          onClick={() => setActiveSubTab('SALES')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'SALES' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4" /> Corporate Sales Ledger
-        </button>
-        <button
-          onClick={() => setActiveSubTab('PAYOUTS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'PAYOUTS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" /> Operations & Payouts Auditing
-        </button>
-        <button
-          onClick={() => setActiveSubTab('LOGS')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeSubTab === 'LOGS' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-          }`}
-        >
-          <Calendar className="w-4 h-4" /> Daily Lifecycle Logs
-        </button>
       </div>
 
       {/* SUB-TAB PANELS */}
@@ -1019,24 +1048,23 @@ export default function AdminPanel({
                     />
                     <Percent className="absolute right-3 top-3 w-3.5 h-3.5 text-stone-400" />
                   </div>
-                  <p className="text-[9.5px] text-stone-550 mt-1">Government mandated withholding rate on commissions</p>
+                  <p className="text-[9.5px] text-stone-500 mt-1">Government mandated withholding rate on commissions</p>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-600 uppercase tracking-wider block mb-1">SBR Admin Retention Fee</label>
+                  <label className="text-[10px] font-bold text-stone-600 uppercase tracking-wider block mb-1">SBR Admin Retention Fee (Flat ₹)</label>
                   <div className="relative">
                     <input
                       type="number"
-                      step="0.1"
+                      step="100"
                       min="0"
-                      max="100"
                       value={adminFee}
                       onChange={(e) => setAdminFee(parseFloat(e.target.value) || 0)}
                       className="w-full pr-8 pl-3 py-2 text-xs font-mono font-bold rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                     />
-                    <Percent className="absolute right-3 top-3 w-3.5 h-3.5 text-stone-400" />
+                    <DollarSign className="absolute right-3 top-3 w-3.5 h-3.5 text-stone-400" />
                   </div>
-                  <p className="text-[9.5px] text-stone-550 mt-1">Platform development and logistics operational charge</p>
+                  <p className="text-[9.5px] text-stone-500 mt-1">Flat administrative service fee deduction in ₹ per payout</p>
                 </div>
               </div>
 
@@ -1045,12 +1073,12 @@ export default function AdminPanel({
                 <span className="text-[10px] font-bold text-stone-600 uppercase tracking-wider block font-sans">Commission Slab Override Grid (L1 to L10)</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-stone-200 rounded-xl p-3 bg-stone-50">
                   {levels.map((lvl) => (
-                    <div key={lvl.level} className="flex items-center justify-between gap-3 text-xs p-1.5 rounded bg-white border border-stone-150">
+                    <div key={lvl.level} className="flex items-center justify-between gap-3 text-xs p-1.5 rounded bg-white border border-stone-200">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-bold flex items-center justify-center border border-emerald-150 font-mono">
+                        <span className="w-5 h-5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-bold flex items-center justify-center border border-emerald-200 font-mono">
                           L{lvl.level}
                         </span>
-                        <span className="text-stone-750 font-medium font-sans text-[11px]">
+                        <span className="text-stone-700 font-medium font-sans text-[11px]">
                           {lvl.level === 1 ? 'Direct Sourcing Broker' : `Sponsor Partner (Tier ${lvl.level})`}
                         </span>
                       </div>
@@ -1072,7 +1100,7 @@ export default function AdminPanel({
               </div>
 
               {successMsg && (
-                <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-250 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 stroke-2 text-emerald-800" />
                   {successMsg}
                 </div>
@@ -1105,9 +1133,9 @@ export default function AdminPanel({
                   {leadershipConfigs.map((cfg, idx) => (
                     <div key={idx}>
                       {editingLeadIdx === idx ? (
-                        <div className="bg-emerald-50/45 border border-emerald-250 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
+                        <div className="bg-emerald-50/45 border border-emerald-200 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
                           <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wide">Edit Designation Config</span>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-bold text-stone-500 uppercase block mb-0.5">Designation</label>
                               <input
@@ -1169,7 +1197,7 @@ export default function AdminPanel({
                                   const updated = [...leadershipConfigs];
                                   updated[idx] = {
                                     ...updated[idx],
-                                    designation: editLeadDesignation,
+                                    designation: editLeadDesignation as LeadershipConfig['designation'],
                                     condition: editLeadCondition,
                                     directVol: editLeadDirectVol,
                                     incentivePrice: editLeadIncentivePrice,
@@ -1196,7 +1224,7 @@ export default function AdminPanel({
                               </span>
                             </div>
                             {cfg.condition && (
-                              <p className="text-[10px] text-stone-600">Condition: <strong className="text-stone-850">{cfg.condition}</strong></p>
+                              <p className="text-[10px] text-stone-600">Condition: <strong className="text-stone-800">{cfg.condition}</strong></p>
                             )}
                             <p className="text-[10px] text-stone-600">Min Direct Vol: <strong className="text-stone-900">{(cfg.directVol || 0).toLocaleString()} sq yd</strong></p>
                             <p className="text-[9.5px] text-stone-500 leading-normal italic">Lineage: {cfg.rules}</p>
@@ -1238,8 +1266,8 @@ export default function AdminPanel({
 
                 {/* Inline Add Form */}
                 <div className="p-3 bg-stone-50/50 border border-dashed border-stone-200 rounded-xl space-y-2.5">
-                  <span className="text-[9.5px] font-bold text-stone-650 uppercase tracking-wide block font-sans">Add Custom Designation Config</span>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-[9.5px] font-bold text-stone-600 uppercase tracking-wide block font-sans">Add Custom Designation Config</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <input
                       type="text"
                       id="lead-rank"
@@ -1283,7 +1311,7 @@ export default function AdminPanel({
                         const updated = [
                           ...leadershipConfigs,
                           {
-                            designation: rankEl.value,
+                            designation: rankEl.value as LeadershipConfig['designation'],
                             condition: condEl ? condEl.value : '',
                             directVol: Number(volEl.value) || 0,
                             incentivePrice: Number(priceEl.value) || 0,
@@ -1320,7 +1348,7 @@ export default function AdminPanel({
                   {promotionalMilestones.map((m, idx) => (
                     <div key={idx}>
                       {editingMilestoneIdx === idx ? (
-                        <div className="bg-emerald-50/45 border border-emerald-250 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
+                        <div className="bg-emerald-50/45 border border-emerald-200 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
                           <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wide">Edit Milestone Config</span>
                           <div className="space-y-2">
                             <div>
@@ -1374,7 +1402,7 @@ export default function AdminPanel({
                       ) : (
                         <div className="flex justify-between items-start bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs gap-3">
                           <div className="font-sans">
-                            <strong className="text-stone-850 block">Condition: {m.condition}</strong>
+                            <strong className="text-stone-800 block">Condition: {m.condition}</strong>
                             <span className="text-emerald-800 font-semibold text-[11px] block mt-1">Reward Perks: {m.award}</span>
                           </div>
                           <div className="flex gap-1 shrink-0">
@@ -1464,9 +1492,9 @@ export default function AdminPanel({
                   {specialMonthlyOffers.map((o, idx) => (
                     <div key={idx}>
                       {editingOfferIdx === idx ? (
-                        <div className="bg-emerald-50/45 border border-emerald-250 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
+                        <div className="bg-emerald-50/45 border border-emerald-200 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
                           <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wide">Edit Special Offer Config</span>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                               <label className="text-[9px] font-bold text-stone-500 uppercase block mb-0.5 font-sans">Target Volume (sq yd)</label>
                               <input
@@ -1548,8 +1576,8 @@ export default function AdminPanel({
                       ) : (
                         <div className="flex justify-between items-start bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs gap-3 font-sans">
                           <div className="font-sans space-y-0.5">
-                            <strong className="text-stone-855 block text-stone-800">Target Volume: {o.volumeSqYds} SQ YD</strong>
-                            <p className="text-[10px] text-stone-550">Required Down Payment receipt: {o.paymentPercentage}%</p>
+                            <strong className="text-stone-800 block text-stone-800">Target Volume: {o.volumeSqYds} SQ YD</strong>
+                            <p className="text-[10px] text-stone-500">Required Down Payment receipt: {o.paymentPercentage}%</p>
                             {o.startDate && o.endDate ? (
                               <p className="text-[10px] font-medium text-amber-700 bg-amber-50/50 px-1.5 py-0.5 rounded inline-block">
                                 Campaign Phase: {o.startDate} to {o.endDate}
@@ -1684,7 +1712,7 @@ export default function AdminPanel({
                   {termsAndConditions.map((term, idx) => (
                     <div key={idx}>
                       {editingTermIdx === idx ? (
-                        <div className="bg-emerald-50/45 border border-emerald-250 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
+                        <div className="bg-emerald-50/45 border border-emerald-200 rounded-xl p-3 text-xs space-y-2 flex flex-col font-sans">
                           <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wide">Edit Compliance Rule</span>
                           <textarea
                             value={editTermText}
@@ -1788,7 +1816,7 @@ export default function AdminPanel({
       {/* 2. ONBOARD SPONSORS WITH DETAILED INFO */}
       {activeSubTab === 'AGENTS' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+          <div id="sbr-edit-detail" className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50">
               <h3 className="font-bold text-stone-900 flex items-center gap-2 text-sm uppercase tracking-wide">
                 <PlusCircle className="w-5 h-5 text-emerald-800" /> Register Strategic Sponsoring Partner (SBR Series)
@@ -1806,7 +1834,7 @@ export default function AdminPanel({
                   <Users className="w-4 h-4 text-emerald-800" /> Primary Broker Credentials
                 </h4>
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Full Representative Name</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Full Representative Name</label>
                   <input
                     type="text"
                     required
@@ -1818,7 +1846,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Email ID (Optional)</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Email ID (Optional)</label>
                   <input
                     type="email"
                     placeholder="anand@sbrpartners.in"
@@ -1829,7 +1857,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-555 uppercase tracking-widest block mb-1">Mobile Contact Phone</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Mobile Contact Phone</label>
                   <input
                     type="text"
                     required
@@ -1841,12 +1869,12 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-555 uppercase tracking-widest block mb-1">Direct Recruiter / Sponsor</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Direct Recruiter / Sponsor</label>
                   <select
                     required
                     value={newSponsor}
                     onChange={(e) => setNewSponsor(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 cursor-pointer focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 cursor-pointer focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                   >
                     <option value="" disabled>Select Sponsor</option>
                     {users
@@ -1867,7 +1895,7 @@ export default function AdminPanel({
                 </h4>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Date of Birth (DOB)</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Date of Birth (DOB)</label>
                   <input
                     type="date"
                     required
@@ -1878,7 +1906,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Aadhaar Card (12-Digit)</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Aadhaar Card (12-Digit)</label>
                   <input
                     type="text"
                     required
@@ -1890,7 +1918,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">PAN Card Number (10 Alphanumeric)</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">PAN Card Number (10 Alphanumeric)</label>
                   <input
                     type="text"
                     required
@@ -1902,7 +1930,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Father's / Husband's Name</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Father's / Husband's Name</label>
                   <input
                     type="text"
                     required
@@ -1914,13 +1942,13 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Residential Address</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Residential Address</label>
                   <textarea
                     rows={2}
                     placeholder="Flat 202, Heights Tower, Hyderabad 500032"
                     value={newAddress}
                     onChange={(e) => setNewAddress(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 outline-none resize-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 outline-none resize-none"
                   />
                 </div>
               </div>
@@ -1932,7 +1960,7 @@ export default function AdminPanel({
                 </h4>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Bank Account Number</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Bank Account Number</label>
                   <input
                     type="text"
                     placeholder="e.g. 50200012345678"
@@ -1943,7 +1971,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">IFSC Code</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">IFSC Code</label>
                   <input
                     type="text"
                     placeholder="e.g. HDFC0001234"
@@ -1954,7 +1982,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Branch Name</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Branch Name</label>
                   <input
                     type="text"
                     placeholder="e.g. Gachibowli, Hyderabad"
@@ -1965,7 +1993,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Nominee Name</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Nominee Name</label>
                   <input
                     type="text"
                     placeholder="e.g. Savita Satpute (Spouse)"
@@ -1976,7 +2004,7 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-stone-550 uppercase tracking-widest block mb-1">Nominee Relation</label>
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Nominee Relation</label>
                   <input
                     type="text"
                     placeholder="e.g. Spouse, Son, Mother"
@@ -2043,13 +2071,45 @@ export default function AdminPanel({
             </form>
           </div>
 
-          <TreeVisualizer 
-            users={users}
-            onSelectUser={(id) => setSelectedTreeUserId(id)}
-            selectedUserId={selectedTreeUserId}
-          />
+          {/* Sponsor Reference Code — admin's own onboarding ID, mirrors the AgentPanel card */}
+          {currentUserAgentId && (
+            <div id="sbr-sponsor-code" className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs scroll-mt-24">
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block font-sans">Sponsor Reference Code</span>
+              <p className="text-xs text-stone-500 mt-1.5 leading-relaxed font-sans">
+                Share this ID as the recruiting sponsor when onboarding new associates.
+              </p>
+              <div className="flex gap-2 mt-4 max-w-sm">
+                <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 flex-grow font-mono font-bold text-sm text-emerald-800 flex items-center select-all">
+                  {currentUserAgentId}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentUserAgentId);
+                    setCopiedUserId('__SELF_CODE__');
+                    setTimeout(() => setCopiedUserId(null), 2000);
+                  }}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
+                    copiedUserId === '__SELF_CODE__'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-white text-stone-800 border-stone-200 hover:bg-stone-50'
+                  }`}
+                >
+                  {copiedUserId === '__SELF_CODE__' ? 'Copied!' : 'Copy Code'}
+                </button>
+              </div>
+            </div>
+          )}
 
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+          <div id="sbr-tree-section" className="scroll-mt-24">
+            <TreeVisualizer
+              users={users}
+              onSelectUser={(id) => setSelectedTreeUserId(id)}
+              selectedUserId={selectedTreeUserId}
+            />
+          </div>
+
+          <div id="sbr-user-detail" className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24">
             <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex items-center justify-between flex-col md:flex-row gap-4">
               <div>
                 <h4 className="font-bold text-stone-900 text-xs uppercase font-sans">Live Sourcing Team Directory</h4>
@@ -2067,7 +2127,110 @@ export default function AdminPanel({
               </div>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
+            {/* Mobile: stacked partner cards (the 7-column table is unreadable <sm) */}
+            <div className="sm:hidden divide-y divide-stone-200">
+              {filteredAgents.map((agent) => (
+                <div key={agent.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-stone-900 text-sm truncate">{agent.name}</p>
+                      <p className="text-[10px] text-stone-500 mt-0.5 truncate">{agent.email ? `${agent.email} • ` : ''}{agent.phone}</p>
+                    </div>
+                    <span className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                      agent.status === 'ACTIVE'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-stone-100 text-stone-600 border-stone-200'
+                    }`}>
+                      {agent.status}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono font-bold text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">{agent.id}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-800 border border-stone-200">{agent.designation || 'Associate'}</span>
+                    {agent.sponsorId ? (
+                      <span className="text-[9px] font-mono bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded border border-stone-200">Spon: {agent.sponsorId}</span>
+                    ) : (
+                      <span className="text-[9px] text-amber-800 bg-amber-50 px-1.5 py-0.5 border border-amber-200 rounded">Independent Director</span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] bg-stone-50 border border-stone-200 rounded-lg p-2.5">
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Direct Sales</span>
+                      <span className="font-mono font-bold text-stone-900">{formatPoints(agent.totalDirectSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Downline</span>
+                      <span className="font-mono font-bold text-stone-900">{formatPoints(agent.totalDownlineSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Aadhaar</span>
+                      <span className="font-mono text-stone-600">{agent.aadhar || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 uppercase font-bold text-[8.5px] block">PAN</span>
+                      <span className="font-mono uppercase text-stone-600">{agent.pan || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions: full-width tap targets in a 2-col grid */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {!isRestrictedForCurrentUser(agent.id) ? (
+                      <>
+                        <button
+                          onClick={() => openCredentialsEditor(agent)}
+                          className="flex items-center justify-center gap-1 py-2 text-[11px] font-bold rounded-lg border border-stone-200 bg-white text-stone-700 active:bg-stone-100 cursor-pointer"
+                        >
+                          <Key className="w-3 h-3 text-stone-500" /> Credentials
+                        </button>
+                        <button
+                          onClick={() => { window.location.hash = `/profile/${agent.id}`; }}
+                          className="flex items-center justify-center gap-1 py-2 text-[11px] font-bold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 active:bg-emerald-100 cursor-pointer"
+                        >
+                          <Users className="w-3 h-3" /> Profile
+                        </button>
+                        <button
+                          onClick={() => copyInviteMessage(agent)}
+                          className={`flex items-center justify-center gap-1 py-2 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                            copiedUserId === agent.id
+                              ? 'bg-emerald-800 border-emerald-800 text-white'
+                              : 'bg-white border-stone-200 text-stone-700 active:bg-stone-100'
+                          }`}
+                        >
+                          <Share2 className="w-3 h-3" /> {copiedUserId === agent.id ? 'Copied ✓' : 'Invite'}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="flex items-center justify-center py-2 text-[11px] bg-stone-50 text-stone-400 font-bold rounded-lg border border-stone-200 select-none">
+                        🔒 Restricted
+                      </span>
+                    )}
+                    <button
+                      onClick={() => onToggleUserStatus(agent.id)}
+                      className={`flex items-center justify-center py-2 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                        agent.status === 'ACTIVE'
+                          ? 'bg-rose-50 border-rose-200 text-rose-800 active:bg-rose-100'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-800 active:bg-emerald-100'
+                      }`}
+                    >
+                      {agent.status === 'ACTIVE' ? 'Suspend' : 'Authorize'}
+                    </button>
+                    {!isAdminId(agent.id) && (
+                      <button
+                        onClick={() => confirmDeleteAgent(agent)}
+                        className="col-span-2 flex items-center justify-center py-2 text-[11px] font-bold rounded-lg bg-rose-600 border border-rose-700 text-white active:bg-rose-700 cursor-pointer"
+                      >
+                        Delete Sponsor
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
@@ -2080,7 +2243,7 @@ export default function AdminPanel({
                     <th className="px-5 py-3 text-right font-sans">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-150 text-stone-850">
+                <tbody className="divide-y divide-stone-200 text-stone-800">
                   {filteredAgents.map((agent) => (
                     <tr key={agent.id} className="hover:bg-stone-50/30 transition-colors">
                       <td className="px-5 py-3">
@@ -2089,7 +2252,7 @@ export default function AdminPanel({
                             <p className="font-bold text-stone-900 text-xs">{agent.name}</p>
                             <p className="text-[9.5px] text-stone-500 mt-0.5">{agent.email} • {agent.phone}</p>
                             <div className="flex gap-1.5 mt-1">
-                              <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-stone-100 text-stone-850 border border-stone-200">{agent.designation || 'Associate'}</span>
+                              <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-stone-100 text-stone-800 border border-stone-200">{agent.designation || 'Associate'}</span>
                             </div>
                           </div>
                         </div>
@@ -2109,7 +2272,7 @@ export default function AdminPanel({
                       <td className="px-5 py-3 text-stone-600 font-mono">{agent.aadhar || 'xxxx-xxxx-xxxx'}</td>
                       <td className="px-5 py-3 text-stone-600 uppercase font-mono">{agent.pan || 'XXXXXXXXXX'}</td>
                       <td className="px-5 py-3">
-                        <p className="font-bold text-stone-905 text-xs font-mono">{formatPoints(agent.totalDirectSales)}</p>
+                        <p className="font-bold text-stone-900 text-xs font-mono">{formatPoints(agent.totalDirectSales)}</p>
                         <p className="text-[9px] text-stone-500 mt-0.5 font-sans">Downline: {formatPoints(agent.totalDownlineSales)}</p>
                       </td>
                       <td className="px-5 py-3 text-right font-sans">
@@ -2117,42 +2280,21 @@ export default function AdminPanel({
                           {!isRestrictedForCurrentUser(agent.id) ? (
                             <>
                               <button
-                                onClick={() => {
-                                  setSelectedAgentForPassword(agent);
-                                  setEditName(agent.name || '');
-                                  setEditEmail(agent.email || '');
-                                  setEditPhone(agent.phone || '');
-                                  setEditDob(agent.dob || '');
-                                  setEditAadhar(agent.aadhar || '');
-                                  setEditPan(agent.pan || '');
-                                  setEditAddress(agent.address || '');
-                                  setEditFatherOrHusbandName(agent.fatherOrHusbandName || '');
-                                  setEditBankAccountNumber(agent.bankAccountNumber || '');
-                                  setEditIfscCode(agent.ifscCode || '');
-                                  setEditBranchName(agent.branchName || '');
-                                  setEditNominee(agent.nominee || '');
-                                  setEditNomineeRelation(agent.nomineeRelation || '');
-                                  const username = agent.id.toUpperCase();
-                                  let calculatedDefaultPass = '';
-                                  if (agent.dob) {
-                                    const parts = agent.dob.split('-');
-                                    if (parts.length === 3) {
-                                      const year = parts[0];
-                                      const month = parts[1];
-                                      const day = parts[2];
-                                      if (year.length === 4 && month.length === 2 && day.length === 2) {
-                                        calculatedDefaultPass = `${username}${day}${month}${year}`;
-                                      }
-                                    }
-                                  }
-                                  setTempPassword(getDisplayPasscode(agent.id, agent.password || '', calculatedDefaultPass));
-                                  setPasswordStatusMsg('');
-                                }}
+                                onClick={() => openCredentialsEditor(agent)}
                                 className="text-[10px] font-bold px-2.5 py-1 rounded border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all cursor-pointer flex items-center gap-1"
                                 title="Edit secure credentials"
                               >
                                 <Key className="w-2.5 h-2.5 text-stone-500" />
                                 <span>Credentials</span>
+                              </button>
+
+                              <button
+                                onClick={() => { window.location.hash = `/profile/${agent.id}`; }}
+                                className="text-[10px] font-bold px-2.5 py-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1"
+                                title="Open full partner profile"
+                              >
+                                <Users className="w-2.5 h-2.5" />
+                                <span>Profile</span>
                               </button>
 
                               {/* SMS button hidden until DLT registration is complete */}
@@ -2168,31 +2310,7 @@ export default function AdminPanel({
                               */}
 
                               <button
-                                onClick={() => {
-                                  const username = agent.id.toUpperCase();
-                                  let calculatedDefaultPass = '';
-                                  if (agent.dob) {
-                                    const parts = agent.dob.split('-');
-                                    if (parts.length === 3) {
-                                      const year = parts[0];
-                                      const month = parts[1];
-                                      const day = parts[2];
-                                      if (year.length === 4 && month.length === 2 && day.length === 2) {
-                                        calculatedDefaultPass = `${username}${day}${month}${year}`;
-                                      }
-                                    }
-                                  }
-                                  const inviteText = `*SBR Operations Portal Invite* 💼\n\n` +
-                                    `Hello *${agent.name}*,\n` +
-                                    `Your account has been onboarded to SBR Sponsors successfully!\n\n` +
-                                    `🔗 *SBR Portal Link:* ${window.location.origin}\n` +
-                                    `🆔 *Associate Sponsor ID:* ${agent.id}\n` +
-                                    `🔑 *Default Passcode:* ${getDisplayPasscode(agent.id, agent.password || '', calculatedDefaultPass)}\n\n` +
-                                    `Please log in using your Sponsor ID and password to manage sales, track downline networks, and view payouts.`;
-                                  navigator.clipboard.writeText(inviteText);
-                                  setCopiedUserId(agent.id);
-                                  setTimeout(() => setCopiedUserId(null), 2000);
-                                }}
+                                onClick={() => copyInviteMessage(agent)}
                                 className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-all cursor-pointer flex items-center gap-1 ${
                                   copiedUserId === agent.id
                                     ? 'bg-emerald-800 border-emerald-800 text-white'
@@ -2223,11 +2341,7 @@ export default function AdminPanel({
 
                           {!isAdminId(agent.id) && (
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to permanently delete sponsor ${agent.name} (${agent.id})? This will remove their user profile. Any immediate downlines will be reparented to their sponsor.`)) {
-                                  onDeleteUser?.(agent.id);
-                                }
-                              }}
+                              onClick={() => confirmDeleteAgent(agent)}
                               className="text-[10px] font-bold px-2.5 py-1 rounded bg-rose-600 border border-rose-700 text-white hover:bg-rose-700 transition-all cursor-pointer"
                               title="Permanently Delete Sponsor"
                             >
@@ -2250,7 +2364,7 @@ export default function AdminPanel({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
           <div className="lg:col-span-5 bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden h-fit">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50">
-              <h3 className="font-bold text-stone-90 restored-text-color flex items-center gap-2 text-sm uppercase tracking-wide">
+              <h3 className="font-bold text-stone-900 restored-text-color flex items-center gap-2 text-sm uppercase tracking-wide">
                 <Home className="w-5 h-5 text-emerald-800" /> Upload SBR Real Estate Project
               </h3>
               <p className="text-xs text-stone-500 mt-1">Add Name, Location, Starting Prices, and customize villa/plot dimensions.</p>
@@ -2281,7 +2395,7 @@ export default function AdminPanel({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Starting Price per Sq Yd</label>
                   <div className="relative">
@@ -2307,7 +2421,7 @@ export default function AdminPanel({
                       onChange={(e) => setProjMapUrl(e.target.value)}
                       className="flex-1 min-w-0 px-2 py-2 text-[11px] rounded-lg border border-stone-200 bg-white text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-700 font-mono"
                     />
-                    <label className="px-2.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-750 font-bold rounded-lg text-[10.5px] cursor-pointer border border-stone-250 shrink-0 transition-all flex items-center justify-center">
+                    <label className="px-2.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-lg text-[10.5px] cursor-pointer border border-stone-200 shrink-0 transition-all flex items-center justify-center">
                       Upload
                       <input
                         type="file"
@@ -2337,7 +2451,7 @@ export default function AdminPanel({
                   SBR Project Registration & Legal Metadata
                 </span>
                 
-                <div className="grid grid-cols-2 gap-3 bg-stone-50/50 p-3 rounded-xl border border-stone-150">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-stone-50/50 p-3 rounded-xl border border-stone-200">
                   <div>
                     <label className="text-[9px] font-bold text-stone-500 uppercase block mb-1">Project Stage</label>
                     <select
@@ -2499,7 +2613,7 @@ export default function AdminPanel({
               </div>
 
               {projSuccess && (
-                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-250 text-emerald-800 text-xs font-semibold">
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
                   {projSuccess}
                 </div>
               )}
@@ -2559,7 +2673,7 @@ export default function AdminPanel({
                     <div className="p-4 space-y-3">
                       <div>
                         <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-mono bg-emerald-55 border border-emerald-250 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-mono bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
                             {proj.id}
                           </span>
                           <span className="text-[10px] text-stone-500 font-mono font-semibold">{formatINR(proj.sqYardStartingPrice)} / Sq Yard</span>
@@ -2568,7 +2682,7 @@ export default function AdminPanel({
                         <p className="text-[10px] text-stone-500">{proj.location}</p>
                       </div>
 
-                      <div className="grid grid-cols-4 gap-1 text-center border-t border-stone-150 pt-3">
+                      <div className="grid grid-cols-4 gap-1 text-center border-t border-stone-200 pt-3">
                         <div className="bg-stone-50 p-1.5 rounded">
                           <p className="text-[11.5px] font-mono font-bold text-stone-800">{totalUnits}</p>
                           <p className="text-[8.5px] text-stone-500 uppercase mt-0.5">Total</p>
@@ -2588,7 +2702,7 @@ export default function AdminPanel({
                       </div>
 
                       {/* SBR Project Legal & Milestones Metadata details */}
-                      <div className="border-t border-stone-150 pt-2.5 space-y-2">
+                      <div className="border-t border-stone-200 pt-2.5 space-y-2">
                         <div className="flex items-center justify-between text-[10px]">
                           <span className="text-stone-500 font-medium">Project Stage:</span>
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
@@ -2604,7 +2718,7 @@ export default function AdminPanel({
                           </span>
                         </div>
 
-                        <div className="bg-stone-50/70 rounded-lg p-2 border border-stone-150/70 space-y-1 text-[10px]">
+                        <div className="bg-stone-50/70 rounded-lg p-2 border border-stone-200/70 space-y-1 text-[10px]">
                           <div className="flex justify-between items-center border-b border-stone-100 pb-1 mb-1">
                             <span className="font-bold text-stone-600 uppercase text-[8px] tracking-wider">Registry</span>
                             <span className={`px-1 rounded-sm text-[8px] font-bold ${
@@ -2614,13 +2728,13 @@ export default function AdminPanel({
                                 ? 'bg-amber-100 text-amber-800'
                                 : proj.registryStatus === 'On Hold'
                                 ? 'bg-rose-100 text-rose-800'
-                                : 'bg-stone-150 text-stone-600'
+                                : 'bg-stone-200 text-stone-600'
                             }`}>
                               {proj.registryStatus || 'Not Started'}
                             </span>
                           </div>
                           {(proj.registryDate || proj.sroOffice) ? (
-                            <div className="grid grid-cols-2 gap-1 text-[9px] text-stone-650">
+                            <div className="grid grid-cols-2 gap-1 text-[9px] text-stone-600">
                               {proj.registryDate && (
                                 <div>
                                   <span className="text-stone-400">Date:</span> <span className="font-mono font-semibold">{proj.registryDate}</span>
@@ -2628,7 +2742,7 @@ export default function AdminPanel({
                               )}
                               {proj.sroOffice && (
                                 <div className="text-right">
-                                  <span className="text-stone-400">SRO:</span> <span className="font-bold text-emerald-850">{proj.sroOffice}</span>
+                                  <span className="text-stone-400">SRO:</span> <span className="font-bold text-emerald-800">{proj.sroOffice}</span>
                                 </div>
                               )}
                             </div>
@@ -2637,7 +2751,7 @@ export default function AdminPanel({
                           )}
                         </div>
 
-                        <div className="bg-stone-50/70 rounded-lg p-2 border border-stone-150/70 space-y-1 text-[10px]">
+                        <div className="bg-stone-50/70 rounded-lg p-2 border border-stone-200/70 space-y-1 text-[10px]">
                           <div className="flex justify-between items-center border-b border-stone-100 pb-1 mb-1">
                             <span className="font-bold text-stone-600 uppercase text-[8px] tracking-wider">Mutation (Intakal)</span>
                             <span className={`px-1 rounded-sm text-[8px] font-bold ${
@@ -2647,13 +2761,13 @@ export default function AdminPanel({
                                 ? 'bg-amber-100 text-amber-800'
                                 : proj.mutationStatus === 'Rejected'
                                 ? 'bg-rose-100 text-rose-800'
-                                : 'bg-stone-150 text-stone-600'
+                                : 'bg-stone-200 text-stone-600'
                             }`}>
                               {proj.mutationStatus || 'Pending'}
                             </span>
                           </div>
                           {(proj.mutationDate || proj.mutationNumber) ? (
-                            <div className="grid grid-cols-2 gap-1 text-[9px] text-stone-655">
+                            <div className="grid grid-cols-2 gap-1 text-[9px] text-stone-600">
                               {proj.mutationDate && (
                                 <div>
                                   <span className="text-stone-400">Date:</span> <span className="font-mono font-semibold">{proj.mutationDate}</span>
@@ -2671,7 +2785,7 @@ export default function AdminPanel({
                         </div>
                       </div>
 
-                      <div className="border-t border-stone-150 pt-2 flex flex-col gap-1.5">
+                      <div className="border-t border-stone-200 pt-2 flex flex-col gap-1.5">
                         <button
                           type="button"
                           onClick={() => setEditingProject(proj)}
@@ -2698,7 +2812,7 @@ export default function AdminPanel({
                               {proj.inventory.flatMap(cat => 
                                 cat.units.map(u => ({ ...u, size: cat.size }))
                               ).map((u, ui) => (
-                                <div key={ui} className="flex justify-between items-center text-[10px] bg-white p-1.5 rounded border border-stone-150 shadow-xxs">
+                                <div key={ui} className="flex justify-between items-center text-[10px] bg-white p-1.5 rounded border border-stone-200 shadow-xxs">
                                   <div className="flex flex-col">
                                     <span className="font-bold text-stone-800">{u.unitNumber}</span>
                                     <span className="text-[8px] text-stone-500 font-medium font-sans">
@@ -2709,7 +2823,7 @@ export default function AdminPanel({
                                     u.status === 'BOOKED' 
                                       ? 'bg-rose-100 text-rose-800 border border-rose-200' 
                                       : u.status === 'HOLD'
-                                      ? 'bg-amber-100 text-amber-800 border border-amber-250'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                       : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                   }`}>
                                     {u.status}
@@ -2734,14 +2848,14 @@ export default function AdminPanel({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
           <div className="lg:col-span-6 bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden h-fit">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50">
-              <h3 className="font-bold text-stone-90 restored-text-color flex items-center gap-2 text-sm uppercase tracking-wide">
+              <h3 className="font-bold text-stone-900 restored-text-color flex items-center gap-2 text-sm uppercase tracking-wide">
                 <Layers className="w-5 h-5 text-emerald-800" /> Book Inventory & Allocate Overrides
               </h3>
               <p className="text-xs text-stone-500 mt-1">Admin registers a sales agreement. Compiles exact overrides and pays down lines instantly.</p>
             </div>
 
             <form onSubmit={handleBookInventorySubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 
                 <div>
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">1. Select SBR Project</label>
@@ -2814,11 +2928,11 @@ export default function AdminPanel({
                     3. Select available unit(s) (Multi-select)
                   </label>
                   {unitsToBook.length === 0 ? (
-                    <div className="text-xs text-stone-400 italic p-3 bg-stone-50 rounded-lg border border-stone-150">
+                    <div className="text-xs text-stone-400 italic p-3 bg-stone-50 rounded-lg border border-stone-200">
                       {bookProjId ? "No available units found for the selected size." : "Select a project first."}
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 bg-stone-550/5 border border-stone-200 rounded-lg">
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2.5 bg-stone-500/5 border border-stone-200 rounded-lg">
                       {unitsToBook.map((u) => {
                         const isSelected = selectedUnits.includes(u.unitNumber);
                         return (
@@ -2835,7 +2949,7 @@ export default function AdminPanel({
                             className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-800 text-white border-emerald-900 shadow-sm'
-                                : 'bg-white text-stone-750 border-stone-200 hover:bg-stone-100'
+                                : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
                             }`}
                           >
                             {u.unitNumber}
@@ -2846,7 +2960,7 @@ export default function AdminPanel({
                   )}
                   {selectedUnits.length > 0 && (
                     <div className="text-[10.5px] text-stone-600 font-sans mt-1.5">
-                      Selected ({selectedUnits.length}): <strong className="text-emerald-850">{selectedUnits.join(', ')}</strong>
+                      Selected ({selectedUnits.length}): <strong className="text-emerald-800">{selectedUnits.join(', ')}</strong>
                     </div>
                   )}
                 </div>
@@ -2889,7 +3003,7 @@ export default function AdminPanel({
                   <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider font-sans">👑 Admin-Only Booking Parameters</h4>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">Rate per Sq Yard (INR)</label>
                     <div className="relative">
@@ -2930,7 +3044,7 @@ export default function AdminPanel({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-1">Actual Sale Value (Points)</label>
                   <div className="relative">
@@ -2984,7 +3098,7 @@ export default function AdminPanel({
               </div>
 
               <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-3">
-                <label className="text-[10px] font-bold text-stone-550 uppercase block font-sans">Milestone Tracking Status</label>
+                <label className="text-[10px] font-bold text-stone-500 uppercase block font-sans">Milestone Tracking Status</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -3002,7 +3116,7 @@ export default function AdminPanel({
                     onClick={() => setBookingFormStatus('BOOKING_DONE')}
                     className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer text-center ${
                       bookingFormStatus === 'BOOKING_DONE'
-                        ? 'bg-blue-105 bg-opacity-80 text-blue-900 border-blue-300 shadow-xs'
+                        ? 'bg-blue-100 bg-opacity-80 text-blue-900 border-blue-300 shadow-xs'
                         : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
                     }`}
                   >
@@ -3040,14 +3154,14 @@ export default function AdminPanel({
               </div>
 
               {bookingSuccess && (
-                <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-850 text-xs font-semibold flex items-center gap-2">
+                <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-emerald-800 shrink-0" />
                   {bookingSuccess}
                 </div>
               )}
 
               {bookingError && (
-                <div className="p-3 rounded-lg bg-rose-50 border border-rose-250 text-rose-800 text-xs font-semibold">
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
                   {bookingError}
                 </div>
               )}
@@ -3061,7 +3175,7 @@ export default function AdminPanel({
             </form>
           </div>
 
-          <div className="lg:col-span-6 bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-xs">
+          <div id="sbr-inventory-section" className="lg:col-span-6 bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-xs scroll-mt-24">
             <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wide">Real Estate Inventory Table (Live status)</h3>
             <p className="text-xs text-stone-500">View real-time booking statuses of every SBR project unit categorized by size.</p>
 
@@ -3086,8 +3200,8 @@ export default function AdminPanel({
                               u.status === 'BOOKED'
                                 ? 'bg-rose-50 border-rose-200 text-rose-800'
                                 : u.status === 'HOLD'
-                                ? 'bg-amber-50 border-amber-200 text-amber-850'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-805'
+                                ? 'bg-amber-50 border-amber-200 text-amber-800'
+                                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
                             }`}
                           >
                             <span>{u.unitNumber}</span>
@@ -3119,7 +3233,99 @@ export default function AdminPanel({
             </div>
           </div>
 
-          <div className="overflow-x-auto custom-scrollbar">
+          {/* Mobile: one card per booking with the same controls as the table row */}
+          <div className="sm:hidden divide-y divide-stone-200">
+            {sales.map((sale) => (
+              <div key={sale.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-stone-900 text-sm truncate">{sale.project} · <span className="text-emerald-800">{sale.unitNumber}</span></p>
+                    <p className="text-[10px] text-stone-500 font-mono mt-0.5">{sale.id} · {sale.sizeSqYards} SQ YD</p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 text-[9px] uppercase font-bold rounded px-1.5 py-0.5 border shrink-0 ${
+                    sale.status === 'HOLD'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}>
+                    {sale.status === 'HOLD' ? 'HOLD' : 'CONFIRMED'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[10px] bg-stone-50 border border-stone-200 rounded-lg p-2.5">
+                  <div>
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Buyer</span>
+                    <span className="font-bold text-stone-800">{sale.buyerName}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Broker</span>
+                    <span className="font-bold text-stone-800">{sale.agentName}</span>
+                    <span className="font-mono text-stone-500 block text-[9px]">{sale.agentId}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Agreement Price</span>
+                    <span className="font-mono font-bold text-stone-900">{formatPoints(sale.saleValue)}</span>
+                  </div>
+                </div>
+
+                {renderPaymentProgress(sale)}
+                <button
+                  onClick={() => openPaymentsLedger(sale.id)}
+                  className="w-full py-2 text-[11px] font-bold text-emerald-800 bg-emerald-50 active:bg-emerald-100 border border-emerald-200 rounded-lg cursor-pointer"
+                >
+                  💳 Manage Payments ({getSalePayments(sale).length})
+                </button>
+
+                <div className="space-y-1.5">
+                  <select
+                    value={sale.bookingStatus || 'TOKEN_RECEIVED'}
+                    onChange={(e) => {
+                      if (onUpdateSaleBookingStatus) {
+                        const newStatus = e.target.value as 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE';
+                        const currentAmt = sale.tokenAmount !== undefined ? sale.tokenAmount : 75000;
+                        onUpdateSaleBookingStatus(sale.id, newStatus, currentAmt);
+                      }
+                    }}
+                    className={`w-full text-[11px] font-bold px-2 py-2 rounded-lg border focus:outline-none cursor-pointer ${
+                      sale.bookingStatus === 'REGISTRY_DONE'
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                        : sale.bookingStatus === 'BOOKING_DONE'
+                        ? 'bg-blue-50 text-blue-900 border-blue-200'
+                        : 'bg-amber-50 text-amber-900 border-amber-200'
+                    }`}
+                  >
+                    <option value="TOKEN_RECEIVED">Token Received</option>
+                    <option value="BOOKING_DONE">Booking Done (30% paid)</option>
+                    <option value="REGISTRY_DONE">Registry Done (100% paid)</option>
+                  </select>
+
+                  {(sale.bookingStatus || 'TOKEN_RECEIVED') === 'TOKEN_RECEIVED' ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-stone-500 whitespace-nowrap">Token Amt:</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={sale.tokenAmount !== undefined ? sale.tokenAmount : 75000}
+                        onChange={(e) => {
+                          if (onUpdateSaleBookingStatus && e.target.value !== '') {
+                            onUpdateSaleBookingStatus(sale.id, 'TOKEN_RECEIVED', parseFloat(e.target.value));
+                          }
+                        }}
+                        className="flex-1 px-2 py-1.5 text-[11px] font-mono font-bold bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                        title="Edit token amount in INR"
+                      />
+                      <span className="text-[9px] text-stone-500 font-bold">INR</span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-stone-500 italic">
+                      {sale.bookingStatus === 'REGISTRY_DONE' ? '100% fully paid' : '30% paid done'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
@@ -3128,13 +3334,14 @@ export default function AdminPanel({
                   <th className="px-5 py-3">Acquirer Representative</th>
                   <th className="px-5 py-3">Broker Sourced</th>
                   <th className="px-5 py-3">Size dimension</th>
-                  <th className="px-5 py-3 font-mono">Agreement Price</th>
+                  <th className="px-5 py-3 font-mono">Total Points</th>
+                  <th className="px-5 py-3 font-mono">Agreement Price (INR)</th>
                   <th className="px-5 py-3">Payment Health (INR)</th>
                   <th className="px-5 py-3">Allotment State</th>
                   <th className="px-5 py-3">Milestone Booking Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-150 text-stone-800">
+              <tbody className="divide-y divide-stone-200 text-stone-800">
                 {sales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-stone-50/30 transition-colors">
                     <td className="px-5 py-3.5 font-bold font-mono text-stone-900">{sale.id}</td>
@@ -3148,19 +3355,12 @@ export default function AdminPanel({
                       <p className="text-[9.5px] text-stone-500 mt-0.5 font-mono">{sale.agentId}</p>
                     </td>
                     <td className="px-5 py-3.5 text-stone-600 font-mono">{sale.sizeSqYards} SQ YD</td>
-                    <td className="px-5 py-3.5 font-bold text-stone-900 text-xs font-mono">{formatPoints(sale.saleValue)}</td>
+                    <td className="px-5 py-3.5 font-bold text-emerald-800 text-xs font-mono">{formatPoints(getSalePoints(sale))}</td>
+                    <td className="px-5 py-3.5 font-bold text-stone-900 text-xs font-mono">{formatINR(getSaleAgreementValueINR(sale))}</td>
                     <td className="px-5 py-3.5">
                       {renderPaymentProgress(sale)}
                       <button
-                        onClick={() => {
-                          setSelectedPaymentSaleId(sale.id);
-                          setPaymentFormId(null);
-                          setPaymentFormAmount('');
-                          setPaymentFormDate(new Date().toISOString().split('T')[0]);
-                          setPaymentFormMode('BANK_TRANSFER');
-                          setPaymentFormReference('');
-                          setPaymentFormNotes('');
-                        }}
+                        onClick={() => openPaymentsLedger(sale.id)}
                         className="mt-1.5 flex items-center gap-1 px-2.5 py-1 text-[10.5px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg cursor-pointer transition-all w-full justify-center shadow-2xs"
                       >
                         💳 Manage Payments ({getSalePayments(sale).length})
@@ -3169,8 +3369,8 @@ export default function AdminPanel({
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center gap-1 text-[10px] uppercase rounded px-1.5 py-0.5 border ${
                         sale.status === 'HOLD'
-                          ? 'bg-amber-50 text-amber-800 border-amber-205 py-0.5'
-                          : 'bg-emerald-50 text-emerald-800 border-emerald-205 py-0.5'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200 py-0.5'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200 py-0.5'
                       }`}>
                         <span className={`w-1 h-1 rounded-full ${sale.status === 'HOLD' ? 'bg-amber-600' : 'bg-emerald-600'}`} />
                         {sale.status === 'HOLD' ? 'HOLD' : 'CONFIRMED'}
@@ -3216,7 +3416,7 @@ export default function AdminPanel({
                                   );
                                 }
                               }}
-                              className="w-20 px-1 py-0.5 text-[10px] font-mono font-bold bg-white border border-stone-250 rounded focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                              className="w-20 px-1 py-0.5 text-[10px] font-mono font-bold bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-700"
                               title="Edit token amount in INR"
                             />
                             <span className="text-[9px] text-stone-500 font-bold font-sans">INR</span>
@@ -3236,40 +3436,9 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* 6. OPERATIONS & PAYOUTS AUDITING */}
+      {/* 6. OPERATIONS & PAYOUTS AUDITING — shared desk, also served at /payouts */}
       {activeSubTab === 'PAYOUTS' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Summary metrics cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block">Unprocessed Queue (Pending Approval)</span>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-amber-700 mt-1">
-                {formatPoints(payouts.filter(p => p.status === 'PENDING').reduce((acc, p) => acc + p.netCommission, 0))}
-              </h3>
-              <p className="text-[9.5px] text-stone-500 mt-2">
-                {payouts.filter(p => p.status === 'PENDING').length} commission transactions awaiting sanctioning
-              </p>
-            </div>
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block">Approved & Sanctioned (Awaiting bank release)</span>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-amber-900 mt-1">
-                {formatPoints(payouts.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + p.netCommission, 0))}
-              </h3>
-              <p className="text-[9.5px] text-stone-500 mt-2">
-                {payouts.filter(p => p.status === 'APPROVED').length} commission vouchers sanctioned for RTGS/NEFT
-              </p>
-            </div>
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block">Disbursed net bank transfers</span>
-              <h3 className="text-xl sm:text-2xl font-bold font-mono text-emerald-800 mt-1">
-                {formatPoints(payouts.filter(p => p.status === 'DISBURSED').reduce((acc, p) => acc + p.netCommission, 0))}
-              </h3>
-              <p className="text-[9.5px] text-stone-500 mt-2">
-                {payouts.filter(p => p.status === 'DISBURSED').length} transactions cleared & marked paid
-              </p>
-            </div>
-          </div>
-
+        <div id="sbr-payouts-section" className="space-y-6 animate-fade-in scroll-mt-24">
           <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center flex-col md:flex-row gap-4">
               <div>
@@ -3282,71 +3451,82 @@ export default function AdminPanel({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
-                    <th className="px-5 py-3">Payout ID</th>
-                    <th className="px-5 py-3">Beneficiary Sponsor</th>
-                    <th className="px-5 py-3 font-mono">Gross Calculated</th>
-                    <th className="px-5 py-3 font-mono">TDS Withheld (194H)</th>
-                    <th className="px-5 py-3 font-mono">Admin Retained</th>
-                    <th className="px-5 py-3 font-mono">Net Release</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Auditing Clearances</th>
+                    <th className="px-4 py-3">Payout / Sale ID</th>
+                    <th className="px-4 py-3">Payee Name / ID</th>
+                    <th className="px-4 py-3">Network Level</th>
+                    <th className="px-4 py-3 font-mono text-center">Comm %</th>
+                    <th className="px-4 py-3 font-mono">Gross Commission (₹)</th>
+                    <th className="px-4 py-3 font-mono">TDS 5% (₹)</th>
+                    <th className="px-4 py-3 font-mono">Flat Admin Fee (₹)</th>
+                    <th className="px-4 py-3 font-mono">Net Release (₹)</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Auditing Clearances</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-150 text-stone-800">
+                <tbody className="divide-y divide-stone-200 text-stone-800">
                   {payouts.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-10 text-center text-stone-400 font-medium font-sans">
+                      <td colSpan={10} className="px-5 py-10 text-center text-stone-400 font-medium font-sans">
                         No commission disbursements recorded yet. Create a plot booking first.
                       </td>
                     </tr>
                   ) : (
                     payouts.map((pay) => (
                       <tr key={pay.id} className="hover:bg-stone-50/30 transition-colors">
-                        <td className="px-5 py-3.5 font-bold font-mono text-stone-900">{pay.id}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-4 py-3.5">
+                          <p className="font-bold font-mono text-stone-900">{pay.id}</p>
+                          <p className="text-[9.5px] font-mono text-stone-500">{pay.saleId} ({pay.unitNumber})</p>
+                        </td>
+                        <td className="px-4 py-3.5">
                           <p className="font-bold text-stone-900">{pay.agentName}</p>
                           <p className="text-[9.5px] text-stone-500 mt-0.5 font-mono">{pay.agentId}</p>
                         </td>
-                        <td className="px-5 py-3.5 font-mono text-stone-600 font-bold">{formatPoints(pay.grossCommission)}</td>
-                        <td className="px-5 py-3.5 font-mono text-rose-600">-{formatPoints(pay.tdsDeduction)}</td>
-                        <td className="px-5 py-3.5 font-mono text-stone-500">-{formatPoints(pay.adminFee)}</td>
-                        <td className="px-5 py-3.5 font-bold text-stone-900 font-mono text-emerald-800">{formatPoints(pay.netCommission)}</td>
-                        <td className="px-5 py-3.5">
-                          <span className={`inline-flex items-center gap-1 text-[9.5px] font-bold uppercase rounded px-2 py-0.5 border ${
-                            pay.status === 'PENDING'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : pay.status === 'APPROVED'
-                              ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-205'
-                          }`}>
-                            <span className={`w-1 h-1 rounded-full ${
-                              pay.status === 'PENDING' ? 'bg-amber-600' : pay.status === 'APPROVED' ? 'bg-blue-600' : 'bg-emerald-600'
-                            }`} />
-                            {pay.status}
-                          </span>
+                        <td className="px-4 py-3.5 font-semibold text-stone-700">Level {pay.level}</td>
+                        <td className="px-4 py-3.5 font-mono text-center font-bold text-stone-700">{pay.percentage}%</td>
+                        <td className="px-4 py-3.5 font-mono text-stone-900 font-bold">{formatINR(pay.grossCommission)}</td>
+                        <td className="px-4 py-3.5 font-mono text-rose-600">-{formatINR(pay.tdsDeduction)}</td>
+                        <td className="px-4 py-3.5 font-mono text-stone-500">-{formatINR(pay.adminFee)}</td>
+                        <td className="px-4 py-3.5 font-bold text-emerald-800 font-mono text-sm">{formatINR(pay.netCommission)}</td>
+                        <td className="px-4 py-3.5">
+                          <select
+                            value={pay.status}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as 'PENDING' | 'APPROVED' | 'DISBURSED';
+                              if (onUpdatePayoutStatus) {
+                                onUpdatePayoutStatus(pay.id, newStatus);
+                              } else if (newStatus === 'APPROVED') {
+                                onApprovePayout(pay.id);
+                              } else if (newStatus === 'DISBURSED') {
+                                onDisbursePayout(pay.id);
+                              }
+                            }}
+                            className={`text-xs font-bold rounded-lg border px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-700 cursor-pointer shadow-2xs transition-all ${
+                              pay.status === 'PENDING'
+                                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                                : pay.status === 'APPROVED'
+                                ? 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
+                                : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <option value="PENDING" className="bg-white text-amber-900 font-bold">PENDING</option>
+                            <option value="APPROVED" className="bg-white text-blue-900 font-bold">APPROVED</option>
+                            <option value="DISBURSED" className="bg-white text-emerald-900 font-bold">DISBURSED</option>
+                          </select>
                         </td>
-                        <td className="px-5 py-3.5 text-right font-sans">
-                          {pay.status === 'PENDING' && (
-                            <button
-                              onClick={() => onApprovePayout(pay.id)}
-                              className="px-2.5 py-1 text-[10.5px] font-bold rounded bg-emerald-850 hover:bg-emerald-900 text-white transition-all cursor-pointer shadow-xs inline-flex items-center gap-1"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" /> Sanction Payout
-                            </button>
-                          )}
-                          {pay.status === 'APPROVED' && (
-                            <button
-                              onClick={() => onDisbursePayout(pay.id)}
-                              className="px-2.5 py-1 text-[10.5px] font-bold rounded bg-emerald-850 hover:bg-emerald-900 text-white transition-all cursor-pointer shadow-xs inline-flex items-center gap-1 animate-pulse"
-                            >
-                              <DollarSign className="w-3.5 h-3.5" /> Confirm Bank Dispatch
-                            </button>
-                          )}
-                          {pay.status === 'DISBURSED' && (
-                            <span className="text-[10px] text-emerald-700 font-bold block leading-relaxed font-sans">
-                              Cleared RTGS transfer
-                            </span>
-                          )}
+                        <td className="px-4 py-3.5 text-right font-sans">
+                          <span className={`text-[11px] font-bold ${
+                            pay.status === 'PENDING' 
+                              ? 'text-amber-700' 
+                              : pay.status === 'APPROVED' 
+                              ? 'text-blue-700' 
+                              : 'text-emerald-700 font-mono'
+                          }`}>
+                            {pay.status === 'PENDING' 
+                              ? 'Awaiting Sanction' 
+                              : pay.status === 'APPROVED' 
+                              ? 'Sanctioned for RTGS' 
+                              : 'Cleared Bank Transfer'}
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -3364,7 +3544,7 @@ export default function AdminPanel({
           {/* Summary metrics cards for logs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block">Total Recorded Lifecycle Events</span>
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Total Recorded Lifecycle Events</span>
               <h3 className="text-xl sm:text-2xl font-bold font-mono text-emerald-800 mt-1">
                 {userLogs.length}
               </h3>
@@ -3373,7 +3553,7 @@ export default function AdminPanel({
               </p>
             </div>
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block font-sans text-green-700">Total User Additions</span>
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block font-sans text-green-700">Total User Additions</span>
               <h3 className="text-xl sm:text-2xl font-bold font-mono text-green-800 mt-1">
                 {userLogs.filter(l => l.action === 'ADDITION').length}
               </h3>
@@ -3382,7 +3562,7 @@ export default function AdminPanel({
               </p>
             </div>
             <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-              <span className="text-[10px] font-bold text-stone-550 uppercase tracking-wider block font-sans text-rose-700">Total User Deletions</span>
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block font-sans text-rose-700">Total User Deletions</span>
               <h3 className="text-xl sm:text-2xl font-bold font-mono text-rose-800 mt-1">
                 {userLogs.filter(l => l.action === 'DELETION').length}
               </h3>
@@ -3403,13 +3583,46 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={handleExportLogsCSV}
-                className="px-3.5 py-1.5 bg-emerald-850 hover:bg-emerald-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all font-sans uppercase tracking-wider"
+                className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all font-sans uppercase tracking-wider"
               >
                 <Download className="w-3.5 h-3.5" /> Export Logs to CSV
               </button>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
+            {/* Mobile: compact log entries */}
+            <div className="sm:hidden divide-y divide-stone-200">
+              {userLogs.length === 0 ? (
+                <p className="px-5 py-10 text-center text-stone-400 text-xs font-medium">
+                  No user lifecycle activities have been logged yet today.
+                </p>
+              ) : (
+                userLogs.map((log) => (
+                  <div key={log.id} className="p-4 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1 text-[9px] font-extrabold uppercase rounded-full px-2 py-0.5 border ${
+                        log.action === 'ADDITION'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {log.action}
+                      </span>
+                      <span className="font-mono text-[9.5px] text-stone-400">
+                        {new Date(log.timestamp).toLocaleString('en-IN', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-stone-900">
+                      {log.userName} <span className="font-mono font-normal text-stone-500">({log.userId})</span>
+                    </p>
+                    <p className="text-[10px] text-stone-500">
+                      Sponsor: <span className="font-mono">{log.sponsorId || '—'}</span> · By {log.performedBy}
+                    </p>
+                    <p className="text-[10.5px] text-stone-600 leading-snug">{log.details}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="hidden sm:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500 tracking-wider">
@@ -3422,7 +3635,7 @@ export default function AdminPanel({
                     <th className="px-5 py-3">System Log Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-150 text-stone-800 font-sans">
+                <tbody className="divide-y divide-stone-200 text-stone-800 font-sans">
                   {userLogs.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-5 py-10 text-center text-stone-400 font-medium font-sans">
@@ -3442,7 +3655,7 @@ export default function AdminPanel({
                       });
                       return (
                         <tr key={log.id} className="hover:bg-stone-50/30 transition-colors">
-                          <td className="px-5 py-3.5 font-mono text-stone-550 whitespace-nowrap text-[11px]">{formattedTime}</td>
+                          <td className="px-5 py-3.5 font-mono text-stone-500 whitespace-nowrap text-[11px]">{formattedTime}</td>
                           <td className="px-5 py-3.5">
                             <span className={`inline-flex items-center gap-1 text-[9px] font-extrabold uppercase rounded-full px-2.5 py-0.5 border ${
                               log.action === 'ADDITION'
@@ -3456,8 +3669,8 @@ export default function AdminPanel({
                             </span>
                           </td>
                           <td className="px-5 py-3.5 font-mono font-bold text-stone-900 text-[11px]">{log.userId}</td>
-                          <td className="px-5 py-3.5 font-bold text-stone-850">{log.userName}</td>
-                          <td className="px-5 py-3.5 font-mono text-stone-550 text-[11px]">{log.sponsorId}</td>
+                          <td className="px-5 py-3.5 font-bold text-stone-800">{log.userName}</td>
+                          <td className="px-5 py-3.5 font-mono text-stone-500 text-[11px]">{log.sponsorId}</td>
                           <td className="px-5 py-3.5 text-stone-700 font-medium whitespace-nowrap">{log.performedBy}</td>
                           <td className="px-5 py-3.5 text-stone-600 leading-relaxed text-[11px] max-w-[320px] truncate" title={log.details}>
                             {log.details}
@@ -3494,7 +3707,7 @@ export default function AdminPanel({
                     💳 Payment Installments & Ledger
                   </h4>
                   <p className="text-[11px] text-stone-500 mt-0.5 font-sans">
-                    Manage payment installments, check transaction status, and add new payment events for Booking ID: <span className="font-mono font-bold text-stone-850">{sale.id}</span>
+                    Manage payment installments, check transaction status, and add new payment events for Booking ID: <span className="font-mono font-bold text-stone-800">{sale.id}</span>
                   </p>
                 </div>
                 <button
@@ -3525,14 +3738,14 @@ export default function AdminPanel({
                     <p className="text-[10px] text-stone-500 font-mono">ID: {sale.agentId}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Agreement Price (PTS)</p>
-                    <p className="font-extrabold text-stone-900 font-mono text-sm">{formatPoints(sale.saleValue)}</p>
-                    <p className="text-[9.5px] text-stone-400 uppercase tracking-widest font-mono">({sale.sizeSqYards} SQ YD)</p>
+                    <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mb-0.5 font-sans">Points (From Size)</p>
+                    <p className="font-extrabold text-emerald-800 font-mono text-sm">{formatPoints(getSalePoints(sale))}</p>
+                    <p className="text-[10px] text-stone-600 font-mono font-bold mt-0.5">{formatINR(getSaleAgreementValueINR(sale))} ({sale.sizeSqYards} SQ YD)</p>
                   </div>
                 </div>
 
                 {/* Overall Financial Progress Card */}
-                <div className="bg-emerald-50/10 border border-emerald-250 p-4 rounded-xl space-y-3">
+                <div className="bg-emerald-50/10 border border-emerald-200 p-4 rounded-xl space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wide">
                       Installment Progress Tracker
@@ -3546,7 +3759,7 @@ export default function AdminPanel({
                     <div 
                       className={`h-full transition-all duration-500 ${
                         pct >= 100 
-                          ? 'bg-emerald-650' 
+                          ? 'bg-emerald-600' 
                           : pct >= 30 
                           ? 'bg-blue-600' 
                           : 'bg-amber-600'
@@ -3590,7 +3803,7 @@ export default function AdminPanel({
                             <th className="px-3 py-2 text-right">Action</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-stone-150">
+                        <tbody className="divide-y divide-stone-200">
                           {payments.map((p) => (
                             <tr key={p.id} className="hover:bg-stone-50/50">
                               <td className="px-3 py-2.5 font-mono text-stone-500 text-[11px] whitespace-nowrap">
@@ -3631,7 +3844,7 @@ export default function AdminPanel({
                                           handleDeletePayment(p.id);
                                         }
                                       }}
-                                      className="text-rose-750 hover:text-rose-900 font-bold text-[10.5px] cursor-pointer"
+                                      className="text-rose-700 hover:text-rose-900 font-bold text-[10.5px] cursor-pointer"
                                     >
                                       Delete
                                     </button>
@@ -3891,7 +4104,7 @@ export default function AdminPanel({
                 <button
                   type="button"
                   onClick={() => setEditingProject(null)}
-                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-55 text-stone-750 text-xs font-bold rounded-lg cursor-pointer transition-all"
+                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold rounded-lg cursor-pointer transition-all"
                 >
                   Cancel
                 </button>
@@ -3941,7 +4154,7 @@ export default function AdminPanel({
                   <button
                     type="button"
                     onClick={() => setSelectedAgentForPassword(null)}
-                    className="mt-4 w-full py-1.5 bg-white border border-stone-200 text-stone-700 hover:bg-stone-55 text-xs font-bold rounded-lg cursor-pointer"
+                    className="mt-4 w-full py-1.5 bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 text-xs font-bold rounded-lg cursor-pointer"
                   >
                     Close
                   </button>
@@ -3955,7 +4168,7 @@ export default function AdminPanel({
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="Enter full name"
                       />
                     </div>
@@ -3966,7 +4179,7 @@ export default function AdminPanel({
                         type="email"
                         value={editEmail}
                         onChange={(e) => setEditEmail(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="name@email.com"
                       />
                     </div>
@@ -3977,7 +4190,7 @@ export default function AdminPanel({
                         type="tel"
                         value={editPhone}
                         onChange={(e) => setEditPhone(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="Enter phone number"
                       />
                     </div>
@@ -3988,7 +4201,7 @@ export default function AdminPanel({
                         type="date"
                         value={editDob}
                         onChange={(e) => setEditDob(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                       />
                     </div>
 
@@ -3998,7 +4211,7 @@ export default function AdminPanel({
                         type="text"
                         value={editPan}
                         onChange={(e) => setEditPan(e.target.value.toUpperCase())}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
                         placeholder="ABCDE1234F"
                       />
                     </div>
@@ -4009,7 +4222,7 @@ export default function AdminPanel({
                         type="text"
                         value={editFatherOrHusbandName}
                         onChange={(e) => setEditFatherOrHusbandName(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="Father's or Husband's Name"
                       />
                     </div>
@@ -4020,7 +4233,7 @@ export default function AdminPanel({
                         type="text"
                         value={editAadhar}
                         onChange={(e) => setEditAadhar(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
                         placeholder="12-digit Aadhaar"
                       />
                     </div>
@@ -4031,12 +4244,12 @@ export default function AdminPanel({
                         rows={2}
                         value={editAddress}
                         onChange={(e) => setEditAddress(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none resize-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none resize-none"
                         placeholder="Enter residential address"
                       />
                     </div>
 
-                    <div className="sm:col-span-2 border-t border-stone-150 pt-2.5 mt-1">
+                    <div className="sm:col-span-2 border-t border-stone-200 pt-2.5 mt-1">
                       <h5 className="font-bold text-stone-700 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                         <CreditCard className="w-3.5 h-3.5 text-emerald-800" /> Bank Account Details (Commission)
                       </h5>
@@ -4048,7 +4261,7 @@ export default function AdminPanel({
                         type="text"
                         value={editBankAccountNumber}
                         onChange={(e) => setEditBankAccountNumber(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
                         placeholder="Enter account number"
                       />
                     </div>
@@ -4059,7 +4272,7 @@ export default function AdminPanel({
                         type="text"
                         value={editIfscCode}
                         onChange={(e) => setEditIfscCode(e.target.value.toUpperCase())}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono uppercase"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono uppercase"
                         placeholder="IFSC Code"
                       />
                     </div>
@@ -4070,7 +4283,7 @@ export default function AdminPanel({
                         type="text"
                         value={editBranchName}
                         onChange={(e) => setEditBranchName(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="Enter branch name"
                       />
                     </div>
@@ -4081,7 +4294,7 @@ export default function AdminPanel({
                         type="text"
                         value={editNominee}
                         onChange={(e) => setEditNominee(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="Nominee name"
                       />
                     </div>
@@ -4092,7 +4305,7 @@ export default function AdminPanel({
                         type="text"
                         value={editNomineeRelation}
                         onChange={(e) => setEditNomineeRelation(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
                         placeholder="Nominee relation"
                       />
                     </div>
@@ -4104,13 +4317,13 @@ export default function AdminPanel({
                         placeholder="Enter secure passcode"
                         value={tempPassword}
                         onChange={(e) => setTempPassword(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-850 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white text-stone-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none font-mono"
                       />
                     </div>
                   </div>
 
                   {passwordStatusMsg && (
-                    <p className="text-[10.5px] font-semibold text-emerald-850 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center animate-pulse font-sans">
+                    <p className="text-[10.5px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center animate-pulse font-sans">
                       {passwordStatusMsg}
                     </p>
                   )}
@@ -4206,14 +4419,14 @@ export default function AdminPanel({
             <div className="p-5 space-y-4 font-sans">
               
               {/* Recipient Details Card */}
-              <div className="grid grid-cols-2 gap-3 bg-stone-50 p-3.5 rounded-xl border border-stone-150 text-[11px]">
+              <div className="grid grid-cols-2 gap-3 bg-stone-50 p-3.5 rounded-xl border border-stone-200 text-[11px]">
                 <div>
-                  <p className="text-[8.5px] font-bold text-stone-450 uppercase tracking-widest">Recipient Partner</p>
+                  <p className="text-[8.5px] font-bold text-stone-400 uppercase tracking-widest">Recipient Partner</p>
                   <p className="font-bold text-stone-900 mt-0.5">{selectedAgentForSMS.name}</p>
                   <p className="text-stone-500 text-[10px]">{selectedAgentForSMS.designation || 'Associate'}</p>
                 </div>
                 <div>
-                  <p className="text-[8.5px] font-bold text-stone-450 uppercase tracking-widest">Mobile Number</p>
+                  <p className="text-[8.5px] font-bold text-stone-400 uppercase tracking-widest">Mobile Number</p>
                   <p className="font-bold text-stone-900 mt-0.5 font-mono">{selectedAgentForSMS.phone}</p>
                   <p className="text-stone-500 text-[10px]">{selectedAgentForSMS.email}</p>
                 </div>
@@ -4228,7 +4441,7 @@ export default function AdminPanel({
                   rows={5}
                   value={smsMessageText}
                   onChange={(e) => setSmsMessageText(e.target.value)}
-                  className="w-full px-3 py-2 text-[11.5px] rounded-lg border border-stone-200 bg-white text-stone-850 outline-none focus:ring-1 focus:ring-emerald-700 font-sans leading-relaxed custom-scrollbar"
+                  className="w-full px-3 py-2 text-[11.5px] rounded-lg border border-stone-200 bg-white text-stone-800 outline-none focus:ring-1 focus:ring-emerald-700 font-sans leading-relaxed custom-scrollbar"
                   placeholder="Type your message credentials..."
                 />
               </div>
@@ -4362,7 +4575,7 @@ export default function AdminPanel({
               </div>
 
               {/* Footer Dismiss Button */}
-              <div className="pt-2 border-t border-stone-150 flex justify-end">
+              <div className="pt-2 border-t border-stone-200 flex justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -4385,17 +4598,17 @@ export default function AdminPanel({
         <div className="fixed inset-0 bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
           <div className="bg-stone-900 text-stone-100 rounded-2xl max-w-4xl w-full border border-stone-800 shadow-2xl overflow-hidden flex flex-col h-[85vh]">
             {/* Header */}
-            <div className="bg-stone-950 p-4 border-b border-stone-850 flex items-center justify-between">
+            <div className="bg-stone-950 p-4 border-b border-stone-800 flex items-center justify-between">
               <div>
                 <h4 className="font-extrabold text-xs text-white uppercase tracking-wider">Project Layout Map Zoom</h4>
                 <p className="text-[10px] text-stone-400 mt-0.5">{zoomedMap.title}</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="bg-stone-850 px-2.5 py-1 rounded-lg flex items-center gap-2 border border-stone-750">
+                <div className="bg-stone-800 px-2.5 py-1 rounded-lg flex items-center gap-2 border border-stone-700">
                   <button 
                     type="button"
                     onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
-                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    className="p-1 hover:bg-stone-700 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
                     title="Zoom Out"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
@@ -4406,7 +4619,7 @@ export default function AdminPanel({
                   <button 
                     type="button"
                     onClick={() => setZoomScale(prev => Math.min(4, prev + 0.25))}
-                    className="p-1 hover:bg-stone-750 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
+                    className="p-1 hover:bg-stone-700 rounded text-stone-300 hover:text-white transition-all cursor-pointer"
                     title="Zoom In"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
@@ -4414,7 +4627,7 @@ export default function AdminPanel({
                   <button 
                     type="button"
                     onClick={() => setZoomScale(1)}
-                    className="px-1.5 py-0.5 bg-stone-750 hover:bg-stone-700 rounded text-[9px] font-bold text-stone-300 cursor-pointer"
+                    className="px-1.5 py-0.5 bg-stone-700 hover:bg-stone-700 rounded text-[9px] font-bold text-stone-300 cursor-pointer"
                   >
                     Reset
                   </button>
@@ -4425,7 +4638,7 @@ export default function AdminPanel({
                     setZoomedMap(null);
                     setZoomScale(1);
                   }}
-                  className="p-1.5 bg-stone-850 hover:bg-rose-950 hover:text-rose-400 border border-stone-750 rounded-lg text-stone-300 transition-all cursor-pointer text-xs"
+                  className="p-1.5 bg-stone-800 hover:bg-rose-950 hover:text-rose-400 border border-stone-700 rounded-lg text-stone-300 transition-all cursor-pointer text-xs"
                 >
                   ✕ Close
                 </button>
@@ -4448,7 +4661,7 @@ export default function AdminPanel({
             </div>
 
             {/* Instruction Footer */}
-            <div className="bg-stone-950 p-2 text-center text-[9px] text-stone-550 border-t border-stone-850">
+            <div className="bg-stone-950 p-2 text-center text-[9px] text-stone-500 border-t border-stone-800">
               Use the + and - buttons to adjust map scale. Drag or scroll to navigate large project layouts.
             </div>
           </div>
