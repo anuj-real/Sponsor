@@ -26,6 +26,19 @@ type BookingFilter = 'ALL' | 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE'
 const formatPoints = (val: number) => `${Math.round(val || 0).toLocaleString()}`;
 const formatINR = (val: number) => `₹${Math.round(val || 0).toLocaleString('en-IN')}`;
 
+<<<<<<< HEAD
+=======
+/**
+ * `sizeSqYards` is stored inconsistently — '100' when seeded, but '100 Sq Yards'
+ * when written by the booking form (AdminPanel appends the unit). Strip to the
+ * number and apply exactly one unit, mirroring what points.ts does for the math.
+ */
+const formatPlotSize = (raw?: string) => {
+  const n = parseFloat(String(raw ?? '').replace(/[^\d.]/g, '')) || 0;
+  return n > 0 ? `${n} sq yd` : '—';
+};
+
+>>>>>>> ui/edit
 /** Mirrors AdminPanel: a bare tokenAmount counts as the first receipt. */
 function getSalePayments(s: Sale): PaymentRecord[] {
   if (s.payments && s.payments.length > 0) return s.payments;
@@ -55,7 +68,11 @@ const bookingChipClasses = (status?: string) =>
     : 'bg-amber-50 text-amber-800 border-amber-200';
 
 /**
+<<<<<<< HEAD
  * Shared cell padding — tight enough that ~8 columns fit a phone scroll.
+=======
+ * Shared cell padding — tight enough that several columns fit a phone scroll.
+>>>>>>> ui/edit
  * Row separators live on the cells, not on <tr>: the table uses
  * `border-separate`, where row-level borders are not rendered at all.
  */
@@ -83,12 +100,19 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
       return {
         sale,
         unitNumber: sale.unitNumber || '—',
+<<<<<<< HEAD
         plotSize: sale.sizeSqYards ? `${sale.sizeSqYards} sq yd` : '—',
+=======
+        plotSize: formatPlotSize(sale.sizeSqYards),
+>>>>>>> ui/edit
         points: getSalePoints(sale),
         agreement,
         paid,
         due: Math.max(0, agreement - paid),
+<<<<<<< HEAD
         paidPct: agreement > 0 ? (paid / agreement) * 100 : 0,
+=======
+>>>>>>> ui/edit
         date: sale.saleDate || '—',
         buyer: sale.buyerName || '—',
         userId: sale.agentId || '—',
@@ -104,6 +128,7 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
     });
   }, [sales, users]);
 
+<<<<<<< HEAD
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter(r => {
@@ -113,12 +138,32 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
         .some(v => String(v).toLowerCase().includes(q));
     });
   }, [rows, query, bookingFilter]);
+=======
+  /**
+   * Query-only view. Chip counts must honour the search but NOT the milestone
+   * filter — otherwise every unselected chip would read 0.
+   */
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(r =>
+      [r.unitNumber, r.buyer, r.userId, r.userName, r.refId, r.refName, r.refNo, r.bookingId, r.project]
+        .some(v => String(v).toLowerCase().includes(q)));
+  }, [rows, query]);
+
+  const filtered = useMemo(
+    () => (bookingFilter === 'ALL' ? searched : searched.filter(r => r.bookingStatus === bookingFilter)),
+    [searched, bookingFilter]);
+>>>>>>> ui/edit
 
   const totals = useMemo(() => ({
     count: filtered.length,
     points: filtered.reduce((a, r) => a + r.points, 0),
     agreement: filtered.reduce((a, r) => a + r.agreement, 0),
+<<<<<<< HEAD
     paid: filtered.reduce((a, r) => a + r.paid, 0),
+=======
+>>>>>>> ui/edit
   }), [filtered]);
 
   const exportCSV = () => {
@@ -159,7 +204,11 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
             onClick={exportCSV}
             className="shrink-0 flex items-center gap-1.5 px-2.5 py-2 text-[11px] font-bold rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white cursor-pointer shadow-xs"
           >
+<<<<<<< HEAD
             <Download className="w-3.5 h-3.5" /> <span className="hidden xs:inline sm:inline">CSV</span>
+=======
+            <Download className="w-3.5 h-3.5" /> CSV
+>>>>>>> ui/edit
           </button>
         </div>
 
@@ -175,7 +224,11 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
             />
           </div>
 
+<<<<<<< HEAD
           {/* Booking-milestone filter */}
+=======
+          {/* Booking-milestone filter. Counts reflect the search, not the filter. */}
+>>>>>>> ui/edit
           <div className="flex gap-1 overflow-x-auto custom-scrollbar -mx-1 px-1">
             {([
               { key: 'ALL' as const, label: 'All' },
@@ -183,7 +236,13 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
               { key: 'BOOKING_DONE' as const, label: 'Booking' },
               { key: 'REGISTRY_DONE' as const, label: 'Registry' },
             ]).map(({ key, label }) => {
+<<<<<<< HEAD
               const count = key === 'ALL' ? rows.length : rows.filter(r => r.bookingStatus === key).length;
+=======
+              const count = key === 'ALL'
+                ? searched.length
+                : searched.filter(r => r.bookingStatus === key).length;
+>>>>>>> ui/edit
               return (
                 <button
                   key={key}
@@ -217,6 +276,7 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* The grid. Scrolls both axes; header row and first column stay pinned. */}
       <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-auto max-h-[68vh] custom-scrollbar">
@@ -228,12 +288,30 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
               <tr className="bg-stone-50 text-[9px] uppercase font-bold text-stone-500 tracking-wider">
                 {/* z-30: must sit above both the sticky header row and sticky column */}
                 <th className={`${CELL} sticky left-0 top-0 z-30 bg-stone-50 border-r border-b border-stone-200`}>
+=======
+      {/* The grid. Scrolls both axes; header row and first column stay pinned.
+          The scroll container is `relative` + isolate so the sticky cells layer
+          against each other and never against the app's sticky page header. */}
+      <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
+        <div className="relative isolate overflow-auto max-h-[68vh] custom-scrollbar">
+          {/* border-separate (not -collapse): with collapsed borders the browser
+              owns the border box, so borders on sticky cells scroll away. */}
+          <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
+            <thead>
+              <tr className="bg-stone-50 text-[9px] uppercase font-bold text-stone-500 tracking-wider">
+                {/* Corner cell must outrank both the sticky row and sticky column */}
+                <th className={`${CELL} sticky left-0 top-0 z-30 bg-stone-50 border-r border-stone-200`}>
+>>>>>>> ui/edit
                   Unit No.
                 </th>
                 {['Plot Size', 'Points', 'Plot Value', 'Paid', 'Due', 'Date', 'Buyer', 'User ID',
                   'User Name', 'Ref. ID', 'Ref. Name', 'Ref. No.', 'Booking Status', 'Allotment', 'Project', 'Booking ID',
                 ].map(h => (
+<<<<<<< HEAD
                   <th key={h} className={`${CELL} sticky top-0 z-20 bg-stone-50 border-b border-stone-200`}>{h}</th>
+=======
+                  <th key={h} className={`${CELL} sticky top-0 z-20 bg-stone-50`}>{h}</th>
+>>>>>>> ui/edit
                 ))}
               </tr>
             </thead>
@@ -247,8 +325,13 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
                   </td>
                 </tr>
               ) : (
+<<<<<<< HEAD
                 // Row hover is solid (not /60) so it matches the pinned cell,
                 // which must be fully opaque to hide content scrolling under it.
+=======
+                // Row hover is solid (not translucent) so it matches the pinned
+                // cell, which must be fully opaque to hide content scrolling under it.
+>>>>>>> ui/edit
                 filtered.map(r => (
                   <tr key={r.bookingId} className="group hover:bg-stone-50">
                     <td className={`${STICKY_CELL} font-bold text-stone-900 group-hover:bg-stone-50`}>
@@ -293,7 +376,11 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
       </div>
 
       <p className="text-[10px] text-stone-400 px-1">
+<<<<<<< HEAD
         Unit column stays pinned while you scroll sideways. Values in points and INR are derived from
+=======
+        Unit column stays pinned while you scroll sideways. Points and INR are derived from
+>>>>>>> ui/edit
         plot size × units × rate — editing happens in the Admin → Sales tab.
       </p>
     </div>
