@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
+// first commit for V2
 import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
   INITIAL_MLM_CONFIG, 
