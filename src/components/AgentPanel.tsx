@@ -3,7 +3,6 @@ import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProjec
 import { getSalePoints, getSaleAgreementValueINR } from '../lib/points';
 import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
-import TreeVisualizer from './TreeVisualizer';
 
 interface AgentPanelProps {
   users: User[];
@@ -306,10 +305,8 @@ export default function AgentPanel({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Statistics Left */}
         <div className="lg:col-span-2 space-y-6">
-          {/* SBR Referral Organigram for Associate Downline */}
-          <div id="sbr-tree-section" className="scroll-mt-24">
-            <TreeVisualizer users={[agent, ...downlineNetwork.map(item => item.user)]} />
-          </div>
+          {/* The org chart moved to its own /team page, so it is not repeated
+              here — nav "Team" opens it. */}
 
           {/* Designation Progress Multi-bar Component */}
           <DesignationProgress 

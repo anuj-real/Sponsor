@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 // first commit for V2
 import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
@@ -58,7 +58,8 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
-  { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
+  // Team gets its own page — the chart alone, no dashboard chrome around it.
+  { key: 'TEAM', label: 'Team', icon: Users, route: '/team' },
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
   // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
   // same reasoning as /profile: the dashboard is too long on mobile.
@@ -163,6 +164,7 @@ export default function App() {
         : next.startsWith('/profile') ? 'PROFILE'
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
+        : next.startsWith('/team') ? 'TEAM'
         : 'HOME'
       );
     };
@@ -182,10 +184,43 @@ export default function App() {
   };
 
   /**
-   * The profile pages are deliberately chrome-free: no workspace toggle and no
-   * page footer, so the record itself is the only thing on screen.
+   * Focused pages are deliberately chrome-free: no workspace toggle and no page
+   * footer, so the one thing the page is about is the only thing on screen.
    */
-  const isProfileRoute = route.startsWith('/profile');
+  const isFocusedRoute = route.startsWith('/profile') || route.startsWith('/team');
+
+  /**
+   * Who the team chart covers. An admin sees the whole organisation; anyone
+   * else sees themselves plus their own downline, so the chart roots at them
+   * rather than at the corporate node.
+   */
+  const teamUsers = useMemo(() => {
+    if (session?.role === 'ADMIN') return users;
+
+    const rootId = session?.agentId?.toUpperCase();
+    if (!rootId) return [];
+
+    const childrenOf = new Map<string, User[]>();
+    users.forEach(u => {
+      const parent = u.sponsorId?.toUpperCase();
+      if (!parent) return;
+      const list = childrenOf.get(parent) || [];
+      list.push(u);
+      childrenOf.set(parent, list);
+    });
+
+    const out: User[] = [];
+    const seen = new Set<string>();
+    const walk = (id: string) => {
+      if (seen.has(id)) return; // guards a malformed sponsorId cycle
+      seen.add(id);
+      const self = users.find(u => u.id?.toUpperCase() === id);
+      if (self) out.push(self);
+      (childrenOf.get(id) || []).forEach(child => walk(child.id?.toUpperCase()));
+    };
+    walk(rootId);
+    return out;
+  }, [users, session]);
 
   // The `.dark` class lives on <html> (not the layout root) so it also covers
   // <body> and the pre-login screen. All colour rules hang off it — see theme.css.
@@ -1578,7 +1613,7 @@ export default function App() {
 
           {/* Right: workspace switch (desktop) + theme switch */}
           <div className="flex-1 flex justify-end items-center gap-2">
-            {session?.role === 'ADMIN' && !isProfileRoute && (
+            {session?.role === 'ADMIN' && !isFocusedRoute && (
               <div className="hidden md:flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs shrink-0">
                 <button
                   onClick={() => setActiveRole('ADMIN')}
@@ -1614,7 +1649,7 @@ export default function App() {
         {/* Mobile workspace switch — its own slim row so the centred brand row
             stays uncrowded on small screens. Admin sessions only, and hidden on
             the profile pages to keep them chrome-free. */}
-        {session?.role === 'ADMIN' && !isProfileRoute && (
+        {session?.role === 'ADMIN' && !isFocusedRoute && (
           <div className="md:hidden px-3 pb-2">
             <div className="flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs">
               <button
@@ -1807,6 +1842,9 @@ export default function App() {
             isAdmin={session?.role === 'ADMIN'}
             onUpdateUserProfile={handleAdminUpdateUserProfile}
           />
+        ) : route.startsWith('/team') ? (
+          /* /team — the team structure chart on its own, nothing else. */
+          <TreeVisualizer users={teamUsers} />
         ) : route.startsWith('/payouts') ? (
           /* /payouts — the same desk the admin dashboard uses. Admins get the
              full auditable list with sanction/dispatch; channel partners get
@@ -1922,7 +1960,7 @@ export default function App() {
       </main>
 
       {/* Bottom Professional Whitelabel Footer — omitted on the profile pages */}
-      {!isProfileRoute && (
+      {!isFocusedRoute && (
         <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
             <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
