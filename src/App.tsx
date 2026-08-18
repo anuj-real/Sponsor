@@ -33,7 +33,9 @@ import {
   Layers,
   Share2,
   FileSpreadsheet,
-  FileText
+  FileText,
+  UserPlus,
+  Network
 } from 'lucide-react';
 
 /**
@@ -60,6 +62,9 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
   // Team gets its own page — the chart alone, no dashboard chrome around it.
   { key: 'TEAM', label: 'Team', icon: Users, route: '/team' },
+  // The two member breakdowns pulled out of the tree view.
+  { key: 'DIRECT_MEMBERS', label: 'Direct Members', icon: UserPlus, route: '/direct-members' },
+  { key: 'DOWNLINE_MEMBERS', label: 'Downline Members', icon: Network, route: '/downline-members' },
   // Inventory is its own page: the plot table with a project filter on top.
   { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, route: '/inventory' },
   // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
@@ -86,6 +91,8 @@ import LoginScreen from './components/LoginScreen';
 import PayoutsDesk from './components/PayoutsDesk';
 import SalesReport from './components/SalesReport';
 import InventoryTable from './components/InventoryTable';
+import DirectMembers from './components/DirectMembers';
+import DownlineMembers from './components/DownlineMembers';
 import ProfileIdCard from './components/ProfileIdCard';
 import ProfilePage from './components/ProfilePage';
 import ProfileEdit from './components/ProfileEdit';
@@ -167,6 +174,8 @@ export default function App() {
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
         : next.startsWith('/team') ? 'TEAM'
+        : next.startsWith('/direct-members') ? 'DIRECT_MEMBERS'
+        : next.startsWith('/downline-members') ? 'DOWNLINE_MEMBERS'
         : next.startsWith('/inventory') ? 'INVENTORY'
         : 'HOME'
       );
@@ -191,7 +200,11 @@ export default function App() {
    * footer, so the one thing the page is about is the only thing on screen.
    */
   const isFocusedRoute =
-    route.startsWith('/profile') || route.startsWith('/team') || route.startsWith('/inventory');
+    route.startsWith('/profile') ||
+    route.startsWith('/team') ||
+    route.startsWith('/inventory') ||
+    route.startsWith('/direct-members') ||
+    route.startsWith('/downline-members');
 
   /**
    * Who the team chart covers: the signed-in user and their downline only, so
@@ -1802,6 +1815,12 @@ export default function App() {
         ) : route.startsWith('/team') ? (
           /* /team — the team structure chart on its own, nothing else. */
           <TreeVisualizer users={teamUsers} />
+        ) : route.startsWith('/direct-members') ? (
+          /* First level only — who this user personally sponsored. */
+          <DirectMembers users={users} currentUserId={session?.agentId} />
+        ) : route.startsWith('/downline-members') ? (
+          /* Whole downline, summarised by level; pick a level to see its records. */
+          <DownlineMembers users={users} currentUserId={session?.agentId} />
         ) : route.startsWith('/inventory') ? (
           /* /inventory — every plot, filterable by project. */
           <div className="space-y-4">
