@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+// first commit for V2
 import { User, RealEstateProject, Sale, CommissionPayout, Notification, MLMConfig, UserRole, UserLog } from './types';
 import { 
   INITIAL_MLM_CONFIG, 
@@ -32,7 +32,10 @@ import {
   UserCog,
   Layers,
   Share2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText,
+  UserPlus,
+  Network
 } from 'lucide-react';
 
 /**
@@ -44,18 +47,37 @@ import {
  * on refresh. Anchored entries keep the dashboard a single scrollable page;
  * `route` entries swap the whole main view.
  */
-const NAV_ITEMS = [
-  { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
+/** An entry either scrolls to `anchor` on the dashboard or navigates to `route`
+ *  (a route entry may also carry an anchor to scroll to after navigating). */
+type NavItem = {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  route?: string;
+  anchor?: string;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  // Profile group leads the menu: identity card, then editing, then the full
+  // read-through record. Home sits at the bottom — it is the fallback, not the
+  // destination, now that every section has its own page.
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
-  { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
-  { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
+  { key: 'EDIT_DETAIL', label: 'Edit Details', icon: UserCog, route: '/profile-edit' },
+  { key: 'FULL_PROFILE', label: 'Complete Profile', icon: FileText, route: '/profile-complete' },
+  // Team gets its own page — the chart alone, no dashboard chrome around it.
+  { key: 'TEAM', label: 'Team', icon: Users, route: '/team' },
+  // The two member breakdowns pulled out of the tree view.
+  { key: 'DIRECT_MEMBERS', label: 'Direct Members', icon: UserPlus, route: '/direct-members' },
+  { key: 'DOWNLINE_MEMBERS', label: 'Downline Members', icon: Network, route: '/downline-members' },
+  // Inventory is its own page: the plot table with a project filter on top.
+  { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, route: '/inventory' },
   // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
   // same reasoning as /profile: the dashboard is too long on mobile.
   { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, route: '/payouts' },
   // Sales as a dense data table — the dashboard card view hides fields on mobile.
   { key: 'SALES_REPORT', label: 'Sales Report', icon: FileSpreadsheet, route: '/sales-report' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile', anchor: 'profile-edit-section' },
+  { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -67,9 +89,14 @@ import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
-import ProfilePage from './components/ProfilePage';
 import PayoutsDesk from './components/PayoutsDesk';
 import SalesReport from './components/SalesReport';
+import InventoryTable from './components/InventoryTable';
+import DirectMembers from './components/DirectMembers';
+import DownlineMembers from './components/DownlineMembers';
+import ProfileIdCard from './components/ProfileIdCard';
+import ProfilePage from './components/ProfilePage';
+import ProfileEdit from './components/ProfileEdit';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -141,9 +168,16 @@ export default function App() {
       const next = parseHashRoute();
       setRoute(next);
       setActiveNav(
-        next.startsWith('/profile') ? 'PROFILE'
+        // Hyphenated profile routes also startsWith('/profile') — test first.
+        next.startsWith('/profile-edit') ? 'EDIT_DETAIL'
+        : next.startsWith('/profile-complete') ? 'FULL_PROFILE'
+        : next.startsWith('/profile') ? 'PROFILE'
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
+        : next.startsWith('/team') ? 'TEAM'
+        : next.startsWith('/direct-members') ? 'DIRECT_MEMBERS'
+        : next.startsWith('/downline-members') ? 'DOWNLINE_MEMBERS'
+        : next.startsWith('/inventory') ? 'INVENTORY'
         : 'HOME'
       );
     };
@@ -161,6 +195,48 @@ export default function App() {
       window.location.hash = path; // fires hashchange → state sync above
     }
   };
+
+  /**
+   * Focused pages are deliberately chrome-free: no workspace toggle and no page
+   * footer, so the one thing the page is about is the only thing on screen.
+   */
+  const isFocusedRoute =
+    route.startsWith('/profile') ||
+    route.startsWith('/team') ||
+    route.startsWith('/inventory') ||
+    route.startsWith('/direct-members') ||
+    route.startsWith('/downline-members');
+
+  /**
+   * Who the team chart covers: the signed-in user and their downline only, so
+   * the chart always roots at whoever is logged in — admins included. Nobody
+   * sees the org above themselves here.
+   */
+  const teamUsers = useMemo(() => {
+    const rootId = session?.agentId?.toUpperCase();
+    if (!rootId) return [];
+
+    const childrenOf = new Map<string, User[]>();
+    users.forEach(u => {
+      const parent = u.sponsorId?.toUpperCase();
+      if (!parent) return;
+      const list = childrenOf.get(parent) || [];
+      list.push(u);
+      childrenOf.set(parent, list);
+    });
+
+    const out: User[] = [];
+    const seen = new Set<string>();
+    const walk = (id: string) => {
+      if (seen.has(id)) return; // guards a malformed sponsorId cycle
+      seen.add(id);
+      const self = users.find(u => u.id?.toUpperCase() === id);
+      if (self) out.push(self);
+      (childrenOf.get(id) || []).forEach(child => walk(child.id?.toUpperCase()));
+    };
+    walk(rootId);
+    return out;
+  }, [users, session]);
 
   // The `.dark` class lives on <html> (not the layout root) so it also covers
   // <body> and the pre-login screen. All colour rules hang off it — see theme.css.
@@ -934,6 +1010,10 @@ export default function App() {
     }
     
     await loadPrivateData(newSession);
+
+    // Land on the profile rather than the dashboard — it is the first thing an
+    // associate wants after signing in, and the dashboard is a long scroll.
+    navigateTo('/profile');
   };
 
   const handleLogout = () => {
@@ -1551,30 +1631,10 @@ export default function App() {
             </h1>
           </div>
 
-          {/* Right: workspace switch (desktop) + theme switch */}
+          {/* Right: theme switch. The Owner/Partner workspace switch used to sit
+              here (and on its own mobile row); it now lives only in the nav
+              drawer, so no view carries it in the header. */}
           <div className="flex-1 flex justify-end items-center gap-2">
-            {session?.role === 'ADMIN' && (
-              <div className="hidden md:flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs shrink-0">
-                <button
-                  onClick={() => setActiveRole('ADMIN')}
-                  title="Owner / Admin workspace"
-                  className={`px-2 py-1 rounded text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    activeRole === 'ADMIN' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  👑 <span className="hidden lg:inline">Owner/Admin</span>
-                </button>
-                <button
-                  onClick={() => setActiveRole('AGENT')}
-                  title="Channel Partner workspace"
-                  className={`px-2 py-1 rounded text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    activeRole === 'AGENT' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  💼 <span className="hidden lg:inline">Partner Panel</span>
-                </button>
-              </div>
-            )}
             <button
               onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
@@ -1586,30 +1646,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile workspace switch — its own slim row so the centred brand row
-            stays uncrowded on small screens. Admin sessions only. */}
-        {session?.role === 'ADMIN' && (
-          <div className="md:hidden px-3 pb-2">
-            <div className="flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs">
-              <button
-                onClick={() => setActiveRole('ADMIN')}
-                className={`flex-1 px-2 py-1.5 rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeRole === 'ADMIN' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500'
-                }`}
-              >
-                👑 Owner/Admin
-              </button>
-              <button
-                onClick={() => setActiveRole('AGENT')}
-                className={`flex-1 px-2 py-1.5 rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeRole === 'AGENT' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500'
-                }`}
-              >
-                💼 Partner Panel
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
       {/*
@@ -1750,8 +1786,19 @@ export default function App() {
 
       {/* Primary Dashboard Content Area */}
       <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        {route.startsWith('/profile') ? (
-          /* /profile or /profile/<SBR ID> — full partner record */
+        {/* The hyphenated profile routes also startsWith('/profile'), so they
+            must be tested FIRST or the plain check would shadow them.
+            None of the three render a back link — the hamburger is the way out. */}
+        {route.startsWith('/profile-edit') ? (
+          <ProfileEdit
+            users={users}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
+        ) : route.startsWith('/profile-complete') ? (
+          /* The full record: identity, personal details, KYC and bank sections. */
           <ProfilePage
             users={users}
             sales={sales}
@@ -1759,20 +1806,36 @@ export default function App() {
             profileId={route.split('/')[2]?.toUpperCase() || undefined}
             currentUserId={session?.agentId}
             isAdmin={session?.role === 'ADMIN'}
-            onBack={() => navigateTo('/')}
             onUpdateUserProfile={handleAdminUpdateUserProfile}
           />
+        ) : route.startsWith('/profile') ? (
+          /* /profile or /profile/<SBR ID> — the identity card, nothing else */
+          <ProfileIdCard
+            users={users}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
+        ) : route.startsWith('/team') ? (
+          /* /team — the team structure chart on its own, nothing else. */
+          <TreeVisualizer users={teamUsers} />
+        ) : route.startsWith('/direct-members') ? (
+          /* First level only — who this user personally sponsored. */
+          <DirectMembers users={users} currentUserId={session?.agentId} />
+        ) : route.startsWith('/downline-members') ? (
+          /* Whole downline, summarised by level; pick a level to see its records. */
+          <DownlineMembers users={users} currentUserId={session?.agentId} />
+        ) : route.startsWith('/inventory') ? (
+          /* /inventory — every plot, filterable by project. */
+          <div className="space-y-4">
+            <InventoryTable projects={projects} users={users} />
+          </div>
         ) : route.startsWith('/payouts') ? (
           /* /payouts — the same desk the admin dashboard uses. Admins get the
              full auditable list with sanction/dispatch; channel partners get
              their own payouts, read-only (no handlers passed). */
           <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
             {session?.role === 'ADMIN' ? (
               <PayoutsDesk
                 payouts={payouts}
@@ -1789,12 +1852,6 @@ export default function App() {
           /* /sales-report — dense, mobile-first table of the sales ledger.
              Admins see every booking; a channel partner sees only their own. */
           <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
             <SalesReport
               users={users}
               sales={
@@ -1876,17 +1933,19 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Professional Whitelabel Footer */}
-      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
-          <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
-          <div className="flex gap-4 justify-center text-stone-400">
-            <span>Support: malav.nitin199@gmail.com</span>
-            <span>|</span>
-            <span>Policy: Standard Compliance Manual</span>
+      {/* Bottom Professional Whitelabel Footer — omitted on the profile pages */}
+      {!isFocusedRoute && (
+        <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
+            <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
+            <div className="flex gap-4 justify-center text-stone-400">
+              <span>Support: malav.nitin199@gmail.com</span>
+              <span>|</span>
+              <span>Policy: Standard Compliance Manual</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Security Passcode Modal */}
       {isSecurityModalOpen && session?.agentId && (

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { User, Sale, CommissionPayout } from '../types';
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   CreditCard,
@@ -34,7 +33,6 @@ interface ProfilePageProps {
   profileId?: string;
   currentUserId?: string;
   isAdmin?: boolean;
-  onBack: () => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<User>) => Promise<void>;
 }
 
@@ -129,15 +127,15 @@ export default function ProfilePage({
   profileId,
   currentUserId,
   isAdmin = false,
-  onBack,
   onUpdateUserProfile,
 }: ProfilePageProps) {
   // Only admins may look at someone else's record.
   const requestedId = isAdmin && profileId ? profileId : currentUserId;
   const user = users.find(u => u.id?.toUpperCase() === requestedId?.toUpperCase());
 
-  const [isKycOpen, setIsKycOpen] = useState(true);
-  const [isBankOpen, setIsBankOpen] = useState(true);
+  // Both sections start collapsed so the page opens as a short summary.
+  const [isKycOpen, setIsKycOpen] = useState(false);
+  const [isBankOpen, setIsBankOpen] = useState(false);
 
   // Editable fields
   const [bankAccountNumber, setBankAccountNumber] = useState('');
@@ -170,12 +168,6 @@ export default function ProfilePage({
           No SBR record matches <span className="font-mono font-bold">{requestedId || 'this session'}</span>.
           It may have been removed, or you may not have access to it.
         </p>
-        <button
-          onClick={onBack}
-          className="mt-2 px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-bold cursor-pointer"
-        >
-          Back to dashboard
-        </button>
       </div>
     );
   }
@@ -226,15 +218,9 @@ export default function ProfilePage({
   */
 
   return (
-    /* Tighter rhythm below sm — the profile should read as one calm column on phones. */
+    /* Tighter rhythm below sm — the profile should read as one calm column on phones.
+       No back link: navigation between the profile views is the hamburger's job. */
     <div className="space-y-4 sm:space-y-6">
-      <button
-        onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" /> Back to dashboard
-      </button>
-
       {/* Identity banner */}
       <div className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-row sm:items-center gap-3.5 sm:gap-5">
         {user.photo ? (

@@ -115,7 +115,6 @@ export default function AdminPanel({
 
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, LOGS
   const [activeSubTab, setActiveSubTab] = useState<AdminTabKey>('SETTINGS');
-  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
 
 
   const activeTabMeta = ADMIN_TABS.find(t => t.key === activeSubTab) ?? ADMIN_TABS[0];
@@ -136,11 +135,10 @@ export default function AdminPanel({
   // Reveal the sub-tab that owns the section the header nav is pointing at.
   React.useEffect(() => {
     if (!navFocus) return;
-    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
-    if (navFocus === 'TEAM' || navFocus === 'SPONSOR_CODE') {
+    // Everything else (profile, payouts, team, inventory, sales report) is a
+    // route now and renders its own page, so only the sponsor code is left.
+    if (navFocus === 'SPONSOR_CODE') {
       setActiveSubTab('AGENTS');
-    } else if (navFocus === 'INVENTORY') {
-      setActiveSubTab('BOOKINGS');
     }
   }, [navFocus]);
 
@@ -985,8 +983,9 @@ export default function AdminPanel({
           Mobile: one horizontally-scrollable row of compact pills (short labels,
           active pill auto-centred) + a context line naming the active section.
           Desktop (sm+): wraps into the familiar multi-row bar with full labels.
-          NOTE: repaired after merge 2fedca1 interleaved the old hardcoded
-          buttons with this ADMIN_TABS bar and broke the JSX. */}
+          NOTE: the ui/edit merge repeatedly reintroduces the old hardcoded
+          buttons here, interleaving them with this ADMIN_TABS bar and leaving an
+          unclosed <button> that breaks the build. Keep this single map. */}
       <div className="bg-stone-100 border border-stone-200 rounded-2xl overflow-hidden">
         <div
           ref={tabBarRef}
@@ -2102,11 +2101,7 @@ export default function AdminPanel({
           )}
 
           <div id="sbr-tree-section" className="scroll-mt-24">
-            <TreeVisualizer
-              users={users}
-              onSelectUser={(id) => setSelectedTreeUserId(id)}
-              selectedUserId={selectedTreeUserId}
-            />
+            <TreeVisualizer users={users} />
           </div>
 
           <div id="sbr-user-detail" className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24">
@@ -3261,9 +3256,16 @@ export default function AdminPanel({
                     <span className="font-bold text-stone-800">{sale.agentName}</span>
                     <span className="font-mono text-stone-500 block text-[9px]">{sale.agentId}</span>
                   </div>
-                  <div className="col-span-2">
+                  {/* Derived, not the raw stored saleValue — that field holds
+                      rupees on seeded/imported rows, so rendering it as PTS made
+                      this card disagree with the desktop table for the same sale. */}
+                  <div>
+                    <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Total Points</span>
+                    <span className="font-mono font-bold text-emerald-800">{formatPoints(getSalePoints(sale))}</span>
+                  </div>
+                  <div>
                     <span className="text-stone-400 uppercase font-bold text-[8.5px] block">Agreement Price</span>
-                    <span className="font-mono font-bold text-stone-900">{formatPoints(sale.saleValue)}</span>
+                    <span className="font-mono font-bold text-stone-900">{formatINR(getSaleAgreementValueINR(sale))}</span>
                   </div>
                 </div>
 

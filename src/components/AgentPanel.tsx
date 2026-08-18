@@ -3,7 +3,6 @@ import { User, Sale, CommissionPayout, Notification, MLMConfig, RealEstateProjec
 import { getSalePoints, getSaleAgreementValueINR } from '../lib/points';
 import { Users, TrendingUp, DollarSign, Wallet, Award, Bell, Clipboard, CheckCircle2, History, IndianRupee, Key, Star, ShieldAlert, Check, Layers, Map, Eye, Download, CreditCard, ZoomIn, ZoomOut, Maximize2, ShieldCheck, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import DesignationProgress from './DesignationProgress';
-import TreeVisualizer from './TreeVisualizer';
 
 interface AgentPanelProps {
   users: User[];
@@ -38,7 +37,6 @@ export default function AgentPanel({
   const [selectedInventoryProjId, setSelectedInventoryProjId] = useState<string>('ALL');
   const [selectedInventoryStatus, setSelectedInventoryStatus] = useState<string>('ALL');
   const [expandedMapProjId, setExpandedMapProjId] = useState<string | null>(null);
-  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
 
   // Zoomed Map state
   const [zoomedMap, setZoomedMap] = useState<{ url: string; title: string } | null>(null);
@@ -61,16 +59,9 @@ export default function AgentPanel({
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // Open the section the header nav points at (the tree lives on the LEDGER tab).
-  useEffect(() => {
-    if (!navFocus) return;
-    if (navFocus === 'TEAM') {
-      setActivePanelTab('LEDGER');
-    } else if (navFocus === 'INVENTORY') {
-      setActivePanelTab('INVENTORY');
-    }
-    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
-  }, [navFocus]);
+  // Every nav entry that used to steer this panel is a route now — profile,
+  // payouts, team, inventory and the sales report all render their own page —
+  // so there is nothing left for navFocus to reveal here.
 
   // Campaign date status checker logic
   const now = new Date();
@@ -298,50 +289,17 @@ export default function AgentPanel({
           </div>
         </div>
 
-        {/* Active Team Member Count */}
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 shrink-0 md:self-center">
-          <Users className="w-5 h-5 text-emerald-800" />
-          <div>
-            <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block font-sans">Active Team Members</span>
-            <span className="font-mono font-extrabold text-sm sm:text-base text-emerald-900">
-              {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length} {downlineNetwork.filter(item => item.user.status === 'ACTIVE').length === 1 ? 'Associate' : 'Associates'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Sizing & Points standard Notice for the active broker */}
-      <div className="p-3.5 sm:p-4 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-4 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-800 font-bold shrink-0 border border-emerald-200/30">
-            💡
-          </div>
-          <div>
-            <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider font-sans">Real-time Sizing Conversion Rule</h4>
-            <p className="text-[11px] text-stone-600 mt-0.5 leading-normal">
-              Plot points are derived from plot size (e.g. up to 80 Sq Yd = <span className="font-bold text-emerald-800">1.0 Point</span>, 81-130 = <span className="font-bold text-emerald-800">2.0 Points</span>, 131-180 = <span className="font-bold text-emerald-800">3.0 Points</span>, and up to 10.0 Points for 481-530 Sq Yd). Commission and levels are derived purely in points.
-            </p>
-          </div>
-        </div>
-        <div className="hidden sm:block text-right px-4 py-2 bg-white rounded-xl border border-stone-200 shrink-0">
-          <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-sans">Platform Standard</span>
-          <span className="font-mono font-extrabold text-xs text-emerald-800">Tiered Points System</span>
-        </div>
+        {/* Active-team count and the points-conversion notice used to sit here.
+            The tree's own header now carries the member count, and the chart is
+            the first thing in the team view. */}
       </div>
 
       {/* Sharing and Payout Streams */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Statistics Left */}
         <div className="lg:col-span-2 space-y-6">
-          {/* SBR Referral Organigram for Associate Downline */}
-          <div id="sbr-tree-section" className="scroll-mt-24">
-            <TreeVisualizer
-              users={[agent, ...downlineNetwork.map(item => item.user)]}
-              onSelectUser={(id) => setSelectedTreeUserId(id)}
-              selectedUserId={selectedTreeUserId}
-              hideUpline={true}
-            />
-          </div>
+          {/* The org chart moved to its own /team page, so it is not repeated
+              here — nav "Team" opens it. */}
 
           {/* Designation Progress Multi-bar Component */}
           <DesignationProgress 
