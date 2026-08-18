@@ -93,25 +93,15 @@ function buildTree(users: User[]): TeamNode[] {
     .map(root => toNode(root, new Set()));
 }
 
-function MemberCard({
-  node, isRoot, isSelected, onSelect,
-}: {
-  node: TeamNode; isRoot: boolean; isSelected: boolean; onSelect: () => void;
-}) {
+function MemberCard({ node, isRoot }: { node: TeamNode; isRoot: boolean }) {
   const accent = ACCENT[node.designation] || ACCENT['Associate'];
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`rounded-lg border px-2 py-1.5 text-center cursor-pointer transition-colors ${
-        isRoot ? 'w-28 sm:w-32' : 'w-26 sm:w-28'
-      } ${
-        isSelected
-          ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-700/30'
-          : isRoot
-          ? 'border-amber-400 bg-amber-50 ring-1 ring-amber-300'
-          : 'border-stone-200 bg-white hover:bg-stone-50'
+    <div
+      className={`rounded-lg border px-2 py-1.5 text-center ${
+        isRoot
+          ? 'w-28 sm:w-32 border-amber-400 bg-amber-50 ring-1 ring-amber-300'
+          : 'w-26 sm:w-28 border-stone-200 bg-white'
       }`}
     >
       <UserIcon className="mx-auto h-3.5 w-3.5 text-stone-400" strokeWidth={1.75} />
@@ -130,18 +120,16 @@ function MemberCard({
         <span><span className="text-stone-400">D</span> {node.directCount}</span>
         <span><span className="text-stone-400">T</span> {node.teamSize}</span>
       </div>
-    </button>
+    </div>
   );
 }
 
 function TreeBranch({
-  node, depth, expanded, selectedId, onSelect, onToggle,
+  node, depth, expanded, onToggle,
 }: {
   node: TeamNode;
   depth: number;
   expanded: Set<string>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
   onToggle: (id: string) => void;
 }) {
   const hasChildren = node.children.length > 0;
@@ -153,12 +141,7 @@ function TreeBranch({
     <div className="flex flex-col items-center">
       {/* id is the anchor the scroll-preserving expand measures against */}
       <div id={`tree-node-${node.id}`}>
-        <MemberCard
-          node={node}
-          isRoot={depth === 0}
-          isSelected={selectedId === node.id}
-          onSelect={() => onSelect(node.id)}
-        />
+        <MemberCard node={node} isRoot={depth === 0} />
       </div>
 
       {/* Expand / collapse control, only where it can do something */}
@@ -202,8 +185,6 @@ function TreeBranch({
                     node={child}
                     depth={depth + 1}
                     expanded={expanded}
-                    selectedId={selectedId}
-                    onSelect={onSelect}
                     onToggle={onToggle}
                   />
                 </div>
@@ -228,29 +209,25 @@ function Detail({ label, value, muted = false }: { label: string; value: string;
   );
 }
 
-export default function TreeVisualizer({ users = [], onSelectUser }: TreeVisualizerProps) {
+export default function TreeVisualizer({ users = [] }: TreeVisualizerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const roots = useMemo(() => buildTree(users), [users]);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   /** Where the tapped node sat before the re-render, so we can put it back. */
   const anchorRef = useRef<{ id: string; left: number; top: number } | null>(null);
   const hasCenteredRef = useRef(false);
 
-  // Flatten once so the detail panel can look a node up without re-walking.
-  const nodesById = useMemo(() => {
-    const map = new Map<string, TeamNode>();
-    const walk = (n: TeamNode) => {
-      map.set(n.id, n);
-      n.children.forEach(walk);
-    };
-    roots.forEach(walk);
-    return map;
-  }, [roots]);
+  // The chart always describes the main user — the root of this tree. Nodes are
+  // not selectable, so there is nothing else the detail panel could show.
+  const mainUser = roots[0] || null;
 
-  const selected = (selectedId && nodesById.get(selectedId)) || roots[0] || null;
+  /** Everyone drawn in the chart, roots included. */
+  const totalMembers = useMemo(
+    () => roots.reduce((sum, r) => sum + 1 + r.teamSize, 0),
+    [roots],
+  );
 
   const handleToggle = (id: string) => {
     // Record the node's on-screen offset first; useLayoutEffect restores it
@@ -293,18 +270,14 @@ export default function TreeVisualizer({ users = [], onSelectUser }: TreeVisuali
     hasCenteredRef.current = true;
   }, [roots]);
 
-  const handleSelect = (id: string) => {
-    setSelectedId(id);
-    onSelectUser?.(id);
-  };
-
   return (
     <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-      <div className="border-b border-stone-200 px-3 py-2 text-center">
-        <h3 className="text-xs font-semibold tracking-tight text-stone-900">SBR Team Structure</h3>
-        <p className="text-[10px] text-stone-500">
-          Tap a member for details · D direct · T team
-        </p>
+      {/* Minimal header: the chart starts immediately below it. */}
+      <div className="border-b border-stone-200 px-3 py-1.5 flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold tracking-tight text-stone-900">Team Structure</h3>
+        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
+          {totalMembers} {totalMembers === 1 ? 'member' : 'members'}
+        </span>
       </div>
 
       <div ref={scrollRef} className="max-h-[52vh] overflow-auto p-3 bg-stone-50/60">
@@ -320,8 +293,6 @@ export default function TreeVisualizer({ users = [], onSelectUser }: TreeVisuali
                 node={root}
                 depth={0}
                 expanded={expanded}
-                selectedId={selected?.id ?? null}
-                onSelect={handleSelect}
                 onToggle={handleToggle}
               />
             ))}
@@ -329,23 +300,18 @@ export default function TreeVisualizer({ users = [], onSelectUser }: TreeVisuali
         )}
       </div>
 
-      {/* Detail panel. Fixed row count so selecting never resizes the layout. */}
-      {selected && (
-        <div className="border-t border-stone-200 p-3 space-y-2">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-stone-400">
-            Selected member
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            <Detail label="User ID" value={selected.id} />
-            <Detail label="Name" value={selected.name} />
-            <Detail label="Activation Date" value={selected.joinedDate || '—'} />
-            <Detail label="Total Direct" value={String(selected.directCount)} />
-            <Detail label="Total Team" value={String(selected.teamSize)} />
-            <Detail label="Designation" value={selected.designation} />
-            {/* Leg volumes are not modelled yet — shown so the row set is final. */}
-            <Detail label="Bigger Leg" value="—" muted />
-            <Detail label="Other Leg" value="—" muted />
-          </div>
+      {/* Details of the main user only. */}
+      {mainUser && (
+        <div className="border-t border-stone-200 p-3 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+          <Detail label="User ID" value={mainUser.id} />
+          <Detail label="Name" value={mainUser.name} />
+          <Detail label="Activation Date" value={mainUser.joinedDate || '—'} />
+          <Detail label="Total Direct" value={String(mainUser.directCount)} />
+          <Detail label="Total Team" value={String(mainUser.teamSize)} />
+          <Detail label="Designation" value={mainUser.designation} />
+          {/* Leg volumes are not modelled yet — shown so the row set is final. */}
+          <Detail label="Bigger Leg" value="—" muted />
+          <Detail label="Other Leg" value="—" muted />
         </div>
       )}
     </div>

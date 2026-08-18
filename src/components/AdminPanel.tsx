@@ -115,7 +115,6 @@ export default function AdminPanel({
 
   // Tabs: SETTINGS, AGENTS, PROJECTS, BOOKINGS, SALES, PAYOUTS, LOGS
   const [activeSubTab, setActiveSubTab] = useState<AdminTabKey>('SETTINGS');
-  const [selectedTreeUserId, setSelectedTreeUserId] = useState<string | null>(null);
 
 
   const activeTabMeta = ADMIN_TABS.find(t => t.key === activeSubTab) ?? ADMIN_TABS[0];
@@ -2102,11 +2101,7 @@ export default function AdminPanel({
           )}
 
           <div id="sbr-tree-section" className="scroll-mt-24">
-            <TreeVisualizer
-              users={users}
-              onSelectUser={(id) => setSelectedTreeUserId(id)}
-              selectedUserId={selectedTreeUserId}
-            />
+            <TreeVisualizer users={users} />
           </div>
 
           <div id="sbr-user-detail" className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden scroll-mt-24">
