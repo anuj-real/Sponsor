@@ -52,11 +52,11 @@ function readAndCompress(file: File): Promise<string> {
 function Row({ label, value, mono = false }: { label: string; value?: string; mono?: boolean }) {
   return (
     <tr className="border-b border-stone-200 last:border-b-0">
-      <th className="text-left align-middle px-4 py-3.5 w-[40%] text-[10px] font-bold uppercase tracking-wider text-stone-500 bg-stone-50">
+      <th className="text-left align-middle px-3.5 py-2 w-[40%] text-[9.5px] font-bold uppercase tracking-wider text-stone-500 bg-stone-50">
         {label}
       </th>
-      <td className={`px-4 py-3.5 text-[13px] text-stone-900 font-semibold break-words ${mono ? 'font-mono' : ''}`}>
-        {value?.trim() ? value : <span className="text-stone-400 font-normal text-xs">Not provided</span>}
+      <td className={`px-3.5 py-2 text-xs text-stone-900 font-semibold break-words ${mono ? 'font-mono' : ''}`}>
+        {value?.trim() ? value : <span className="text-stone-400 font-normal">Not provided</span>}
       </td>
     </tr>
   );
@@ -120,69 +120,41 @@ export default function ProfileIdCard({
           that a screenshot crops to a complete, self-contained ID. */}
       <div className="mx-auto w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
         {/* Company band */}
-        <div className="bg-emerald-900 px-4 py-3 text-center">
-          <p className="text-white font-serif font-bold text-base leading-none">
+        <div className="bg-emerald-900 px-3.5 py-2 text-center">
+          <p className="text-white font-serif font-bold text-sm leading-none">
             SBR <span className="font-normal text-emerald-200">Sponsors</span>
           </p>
-          <p className="text-emerald-300 text-[9px] font-bold uppercase tracking-[0.25em] mt-1.5">
+          <p className="text-emerald-300 text-[8px] font-bold uppercase tracking-[0.25em] mt-1">
             Associate Identity Card
           </p>
         </div>
 
-        {/* Photo + name */}
-        <div className="bg-emerald-800 px-4 pt-5 pb-5 flex flex-col items-center gap-3">
-          <div className="relative">
-            {user.photo ? (
-              <img
-                src={user.photo}
-                alt={user.name}
-                referrerPolicy="no-referrer"
-                className="w-36 h-36 sm:w-40 sm:h-40 rounded-2xl object-cover border-4 border-white/80 bg-stone-100 shadow-md"
-              />
-            ) : (
-              <div className="w-36 h-36 sm:w-40 sm:h-40 rounded-2xl bg-white/15 border-4 border-white/60 flex items-center justify-center shadow-md">
-                <UserRound className="w-20 h-20 text-white/90" strokeWidth={1.25} />
-              </div>
-            )}
+        {/* Photo beside the name — side by side keeps the card short.
+            No controls live inside the card, so a screenshot stays clean. */}
+        <div className="bg-emerald-800 px-3.5 py-3 flex flex-row items-center gap-3.5">
+          {user.photo ? (
+            <img
+              src={user.photo}
+              alt={user.name}
+              referrerPolicy="no-referrer"
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border-2 border-white/80 bg-stone-100 shadow-sm shrink-0"
+            />
+          ) : (
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-white/15 border-2 border-white/60 flex items-center justify-center shadow-sm shrink-0">
+              <UserRound className="w-12 h-12 text-white/90" strokeWidth={1.25} />
+            </div>
+          )}
 
-            {canEditPhoto && (
-              <>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhoto}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={isUploading}
-                  aria-label={user.photo ? 'Change profile photo' : 'Add profile photo'}
-                  title={user.photo ? 'Change photo' : 'Add photo'}
-                  className="absolute -bottom-1.5 -right-1.5 w-10 h-10 rounded-full bg-white text-emerald-900 border-2 border-emerald-800 shadow-md flex items-center justify-center cursor-pointer disabled:opacity-70 active:scale-95 transition-transform"
-                >
-                  {isUploading
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Camera className="w-4 h-4" />}
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="text-center">
-            <p className="text-white font-bold text-xl leading-tight break-words">{user.name}</p>
-            <p className="text-emerald-200 text-[11px] font-bold uppercase tracking-widest mt-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-white font-bold text-base leading-tight break-words">{user.name}</p>
+            <p className="text-emerald-200 text-[10px] font-bold uppercase tracking-widest mt-1">
               {user.designation || 'Associate'}
+            </p>
+            <p className="font-mono text-[10.5px] text-white/90 mt-1.5 bg-white/15 inline-block px-1.5 py-0.5 rounded">
+              {user.id}
             </p>
           </div>
         </div>
-
-        {photoError && (
-          <p className="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-700 text-[11px] font-semibold text-center">
-            {photoError}
-          </p>
-        )}
 
         {/* Identity fields */}
         <table className="w-full border-collapse">
@@ -196,12 +168,12 @@ export default function ProfileIdCard({
         </table>
 
         {/* Card foot — keeps the screenshot looking like a complete document */}
-        <div className="mt-auto bg-stone-50 border-t border-stone-200 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="bg-stone-50 border-t border-stone-200 px-3.5 py-2 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[8.5px] font-bold uppercase tracking-wider text-stone-400">Member since</p>
-            <p className="text-[11px] font-mono font-semibold text-stone-700">{user.joinedDate || '—'}</p>
+            <p className="text-[8px] font-bold uppercase tracking-wider text-stone-400">Member since</p>
+            <p className="text-[10.5px] font-mono font-semibold text-stone-700">{user.joinedDate || '—'}</p>
           </div>
-          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border shrink-0 ${
+          <span className={`text-[8.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
             user.status === 'ACTIVE'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
               : 'bg-stone-100 text-stone-600 border-stone-200'
@@ -211,10 +183,27 @@ export default function ProfileIdCard({
         </div>
       </div>
 
+      {/* Photo control lives OUTSIDE the card, so a screenshot of the card
+          never captures it. */}
       {canEditPhoto && (
-        <p className="text-center text-[10px] text-stone-400 px-2">
-          Tap the camera to change your photo — it is resized automatically before saving.
-        </p>
+        <div className="mx-auto w-full max-w-sm space-y-1.5">
+          {photoError && (
+            <p className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-rose-700 text-[11px] font-semibold text-center">
+              {photoError}
+            </p>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={isUploading}
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 text-[11px] font-bold cursor-pointer disabled:opacity-70 transition-all"
+          >
+            {isUploading
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Updating photo…</>
+              : <><Camera className="w-3.5 h-3.5" /> {user.photo ? 'Change photo' : 'Add photo'}</>}
+          </button>
+        </div>
       )}
     </div>
   );
