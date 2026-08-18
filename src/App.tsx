@@ -190,13 +190,11 @@ export default function App() {
   const isFocusedRoute = route.startsWith('/profile') || route.startsWith('/team');
 
   /**
-   * Who the team chart covers. An admin sees the whole organisation; anyone
-   * else sees themselves plus their own downline, so the chart roots at them
-   * rather than at the corporate node.
+   * Who the team chart covers: the signed-in user and their downline only, so
+   * the chart always roots at whoever is logged in — admins included. Nobody
+   * sees the org above themselves here.
    */
   const teamUsers = useMemo(() => {
-    if (session?.role === 'ADMIN') return users;
-
     const rootId = session?.agentId?.toUpperCase();
     if (!rootId) return [];
 
