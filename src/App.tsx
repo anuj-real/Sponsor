@@ -58,8 +58,12 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
+  // Profile group leads the menu: identity card, then editing, then the full
+  // read-through record. Home sits at the bottom — it is the fallback, not the
+  // destination, now that every section has its own page.
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
+  { key: 'EDIT_DETAIL', label: 'Edit Details', icon: UserCog, route: '/profile-edit' },
+  { key: 'FULL_PROFILE', label: 'Complete Profile', icon: FileText, route: '/profile-complete' },
   // Team gets its own page — the chart alone, no dashboard chrome around it.
   { key: 'TEAM', label: 'Team', icon: Users, route: '/team' },
   // The two member breakdowns pulled out of the tree view.
@@ -73,10 +77,7 @@ const NAV_ITEMS: NavItem[] = [
   // Sales as a dense data table — the dashboard card view hides fields on mobile.
   { key: 'SALES_REPORT', label: 'Sales Report', icon: FileSpreadsheet, route: '/sales-report' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  // Profile = identity card only; Edit Details = editing; Complete Profile =
-  // the full read-through record.
-  { key: 'EDIT_DETAIL', label: 'Edit Details', icon: UserCog, route: '/profile-edit' },
-  { key: 'FULL_PROFILE', label: 'Complete Profile', icon: FileText, route: '/profile-complete' },
+  { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -1009,6 +1010,10 @@ export default function App() {
     }
     
     await loadPrivateData(newSession);
+
+    // Land on the profile rather than the dashboard — it is the first thing an
+    // associate wants after signing in, and the dashboard is a long scroll.
+    navigateTo('/profile');
   };
 
   const handleLogout = () => {
