@@ -32,8 +32,7 @@ import {
   UserCog,
   Layers,
   Share2,
-  FileSpreadsheet,
-  FileText
+  FileSpreadsheet
 } from 'lucide-react';
 
 /**
@@ -66,8 +65,8 @@ const NAV_ITEMS: NavItem[] = [
   // Sales as a dense data table — the dashboard card view hides fields on mobile.
   { key: 'SALES_REPORT', label: 'Sales Report', icon: FileSpreadsheet, route: '/sales-report' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile-edit' },
-  { key: 'FULL_PROFILE', label: 'Full Detail', icon: FileText, route: '/profile-complete' },
+  // Profile = identity card only; every other detail + editing is Edit Details.
+  { key: 'EDIT_DETAIL', label: 'Edit Details', icon: UserCog, route: '/profile-edit' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -79,7 +78,6 @@ import TreeVisualizer from './components/TreeVisualizer';
 import AdminPanel from './components/AdminPanel';
 import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
-import ProfilePage from './components/ProfilePage';
 import PayoutsDesk from './components/PayoutsDesk';
 import SalesReport from './components/SalesReport';
 import ProfileIdCard from './components/ProfileIdCard';
@@ -155,9 +153,8 @@ export default function App() {
       const next = parseHashRoute();
       setRoute(next);
       setActiveNav(
-        // Hyphenated profile routes first — they also startsWith('/profile').
+        // `/profile-edit` also startsWith('/profile') — test it first.
         next.startsWith('/profile-edit') ? 'EDIT_DETAIL'
-        : next.startsWith('/profile-complete') ? 'FULL_PROFILE'
         : next.startsWith('/profile') ? 'PROFILE'
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
@@ -178,6 +175,12 @@ export default function App() {
       window.location.hash = path; // fires hashchange → state sync above
     }
   };
+
+  /**
+   * The profile pages are deliberately chrome-free: no workspace toggle and no
+   * page footer, so the record itself is the only thing on screen.
+   */
+  const isProfileRoute = route.startsWith('/profile');
 
   // The `.dark` class lives on <html> (not the layout root) so it also covers
   // <body> and the pre-login screen. All colour rules hang off it — see theme.css.
@@ -1570,7 +1573,7 @@ export default function App() {
 
           {/* Right: workspace switch (desktop) + theme switch */}
           <div className="flex-1 flex justify-end items-center gap-2">
-            {session?.role === 'ADMIN' && (
+            {session?.role === 'ADMIN' && !isProfileRoute && (
               <div className="hidden md:flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs shrink-0">
                 <button
                   onClick={() => setActiveRole('ADMIN')}
@@ -1604,8 +1607,9 @@ export default function App() {
         </div>
 
         {/* Mobile workspace switch — its own slim row so the centred brand row
-            stays uncrowded on small screens. Admin sessions only. */}
-        {session?.role === 'ADMIN' && (
+            stays uncrowded on small screens. Admin sessions only, and hidden on
+            the profile pages to keep them chrome-free. */}
+        {session?.role === 'ADMIN' && !isProfileRoute && (
           <div className="md:hidden px-3 pb-2">
             <div className="flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs">
               <button
@@ -1767,9 +1771,8 @@ export default function App() {
 
       {/* Primary Dashboard Content Area */}
       <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        {/* Profile is three views over one record. The two hyphenated routes are
-            tested FIRST — `/profile-edit` also startsWith('/profile'), so the
-            plain check would otherwise shadow them. */}
+        {/* `/profile-edit` also startsWith('/profile'), so it must be tested
+            FIRST or the plain check would shadow it. */}
         {route.startsWith('/profile-edit') ? (
           <div className="space-y-4">
             <button
@@ -1783,24 +1786,11 @@ export default function App() {
               profileId={route.split('/')[2]?.toUpperCase() || undefined}
               currentUserId={session?.agentId}
               isAdmin={session?.role === 'ADMIN'}
-              onNavigate={navigateTo}
               onUpdateUserProfile={handleAdminUpdateUserProfile}
             />
           </div>
-        ) : route.startsWith('/profile-complete') ? (
-          /* The full record — same view the profile page has always shown. */
-          <ProfilePage
-            users={users}
-            sales={sales}
-            payouts={payouts}
-            profileId={route.split('/')[2]?.toUpperCase() || undefined}
-            currentUserId={session?.agentId}
-            isAdmin={session?.role === 'ADMIN'}
-            onBack={() => navigateTo('/')}
-            onUpdateUserProfile={handleAdminUpdateUserProfile}
-          />
         ) : route.startsWith('/profile') ? (
-          /* /profile or /profile/<SBR ID> — the identity card */
+          /* /profile or /profile/<SBR ID> — the identity card, nothing else */
           <div className="space-y-4">
             <button
               onClick={() => navigateTo('/')}
@@ -1813,7 +1803,6 @@ export default function App() {
               profileId={route.split('/')[2]?.toUpperCase() || undefined}
               currentUserId={session?.agentId}
               isAdmin={session?.role === 'ADMIN'}
-              onNavigate={navigateTo}
             />
           </div>
         ) : route.startsWith('/payouts') ? (
@@ -1930,17 +1919,19 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Professional Whitelabel Footer */}
-      <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
-          <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
-          <div className="flex gap-4 justify-center text-stone-400">
-            <span>Support: malav.nitin199@gmail.com</span>
-            <span>|</span>
-            <span>Policy: Standard Compliance Manual</span>
+      {/* Bottom Professional Whitelabel Footer — omitted on the profile pages */}
+      {!isProfileRoute && (
+        <footer className="bg-stone-100 border-t border-stone-200/80 py-6.5 px-4 md:px-6 shrink-0 text-center">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 gap-4">
+            <p>© 2026 SBR Associates. Standard Sourcing Operations. All rights reserved.</p>
+            <div className="flex gap-4 justify-center text-stone-400">
+              <span>Support: malav.nitin199@gmail.com</span>
+              <span>|</span>
+              <span>Policy: Standard Compliance Manual</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Security Passcode Modal */}
       {isSecurityModalOpen && session?.agentId && (

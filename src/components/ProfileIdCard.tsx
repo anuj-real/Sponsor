@@ -1,20 +1,18 @@
 import { User } from '../types';
 import { ShieldAlert, UserRound } from 'lucide-react';
-import ProfileTabs from './ProfileTabs';
 
 /**
- * `/profile` — the associate's identity card.
+ * `/profile` — the associate's identity card, and nothing else.
  *
- * Deliberately the smallest of the three profile views: a welcome line, one
- * tall card (photo on top, identity table beneath), and a closing note.
- * Everything else lives at `/profile-edit` and `/profile-complete`.
+ * Intentionally the leanest view in the app: a welcome line, a prominent photo
+ * with the name beside it, and the five identity fields. Every other detail and
+ * all editing live at `/profile-edit`.
  */
 interface ProfileIdCardProps {
   users: User[];
   profileId?: string;
   currentUserId?: string;
   isAdmin?: boolean;
-  onNavigate: (path: string) => void;
 }
 
 /** One row of the identity table. */
@@ -31,13 +29,7 @@ function Row({ label, value, mono = false }: { label: string; value?: string; mo
   );
 }
 
-export default function ProfileIdCard({
-  users,
-  profileId,
-  currentUserId,
-  isAdmin = false,
-  onNavigate,
-}: ProfileIdCardProps) {
+export default function ProfileIdCard({ users, profileId, currentUserId, isAdmin = false }: ProfileIdCardProps) {
   // Only admins may open someone else's card.
   const requestedId = isAdmin && profileId ? profileId : currentUserId;
   const user = users.find(u => u.id?.toUpperCase() === requestedId?.toUpperCase());
@@ -68,29 +60,31 @@ export default function ProfileIdCard({
         </p>
       </div>
 
-      <ProfileTabs active="CARD" onNavigate={onNavigate} profileId={isAdmin ? profileId : undefined} />
-
-      {/* The card: a single tall rectangle — photo band on top, identity table beneath. */}
-      <div className="mx-auto w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
-        {/* Photo band */}
-        <div className="bg-emerald-800 px-4 py-5 flex flex-col items-center gap-2.5">
+      {/* The card. Photo and name share one row so the image can be large
+          without pushing the identity table off the first screen. */}
+      <div className="mx-auto w-full max-w-md bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
+        <div className="bg-emerald-800 px-4 py-4 flex flex-row items-center gap-4">
           {user.photo ? (
             <img
               src={user.photo}
               alt={user.name}
               referrerPolicy="no-referrer"
-              className="w-24 h-24 rounded-xl object-cover border-2 border-white/70 bg-stone-100"
+              className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl object-cover border-2 border-white/70 bg-stone-100 shrink-0"
               onError={e => { e.currentTarget.style.display = 'none'; }}
             />
           ) : (
-            <div className="w-24 h-24 rounded-xl bg-white/15 border-2 border-white/50 flex items-center justify-center">
-              <UserRound className="w-10 h-10 text-white/90" strokeWidth={1.5} />
+            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl bg-white/15 border-2 border-white/50 flex items-center justify-center shrink-0">
+              <UserRound className="w-14 h-14 text-white/90" strokeWidth={1.5} />
             </div>
           )}
-          <div className="text-center">
-            <p className="text-white font-bold text-sm leading-tight">{user.name}</p>
-            <p className="text-emerald-100 text-[10px] font-semibold uppercase tracking-wider mt-0.5">
+
+          <div className="min-w-0 flex-1">
+            <p className="text-white font-bold text-base sm:text-lg leading-tight break-words">{user.name}</p>
+            <p className="text-emerald-100 text-[11px] font-semibold uppercase tracking-wider mt-1">
               {user.designation || 'Associate'}
+            </p>
+            <p className="font-mono text-[11px] text-white/90 mt-1.5 bg-white/15 inline-block px-2 py-0.5 rounded">
+              {user.id}
             </p>
           </div>
         </div>
@@ -105,14 +99,6 @@ export default function ProfileIdCard({
             <Row label="PAN Number" value={user.pan?.toUpperCase()} mono />
           </tbody>
         </table>
-
-        {/* Closing note */}
-        <div className="px-4 py-3 border-t border-stone-200 bg-stone-50 text-center">
-          <p className="text-[10.5px] text-stone-500 leading-relaxed">
-            Welcome aboard, {firstName}. This card is your SBR Sponsors identity —
-            keep your Sponsor ID handy when onboarding new associates.
-          </p>
-        </div>
       </div>
     </div>
   );
