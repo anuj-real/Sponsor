@@ -26,6 +26,16 @@ type BookingFilter = 'ALL' | 'TOKEN_RECEIVED' | 'BOOKING_DONE' | 'REGISTRY_DONE'
 const formatPoints = (val: number) => `${Math.round(val || 0).toLocaleString()}`;
 const formatINR = (val: number) => `₹${Math.round(val || 0).toLocaleString('en-IN')}`;
 
+/**
+ * `sizeSqYards` is stored inconsistently — '100' when seeded, but '100 Sq Yards'
+ * when written by the booking form (AdminPanel appends the unit). Strip to the
+ * number and apply exactly one unit, mirroring what points.ts does for the math.
+ */
+const formatPlotSize = (raw?: string) => {
+  const n = parseFloat(String(raw ?? '').replace(/[^\d.]/g, '')) || 0;
+  return n > 0 ? `${n} sq yd` : '—';
+};
+
 /** Mirrors AdminPanel: a bare tokenAmount counts as the first receipt. */
 function getSalePayments(s: Sale): PaymentRecord[] {
   if (s.payments && s.payments.length > 0) return s.payments;
@@ -83,7 +93,7 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
       return {
         sale,
         unitNumber: sale.unitNumber || '—',
-        plotSize: sale.sizeSqYards ? `${sale.sizeSqYards} sq yd` : '—',
+        plotSize: formatPlotSize(sale.sizeSqYards),
         points: getSalePoints(sale),
         agreement,
         paid,
@@ -104,15 +114,21 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
     });
   }, [sales, users]);
 
-  const filtered = useMemo(() => {
+  /**
+   * Query-only view. Chip counts must honour the search but NOT the milestone
+   * filter — otherwise every unselected chip would read 0.
+   */
+  const searched = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return rows.filter(r => {
-      if (bookingFilter !== 'ALL' && r.bookingStatus !== bookingFilter) return false;
-      if (!q) return true;
-      return [r.unitNumber, r.buyer, r.userId, r.userName, r.refId, r.refName, r.refNo, r.bookingId, r.project]
-        .some(v => String(v).toLowerCase().includes(q));
-    });
-  }, [rows, query, bookingFilter]);
+    if (!q) return rows;
+    return rows.filter(r =>
+      [r.unitNumber, r.buyer, r.userId, r.userName, r.refId, r.refName, r.refNo, r.bookingId, r.project]
+        .some(v => String(v).toLowerCase().includes(q)));
+  }, [rows, query]);
+
+  const filtered = useMemo(
+    () => (bookingFilter === 'ALL' ? searched : searched.filter(r => r.bookingStatus === bookingFilter)),
+    [searched, bookingFilter]);
 
   const totals = useMemo(() => ({
     count: filtered.length,
@@ -183,7 +199,9 @@ export default function SalesReport({ sales, users, scopeNote }: SalesReportProp
               { key: 'BOOKING_DONE' as const, label: 'Booking' },
               { key: 'REGISTRY_DONE' as const, label: 'Registry' },
             ]).map(({ key, label }) => {
-              const count = key === 'ALL' ? rows.length : rows.filter(r => r.bookingStatus === key).length;
+              const count = key === 'ALL'
+                ? searched.length
+                : searched.filter(r => r.bookingStatus === key).length;
               return (
                 <button
                   key={key}

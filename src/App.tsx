@@ -32,7 +32,8 @@ import {
   UserCog,
   Layers,
   Share2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 
 /**
@@ -44,7 +45,17 @@ import {
  * on refresh. Anchored entries keep the dashboard a single scrollable page;
  * `route` entries swap the whole main view.
  */
-const NAV_ITEMS = [
+/** An entry either scrolls to `anchor` on the dashboard or navigates to `route`
+ *  (a route entry may also carry an anchor to scroll to after navigating). */
+type NavItem = {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  route?: string;
+  anchor?: string;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { key: 'HOME', label: 'Home', icon: Home, anchor: 'sbr-top' },
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
   { key: 'TEAM', label: 'Team', icon: Users, anchor: 'sbr-team-section' },
@@ -55,7 +66,8 @@ const NAV_ITEMS = [
   // Sales as a dense data table — the dashboard card view hides fields on mobile.
   { key: 'SALES_REPORT', label: 'Sales Report', icon: FileSpreadsheet, route: '/sales-report' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile', anchor: 'profile-edit-section' },
+  { key: 'EDIT_DETAIL', label: 'Edit Detail', icon: UserCog, route: '/profile-edit' },
+  { key: 'FULL_PROFILE', label: 'Full Detail', icon: FileText, route: '/profile-complete' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -70,6 +82,8 @@ import LoginScreen from './components/LoginScreen';
 import ProfilePage from './components/ProfilePage';
 import PayoutsDesk from './components/PayoutsDesk';
 import SalesReport from './components/SalesReport';
+import ProfileIdCard from './components/ProfileIdCard';
+import ProfileEdit from './components/ProfileEdit';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
   seedDatabase, 
@@ -141,7 +155,10 @@ export default function App() {
       const next = parseHashRoute();
       setRoute(next);
       setActiveNav(
-        next.startsWith('/profile') ? 'PROFILE'
+        // Hyphenated profile routes first — they also startsWith('/profile').
+        next.startsWith('/profile-edit') ? 'EDIT_DETAIL'
+        : next.startsWith('/profile-complete') ? 'FULL_PROFILE'
+        : next.startsWith('/profile') ? 'PROFILE'
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
         : 'HOME'
@@ -1750,8 +1767,28 @@ export default function App() {
 
       {/* Primary Dashboard Content Area */}
       <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        {route.startsWith('/profile') ? (
-          /* /profile or /profile/<SBR ID> — full partner record */
+        {/* Profile is three views over one record. The two hyphenated routes are
+            tested FIRST — `/profile-edit` also startsWith('/profile'), so the
+            plain check would otherwise shadow them. */}
+        {route.startsWith('/profile-edit') ? (
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            <ProfileEdit
+              users={users}
+              profileId={route.split('/')[2]?.toUpperCase() || undefined}
+              currentUserId={session?.agentId}
+              isAdmin={session?.role === 'ADMIN'}
+              onNavigate={navigateTo}
+              onUpdateUserProfile={handleAdminUpdateUserProfile}
+            />
+          </div>
+        ) : route.startsWith('/profile-complete') ? (
+          /* The full record — same view the profile page has always shown. */
           <ProfilePage
             users={users}
             sales={sales}
@@ -1762,6 +1799,23 @@ export default function App() {
             onBack={() => navigateTo('/')}
             onUpdateUserProfile={handleAdminUpdateUserProfile}
           />
+        ) : route.startsWith('/profile') ? (
+          /* /profile or /profile/<SBR ID> — the identity card */
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            <ProfileIdCard
+              users={users}
+              profileId={route.split('/')[2]?.toUpperCase() || undefined}
+              currentUserId={session?.agentId}
+              isAdmin={session?.role === 'ADMIN'}
+              onNavigate={navigateTo}
+            />
+          </div>
         ) : route.startsWith('/payouts') ? (
           /* /payouts — the same desk the admin dashboard uses. Admins get the
              full auditable list with sanction/dispatch; channel partners get

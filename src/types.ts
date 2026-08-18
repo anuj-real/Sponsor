@@ -19,6 +19,8 @@ export interface User {
   aadhar?: string;
   pan?: string;
   address?: string;
+  gender?: 'Male' | 'Female' | 'Other';
+  city?: string;
   photo?: string; // SBR associate photo URL or base64 placeholder
   password?: string; // Optional user password
   fatherOrHusbandName?: string;
