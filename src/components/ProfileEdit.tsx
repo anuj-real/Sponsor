@@ -91,8 +91,9 @@ export default function ProfileEdit({
   const [nominee, setNominee] = useState('');
   const [nomineeRelation, setNomineeRelation] = useState('');
 
+  // Both start collapsed — the core detail table is what the page is for.
   const [isKycOpen, setIsKycOpen] = useState(false);
-  const [isBankOpen, setIsBankOpen] = useState(true);
+  const [isBankOpen, setIsBankOpen] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

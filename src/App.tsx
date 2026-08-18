@@ -32,7 +32,8 @@ import {
   UserCog,
   Layers,
   Share2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 
 /**
@@ -65,8 +66,10 @@ const NAV_ITEMS: NavItem[] = [
   // Sales as a dense data table — the dashboard card view hides fields on mobile.
   { key: 'SALES_REPORT', label: 'Sales Report', icon: FileSpreadsheet, route: '/sales-report' },
   { key: 'SPONSOR_CODE', label: 'Sponsor Reference Code', icon: Share2, anchor: 'sbr-sponsor-code' },
-  // Profile = identity card only; every other detail + editing is Edit Details.
+  // Profile = identity card only; Edit Details = editing; Complete Profile =
+  // the full read-through record.
   { key: 'EDIT_DETAIL', label: 'Edit Details', icon: UserCog, route: '/profile-edit' },
+  { key: 'FULL_PROFILE', label: 'Complete Profile', icon: FileText, route: '/profile-complete' },
 ];
 
 /** `#/profile/SBR0004` → `/profile/SBR0004`; empty or bare `#` → `/`. */
@@ -81,6 +84,7 @@ import LoginScreen from './components/LoginScreen';
 import PayoutsDesk from './components/PayoutsDesk';
 import SalesReport from './components/SalesReport';
 import ProfileIdCard from './components/ProfileIdCard';
+import ProfilePage from './components/ProfilePage';
 import ProfileEdit from './components/ProfileEdit';
 import { normalizeUsers, normalizeUsersWithSales, rebuildPayoutsFromSales } from './lib/designation';
 import { 
@@ -153,8 +157,9 @@ export default function App() {
       const next = parseHashRoute();
       setRoute(next);
       setActiveNav(
-        // `/profile-edit` also startsWith('/profile') — test it first.
+        // Hyphenated profile routes also startsWith('/profile') — test first.
         next.startsWith('/profile-edit') ? 'EDIT_DETAIL'
+        : next.startsWith('/profile-complete') ? 'FULL_PROFILE'
         : next.startsWith('/profile') ? 'PROFILE'
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
@@ -1771,40 +1776,36 @@ export default function App() {
 
       {/* Primary Dashboard Content Area */}
       <main id="sbr-top" className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        {/* `/profile-edit` also startsWith('/profile'), so it must be tested
-            FIRST or the plain check would shadow it. */}
+        {/* The hyphenated profile routes also startsWith('/profile'), so they
+            must be tested FIRST or the plain check would shadow them.
+            None of the three render a back link — the hamburger is the way out. */}
         {route.startsWith('/profile-edit') ? (
-          <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
-            <ProfileEdit
-              users={users}
-              profileId={route.split('/')[2]?.toUpperCase() || undefined}
-              currentUserId={session?.agentId}
-              isAdmin={session?.role === 'ADMIN'}
-              onUpdateUserProfile={handleAdminUpdateUserProfile}
-            />
-          </div>
+          <ProfileEdit
+            users={users}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
+        ) : route.startsWith('/profile-complete') ? (
+          /* The full record: identity, personal details, KYC and bank sections. */
+          <ProfilePage
+            users={users}
+            sales={sales}
+            payouts={payouts}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
+          />
         ) : route.startsWith('/profile') ? (
           /* /profile or /profile/<SBR ID> — the identity card, nothing else */
-          <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
-            <ProfileIdCard
-              users={users}
-              profileId={route.split('/')[2]?.toUpperCase() || undefined}
-              currentUserId={session?.agentId}
-              isAdmin={session?.role === 'ADMIN'}
-            />
-          </div>
+          <ProfileIdCard
+            users={users}
+            profileId={route.split('/')[2]?.toUpperCase() || undefined}
+            currentUserId={session?.agentId}
+            isAdmin={session?.role === 'ADMIN'}
+          />
         ) : route.startsWith('/payouts') ? (
           /* /payouts — the same desk the admin dashboard uses. Admins get the
              full auditable list with sanction/dispatch; channel partners get
