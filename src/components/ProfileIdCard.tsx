@@ -129,31 +129,26 @@ export default function ProfileIdCard({
           </p>
         </div>
 
-        {/* Photo beside the name — side by side keeps the card short.
-            No controls live inside the card, so a screenshot stays clean. */}
-        <div className="bg-emerald-800 px-3.5 py-3 flex flex-row items-center gap-3.5">
+        {/* Photo and name, both centred. Designation and ID live in the table
+            below, so this block stays to the portrait and the name.
+            No controls inside the card — a screenshot stays clean. */}
+        <div className="bg-emerald-800 px-3.5 py-4 flex flex-col items-center gap-3">
           {user.photo ? (
             <img
               src={user.photo}
               alt={user.name}
               referrerPolicy="no-referrer"
-              className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border-2 border-white/80 bg-stone-100 shadow-sm shrink-0"
+              className="w-32 h-32 sm:w-36 sm:h-36 rounded-xl object-cover border-2 border-white/80 bg-stone-100 shadow-sm"
             />
           ) : (
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-white/15 border-2 border-white/60 flex items-center justify-center shadow-sm shrink-0">
-              <UserRound className="w-12 h-12 text-white/90" strokeWidth={1.25} />
+            <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-xl bg-white/15 border-2 border-white/60 flex items-center justify-center shadow-sm">
+              <UserRound className="w-16 h-16 text-white/90" strokeWidth={1.25} />
             </div>
           )}
 
-          <div className="min-w-0 flex-1">
-            <p className="text-white font-bold text-base leading-tight break-words">{user.name}</p>
-            <p className="text-emerald-200 text-[10px] font-bold uppercase tracking-widest mt-1">
-              {user.designation || 'Associate'}
-            </p>
-            <p className="font-mono text-[10.5px] text-white/90 mt-1.5 bg-white/15 inline-block px-1.5 py-0.5 rounded">
-              {user.id}
-            </p>
-          </div>
+          <p className="text-white font-bold text-lg leading-tight text-center break-words px-2">
+            {user.name}
+          </p>
         </div>
 
         {/* Identity fields */}
