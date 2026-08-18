@@ -1805,6 +1805,7 @@ export default function App() {
             profileId={route.split('/')[2]?.toUpperCase() || undefined}
             currentUserId={session?.agentId}
             isAdmin={session?.role === 'ADMIN'}
+            onUpdateUserProfile={handleAdminUpdateUserProfile}
           />
         ) : route.startsWith('/payouts') ? (
           /* /payouts — the same desk the admin dashboard uses. Admins get the

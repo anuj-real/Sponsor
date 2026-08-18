@@ -166,18 +166,10 @@ export default function ProfileEdit({
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
-      {/* Company name heads the page */}
-      <div className="text-center px-2">
-        <h1 className="text-lg sm:text-2xl font-bold font-serif text-stone-900">
-          SBR <span className="text-emerald-800 font-normal">Sponsors</span>
-        </h1>
-        <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-stone-500 mt-1">
-          Edit Details
-        </p>
-        <p className="text-[10.5px] text-stone-500 mt-1.5">
-          {user.name} · <span className="font-mono">{user.id}</span>
-        </p>
-      </div>
+      {/* One line, nothing else — the fields below are the page. */}
+      <h1 className="text-base sm:text-xl font-bold font-serif text-stone-900 px-1">
+        Welcome, <span className="text-emerald-800">{user.name?.trim().split(/\s+/)[0] || user.name}</span>
+      </h1>
 
       {success && (
         <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-emerald-800 text-xs font-semibold flex items-center gap-2">
