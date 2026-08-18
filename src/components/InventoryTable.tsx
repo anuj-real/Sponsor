@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { RealEstateProject, User } from '../types';
-import { Search } from 'lucide-react';
+import { LayoutGrid, Layers, Search, Table2 } from 'lucide-react';
 
 /**
  * `/inventory` — every plot across every project as one filterable table.
@@ -14,6 +14,8 @@ interface InventoryTableProps {
 }
 
 type StatusFilter = 'ALL' | 'AVAILABLE' | 'HOLD' | 'BOOKED';
+/** Grid is the default: it reads better on a phone and matches the older view. */
+type ViewMode = 'GRID' | 'TABLE';
 
 /** Row separators live on cells: `border-separate` ignores borders on <tr>. */
 const CELL = 'px-2.5 py-2 whitespace-nowrap border-b border-stone-200';
@@ -31,6 +33,7 @@ export default function InventoryTable({ projects, users = [] }: InventoryTableP
   const [projectId, setProjectId] = useState<string>('ALL');
   const [status, setStatus] = useState<StatusFilter>('ALL');
   const [query, setQuery] = useState('');
+  const [view, setView] = useState<ViewMode>('GRID');
 
   /** Flattens project → size slab → unit into one row per plot. */
   const rows = useMemo(() => {
@@ -80,15 +83,60 @@ export default function InventoryTable({ projects, users = [] }: InventoryTableP
     BOOKED: inProject.filter(r => r.status === 'BOOKED').length,
   }), [inProject]);
 
+  /**
+   * The grid view groups the same filtered rows back into project → size slab,
+   * which is how the inventory read before it became a table.
+   */
+  const grouped = useMemo(() => {
+    const byProject = new Map<string, { name: string; location: string; slabs: Map<string, typeof filtered> }>();
+    filtered.forEach(row => {
+      let project = byProject.get(row.projectId);
+      if (!project) {
+        project = { name: row.projectName, location: row.location, slabs: new Map() };
+        byProject.set(row.projectId, project);
+      }
+      const slab = project.slabs.get(row.size) || [];
+      slab.push(row);
+      project.slabs.set(row.size, slab);
+    });
+    return Array.from(byProject.entries()).map(([id, p]) => ({
+      id,
+      name: p.name,
+      location: p.location,
+      slabs: Array.from(p.slabs.entries()).map(([size, units]) => ({ size, units })),
+    }));
+  }, [filtered]);
+
   return (
     <div className="space-y-3">
       {/* Filters */}
       <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-stone-200 bg-stone-50/60">
-          <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wide">Real Estate Inventory</h3>
-          <p className="text-[10.5px] text-stone-500 mt-0.5">
-            Live plot status · scroll sideways for all columns
-          </p>
+        <div className="p-3 sm:p-4 border-b border-stone-200 bg-stone-50/60 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-bold text-stone-900 text-sm uppercase tracking-wide">Real Estate Inventory</h3>
+            <p className="text-[10.5px] text-stone-500 mt-0.5">Live plot status by project</p>
+          </div>
+
+          {/* Minimal view toggle: grouped plots (default) vs the flat table */}
+          <div className="flex gap-0.5 p-0.5 bg-stone-100 border border-stone-200 rounded-lg shrink-0">
+            {([
+              { key: 'GRID' as const, label: 'Grid', icon: LayoutGrid },
+              { key: 'TABLE' as const, label: 'Table', icon: Table2 },
+            ]).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                aria-pressed={view === key}
+                title={`${label} view`}
+                className={`p-1.5 rounded cursor-pointer transition-all ${
+                  view === key ? 'bg-white text-emerald-800 shadow-xs' : 'text-stone-500 hover:text-stone-900'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="p-3 space-y-2">
@@ -148,7 +196,54 @@ export default function InventoryTable({ projects, users = [] }: InventoryTableP
         </div>
       </div>
 
-      {/* Grid */}
+      {/* Grouped plot view — project → size slab → unit chips */}
+      {view === 'GRID' && (
+        <div className="bg-white border border-stone-200 rounded-2xl shadow-xs p-3 space-y-3">
+          {grouped.length === 0 ? (
+            <p className="py-10 text-center text-stone-500 text-xs font-medium">
+              {rows.length === 0 ? 'No inventory has been added yet.' : 'No plots match these filters.'}
+            </p>
+          ) : (
+            grouped.map(project => (
+              <div key={project.id} className="border border-stone-200 bg-stone-50/50 rounded-xl p-3 space-y-3">
+                <div className="flex justify-between items-baseline gap-2 border-b border-stone-200 pb-1.5">
+                  <h4 className="font-bold text-stone-900 text-xs truncate">{project.name}</h4>
+                  <span className="text-[10px] text-stone-500 font-semibold uppercase shrink-0 truncate">
+                    {project.location}
+                  </span>
+                </div>
+
+                {project.slabs.map(slab => (
+                  <div key={slab.size} className="space-y-1.5">
+                    <span className="text-[10.5px] font-bold text-stone-600 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-emerald-800 shrink-0" />
+                      {slab.size}
+                      <span className="font-normal text-stone-500">({slab.units.length})</span>
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {slab.units.map(u => (
+                        <span
+                          key={u.key}
+                          title={u.buyerName ? `${u.unitNumber} · ${u.buyerName}` : u.unitNumber}
+                          className={`px-2 py-1 rounded text-[10px] font-bold font-mono border flex flex-col items-center select-none ${statusChip(u.status)}`}
+                        >
+                          <span>{u.unitNumber}</span>
+                          <span className="text-[8px] opacity-80 mt-0.5 lowercase font-sans max-w-[70px] truncate">
+                            {u.status === 'BOOKED' ? u.buyerName || 'booked' : u.status.toLowerCase()}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Flat table view */}
+      {view === 'TABLE' && (
       <div className="bg-white border border-stone-200 rounded-2xl shadow-xs overflow-hidden">
         <div className="relative isolate overflow-auto max-h-[64vh] custom-scrollbar">
           <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
@@ -198,9 +293,11 @@ export default function InventoryTable({ projects, users = [] }: InventoryTableP
           </table>
         </div>
       </div>
+      )}
 
       <p className="text-[10px] text-stone-500 px-1">
-        Showing {filtered.length} of {rows.length} plots. Unit column stays pinned while you scroll sideways.
+        Showing {filtered.length} of {rows.length} plots
+        {view === 'TABLE' && ' · unit column stays pinned while you scroll sideways'}.
       </p>
     </div>
   );

@@ -190,7 +190,8 @@ export default function App() {
    * Focused pages are deliberately chrome-free: no workspace toggle and no page
    * footer, so the one thing the page is about is the only thing on screen.
    */
-  const isFocusedRoute = route.startsWith('/profile') || route.startsWith('/team');
+  const isFocusedRoute =
+    route.startsWith('/profile') || route.startsWith('/team') || route.startsWith('/inventory');
 
   /**
    * Who the team chart covers: the signed-in user and their downline only, so
@@ -1612,30 +1613,10 @@ export default function App() {
             </h1>
           </div>
 
-          {/* Right: workspace switch (desktop) + theme switch */}
+          {/* Right: theme switch. The Owner/Partner workspace switch used to sit
+              here (and on its own mobile row); it now lives only in the nav
+              drawer, so no view carries it in the header. */}
           <div className="flex-1 flex justify-end items-center gap-2">
-            {session?.role === 'ADMIN' && !isFocusedRoute && (
-              <div className="hidden md:flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs shrink-0">
-                <button
-                  onClick={() => setActiveRole('ADMIN')}
-                  title="Owner / Admin workspace"
-                  className={`px-2 py-1 rounded text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    activeRole === 'ADMIN' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  👑 <span className="hidden lg:inline">Owner/Admin</span>
-                </button>
-                <button
-                  onClick={() => setActiveRole('AGENT')}
-                  title="Channel Partner workspace"
-                  className={`px-2 py-1 rounded text-[10.5px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    activeRole === 'AGENT' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  💼 <span className="hidden lg:inline">Partner Panel</span>
-                </button>
-              </div>
-            )}
             <button
               onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
@@ -1647,31 +1628,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile workspace switch — its own slim row so the centred brand row
-            stays uncrowded on small screens. Admin sessions only, and hidden on
-            the profile pages to keep them chrome-free. */}
-        {session?.role === 'ADMIN' && !isFocusedRoute && (
-          <div className="md:hidden px-3 pb-2">
-            <div className="flex p-0.5 bg-stone-100 border border-stone-200 rounded-lg shadow-xs">
-              <button
-                onClick={() => setActiveRole('ADMIN')}
-                className={`flex-1 px-2 py-1.5 rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeRole === 'ADMIN' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500'
-                }`}
-              >
-                👑 Owner/Admin
-              </button>
-              <button
-                onClick={() => setActiveRole('AGENT')}
-                className={`flex-1 px-2 py-1.5 rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  activeRole === 'AGENT' ? 'bg-emerald-800 text-white shadow-xs' : 'text-stone-500'
-                }`}
-              >
-                💼 Partner Panel
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
       {/*
@@ -1849,12 +1805,6 @@ export default function App() {
         ) : route.startsWith('/inventory') ? (
           /* /inventory — every plot, filterable by project. */
           <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
             <InventoryTable projects={projects} users={users} />
           </div>
         ) : route.startsWith('/payouts') ? (
@@ -1862,12 +1812,6 @@ export default function App() {
              full auditable list with sanction/dispatch; channel partners get
              their own payouts, read-only (no handlers passed). */
           <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
             {session?.role === 'ADMIN' ? (
               <PayoutsDesk
                 payouts={payouts}
@@ -1884,12 +1828,6 @@ export default function App() {
           /* /sales-report — dense, mobile-first table of the sales ledger.
              Admins see every booking; a channel partner sees only their own. */
           <div className="space-y-4">
-            <button
-              onClick={() => navigateTo('/')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-            >
-              ← Back to dashboard
-            </button>
             <SalesReport
               users={users}
               sales={
