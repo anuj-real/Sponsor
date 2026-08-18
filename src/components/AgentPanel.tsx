@@ -59,16 +59,9 @@ export default function AgentPanel({
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // Open the section the header nav points at (the tree lives on the LEDGER tab).
-  useEffect(() => {
-    if (!navFocus) return;
-    if (navFocus === 'TEAM') {
-      setActivePanelTab('LEDGER');
-    } else if (navFocus === 'INVENTORY') {
-      setActivePanelTab('INVENTORY');
-    }
-    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
-  }, [navFocus]);
+  // Every nav entry that used to steer this panel is a route now — profile,
+  // payouts, team, inventory and the sales report all render their own page —
+  // so there is nothing left for navFocus to reveal here.
 
   // Campaign date status checker logic
   const now = new Date();

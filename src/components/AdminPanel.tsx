@@ -135,11 +135,10 @@ export default function AdminPanel({
   // Reveal the sub-tab that owns the section the header nav is pointing at.
   React.useEffect(() => {
     if (!navFocus) return;
-    // USER_DETAIL/EDIT_DETAIL (→ /profile) and PAYOUTS (→ /payouts) are routes now.
-    if (navFocus === 'TEAM' || navFocus === 'SPONSOR_CODE') {
+    // Everything else (profile, payouts, team, inventory, sales report) is a
+    // route now and renders its own page, so only the sponsor code is left.
+    if (navFocus === 'SPONSOR_CODE') {
       setActiveSubTab('AGENTS');
-    } else if (navFocus === 'INVENTORY') {
-      setActiveSubTab('BOOKINGS');
     }
   }, [navFocus]);
 

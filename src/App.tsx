@@ -60,7 +60,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'PROFILE', label: 'Profile', icon: IdCard, route: '/profile' },
   // Team gets its own page — the chart alone, no dashboard chrome around it.
   { key: 'TEAM', label: 'Team', icon: Users, route: '/team' },
-  { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, anchor: 'sbr-inventory-section' },
+  // Inventory is its own page: the plot table with a project filter on top.
+  { key: 'INVENTORY', label: 'Plot Inventory', icon: Layers, route: '/inventory' },
   // Payouts is a dedicated page (PayoutsDesk) rather than a dashboard scroll —
   // same reasoning as /profile: the dashboard is too long on mobile.
   { key: 'PAYOUTS', label: 'Payouts', icon: Wallet, route: '/payouts' },
@@ -84,6 +85,7 @@ import AgentPanel from './components/AgentPanel';
 import LoginScreen from './components/LoginScreen';
 import PayoutsDesk from './components/PayoutsDesk';
 import SalesReport from './components/SalesReport';
+import InventoryTable from './components/InventoryTable';
 import ProfileIdCard from './components/ProfileIdCard';
 import ProfilePage from './components/ProfilePage';
 import ProfileEdit from './components/ProfileEdit';
@@ -165,6 +167,7 @@ export default function App() {
         : next.startsWith('/payouts') ? 'PAYOUTS'
         : next.startsWith('/sales-report') ? 'SALES_REPORT'
         : next.startsWith('/team') ? 'TEAM'
+        : next.startsWith('/inventory') ? 'INVENTORY'
         : 'HOME'
       );
     };
@@ -1843,6 +1846,17 @@ export default function App() {
         ) : route.startsWith('/team') ? (
           /* /team — the team structure chart on its own, nothing else. */
           <TreeVisualizer users={teamUsers} />
+        ) : route.startsWith('/inventory') ? (
+          /* /inventory — every plot, filterable by project. */
+          <div className="space-y-4">
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+            >
+              ← Back to dashboard
+            </button>
+            <InventoryTable projects={projects} users={users} />
+          </div>
         ) : route.startsWith('/payouts') ? (
           /* /payouts — the same desk the admin dashboard uses. Admins get the
              full auditable list with sanction/dispatch; channel partners get
