@@ -14,9 +14,6 @@ import { User } from '../types';
  */
 interface TreeVisualizerProps {
   users?: User[];
-  onSelectUser?: (userId: string) => void;
-  selectedUserId?: string | null;
-  hideUpline?: boolean;
 }
 
 interface TeamNode {
@@ -117,8 +114,10 @@ function MemberCard({ node, isRoot }: { node: TeamNode; isRoot: boolean }) {
       </span>
 
       <div className="mt-1 flex justify-center gap-2 border-t border-stone-200 pt-0.5 font-mono text-[9px] leading-tight text-stone-600">
-        <span><span className="text-stone-400">D</span> {node.directCount}</span>
-        <span><span className="text-stone-400">T</span> {node.teamSize}</span>
+        {/* stone-500, not -400: at this size stone-400 is ~2.4:1 on white and
+            fails in dark mode too, which made D and T easy to confuse. */}
+        <span><span className="text-stone-500">D</span> {node.directCount}</span>
+        <span><span className="text-stone-500">T</span> {node.teamSize}</span>
       </div>
     </div>
   );
@@ -201,8 +200,8 @@ function TreeBranch({
 function Detail({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 min-w-0">
-      <span className="block text-[8.5px] font-bold uppercase tracking-wider text-stone-400">{label}</span>
-      <span className={`block text-[11.5px] font-semibold truncate ${muted ? 'text-stone-400 italic' : 'text-stone-900'}`}>
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-500">{label}</span>
+      <span className={`block text-[11.5px] font-semibold truncate ${muted ? 'text-stone-500 italic' : 'text-stone-900'}`}>
         {value}
       </span>
     </div>
@@ -282,7 +281,7 @@ export default function TreeVisualizer({ users = [] }: TreeVisualizerProps) {
 
       <div ref={scrollRef} className="max-h-[52vh] overflow-auto p-3 bg-stone-50/60">
         {roots.length === 0 ? (
-          <p className="py-8 text-center text-[11px] text-stone-400">
+          <p className="py-8 text-center text-[11px] text-stone-500">
             No sponsor records available yet.
           </p>
         ) : (
